@@ -17,7 +17,19 @@ export function maintenanceClient(token?: string) {
   });
 }
 
+// Cache curto do status (sem mídia) para não consultar o banco a cada requisição.
+let statusCache: { at: number; value: Awaited<ReturnType<typeof loadMaintenance>> } | null = null;
+const STATUS_TTL_MS = 10_000;
+
 export async function readMaintenance(resolveMedia = true) {
+  if (resolveMedia) return loadMaintenance(true);
+  if (statusCache && Date.now() - statusCache.at < STATUS_TTL_MS) return statusCache.value;
+  const value = await loadMaintenance(false);
+  statusCache = { at: Date.now(), value };
+  return value;
+}
+
+async function loadMaintenance(resolveMedia: boolean) {
   const client = maintenanceClient();
   const { data, error } = await client.from("maintenance_settings").select("*").eq("id", 1).maybeSingle();
   if (error) throw new Error("Não foi possível verificar a manutenção.");
