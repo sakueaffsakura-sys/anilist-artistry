@@ -467,7 +467,7 @@ function Perfil() {
                   style={p.comment_bg ? { background: p.comment_bg } : undefined}
                 >
                   <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 text-sm font-bold">
-                    {c.author?.avatar_url ? <img src={c.author.avatar_url} alt="" className="h-full w-full object-cover" /> : (c.author?.username ?? "?")[0]?.toUpperCase()}
+                    {c.author?.avatar_url ? <img loading="lazy" decoding="async" src={c.author.avatar_url} alt="" className="h-full w-full object-cover" /> : (c.author?.username ?? "?")[0]?.toUpperCase()}
                   </span>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
@@ -811,7 +811,7 @@ function EditProfile({
                   <div className="grid grid-cols-3 gap-2 border-t border-border pt-4 sm:grid-cols-4">
                     {[{ id: "none", name: "Sem moldura", image_url: "" }, ...(frames ?? [])].map((frame) => (
                       <Button key={frame.id} variant="ghost" className={`h-auto min-h-24 flex-col gap-1 border p-2 ${form.avatar_frame === frame.image_url || (!form.avatar_frame && !frame.image_url) ? "border-primary bg-primary/10" : "border-border"}`} onClick={() => setForm({ ...form, avatar_frame: frame.image_url })}>
-                        {frame.image_url ? <img src={frame.image_url} alt="" className="h-14 w-14 object-contain" /> : <span className="h-12 w-12 rounded-full border-2 border-dashed border-border" />}
+                        {frame.image_url ? <img loading="lazy" decoding="async" src={frame.image_url} alt="" className="h-14 w-14 object-contain" /> : <span className="h-12 w-12 rounded-full border-2 border-dashed border-border" />}
                         <span className="line-clamp-1 max-w-full text-[10px]">{frame.name}</span>
                       </Button>
                     ))}

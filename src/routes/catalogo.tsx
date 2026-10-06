@@ -154,7 +154,7 @@ function Pesquisar() {
                 className="flex items-center gap-3 rounded-xl border border-border bg-surface p-4 hover:border-primary/60"
               >
                 <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-surface-2">
-                  {u.avatar_url ? <img src={u.avatar_url} alt="" className="h-full w-full object-cover" /> : <User2 className="h-5 w-5" />}
+                  {u.avatar_url ? <img loading="lazy" decoding="async" src={u.avatar_url} alt="" className="h-full w-full object-cover" /> : <User2 className="h-5 w-5" />}
                 </span>
                 <span>
                   <span className="block font-bold">@{u.username}</span>
@@ -225,7 +225,7 @@ function Pesquisar() {
                 {(results.data?.rows ?? []).map((r) => (
                   <Link key={r.id} to="/obra/$slug" params={{ slug: r.slug }} className="group">
                     <div className="relative overflow-hidden rounded-xl border border-border">
-                      <img src={coverUrl(r.cover_url)} alt={r.title} className="aspect-[2/3] w-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
+                      <img loading="lazy" decoding="async" src={coverUrl(r.cover_url)} alt={r.title} className="aspect-[2/3] w-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
                       <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
                         <span className="flex items-center gap-1 rounded-md bg-background/85 px-2 py-0.5 text-[11px] font-bold">
                           <BookOpen className="h-3 w-3" /> {r.chapters.length} Capítulos

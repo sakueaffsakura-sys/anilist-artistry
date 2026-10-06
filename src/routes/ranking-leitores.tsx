@@ -49,7 +49,7 @@ function LevelBadge({ level }: { level: number }) {
 function Avatar({ reader, className }: { reader: Reader; className: string }) {
   return (
     <span className={`grid place-items-center overflow-hidden rounded-full bg-surface-2 font-medium text-primary ${className}`}>
-      {reader.avatar_url ? <img src={reader.avatar_url} alt={reader.username} className="h-full w-full object-cover" /> : reader.username.slice(0, 2).toUpperCase()}
+      {reader.avatar_url ? <img loading="lazy" decoding="async" src={reader.avatar_url} alt={reader.username} className="h-full w-full object-cover" /> : reader.username.slice(0, 2).toUpperCase()}
     </span>
   );
 }
