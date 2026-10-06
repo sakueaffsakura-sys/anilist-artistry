@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, EyeOff, GalleryHorizontal, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { ChevronDown, Eye, EyeOff, GalleryHorizontal, KeyRound, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/AdminShell";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
@@ -9,7 +10,78 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { coverUrl, timeAgo } from "@/lib/media";
+import { getMediaSettings, saveMediaSettings } from "@/lib/media.functions";
 import { useRoles, useSession } from "@/hooks/useAuth";
+
+function CloudinaryKeys() {
+  const getS = useServerFn(getMediaSettings);
+  const saveS = useServerFn(saveMediaSettings);
+  const [open, setOpen] = useState(false);
+  const [cfg, setCfg] = useState({ cloud_name: "", api_key: "", api_secret: "", folder: "bettermanga" });
+  const [hasSecret, setHasSecret] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    getS()
+      .then((s) => {
+        setCfg((c) => ({ ...c, cloud_name: s.cloud_name, api_key: s.api_key, folder: s.folder }));
+        setHasSecret(s.hasSecret);
+      })
+      .catch(() => {});
+  }, [getS]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await saveS({ data: cfg });
+      if (cfg.api_secret) setHasSecret(true);
+      setCfg((c) => ({ ...c, api_secret: "" }));
+      toast.success("Chaves do Cloudinary salvas.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao salvar.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mb-5 rounded-2xl border border-border bg-surface">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-3 p-4 text-left"
+      >
+        <span className="flex items-center gap-2 font-semibold">
+          <KeyRound className="h-4 w-4 text-primary" /> Chaves do Cloudinary
+          {hasSecret ? (
+            <span className="rounded-full bg-primary/15 px-2 py-px text-[10px] font-bold text-primary">Configurado</span>
+          ) : null}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open ? (
+        <div className="grid gap-2 border-t border-border p-4 sm:grid-cols-2">
+          <Input placeholder="Cloud name" value={cfg.cloud_name} onChange={(e) => setCfg({ ...cfg, cloud_name: e.target.value })} />
+          <Input placeholder="API Key" value={cfg.api_key} onChange={(e) => setCfg({ ...cfg, api_key: e.target.value })} />
+          <Input
+            type="password"
+            placeholder={hasSecret ? "API Secret (salvo — preencha só para trocar)" : "API Secret"}
+            value={cfg.api_secret}
+            onChange={(e) => setCfg({ ...cfg, api_secret: e.target.value })}
+          />
+          <Input placeholder="Pasta" value={cfg.folder} onChange={(e) => setCfg({ ...cfg, folder: e.target.value })} />
+          <div className="flex items-center gap-3 sm:col-span-2">
+            <Button onClick={save} disabled={saving} className="font-semibold">
+              {saving ? "Salvando…" : "Salvar chaves"}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Encontre em console.cloudinary.com → Settings → API Keys. O secret fica guardado só no servidor.
+            </p>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/_authenticated/admin/obras")({
   staticData: { sitemap: false },
@@ -102,6 +174,7 @@ function ObrasAdmin() {
         </Button>
       }
     >
+      {isAdmin ? <CloudinaryKeys /> : null}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-56 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
