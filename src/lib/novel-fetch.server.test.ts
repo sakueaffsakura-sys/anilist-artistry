@@ -1,3 +1,4 @@
+/// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
 import { fetchNovelHtml } from "./novel-fetch.server";
 import { validateNovelImportUrl } from "./novel-import-policy";
