@@ -2,6 +2,20 @@ import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/r
 
 import { renderErrorPage } from "./lib/error-page";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+import { MAINTENANCE_PUBLIC_FUNCTIONS, maintenanceExemptPath } from "@/lib/maintenance-policy";
+import { getCookie } from "@tanstack/react-start/server";
+
+const maintenanceMiddleware = createMiddleware().server(async ({ next, request, pathname, handlerType, serverFnMeta }) => {
+  if (handlerType === "serverFn" && MAINTENANCE_PUBLIC_FUNCTIONS.includes(serverFnMeta?.name ?? "")) return next();
+  if (handlerType === "router" && maintenanceExemptPath(pathname)) return next();
+  const { readMaintenance, verifiedMaintenanceAdmin } = await import("./lib/maintenance.server");
+  const settings = await readMaintenance();
+  if (!settings.enabled) return next();
+  const token = request.headers.get("authorization")?.replace(/^Bearer /, "") || getCookie("bm-maintenance-session");
+  if (await verifiedMaintenanceAdmin(token)) return next();
+  if (handlerType === "serverFn" || pathname.startsWith("/api/")) return new Response("Site em manutenção.", { status: 503, headers: { "Retry-After": "300", "Cache-Control": "no-store" } });
+  return new Response(null, { status: 302, headers: { Location: "/manutencao", "Cache-Control": "no-store" } });
+});
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
@@ -27,5 +41,5 @@ const csrfMiddleware = createCsrfMiddleware({
 
 export const startInstance = createStart(() => ({
   functionMiddleware: [attachSupabaseAuth],
-  requestMiddleware: [errorMiddleware, csrfMiddleware],
+  requestMiddleware: [errorMiddleware, csrfMiddleware, maintenanceMiddleware],
 }));

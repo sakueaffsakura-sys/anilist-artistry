@@ -6,6 +6,7 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  useRouterState,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
@@ -125,6 +126,7 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
+  const maintenancePage = useRouterState({ select: (s) => s.location.pathname === "/manutencao" });
 
   useEffect(() => {
     // Só recarrega dados quando a conta realmente muda (evita recarregar tudo
@@ -146,7 +148,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <Outlet />
       <Toaster position="top-center" />
-      <SupportChat />
+      {maintenancePage ? null : <SupportChat />}
     </QueryClientProvider>
   );
 }
