@@ -9,7 +9,9 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "build:cpanel": "CPANEL_BUILD=1 vite build",
+    "start:cpanel": "node app.cjs"
   },
   "overrides": {
     "rolldown": "1.2.1"
