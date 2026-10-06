@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ExternalLink, FileImage, Link2, Pencil, Save, Trash2, Upload, X } from "lucide-react";
+import { ArrowLeft, Cloud, ExternalLink, FileImage, Link2, Pencil, Save, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/AdminShell";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
