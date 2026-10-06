@@ -29,6 +29,8 @@ export const Route = createFileRoute("/_authenticated/admin/$id")({
       { name: "description", content: "Edite a obra, envie páginas e gerencie os capítulos." },
       { property: "og:title", content: "Editar obra — Better Mangá" },
       { property: "og:description", content: "Gestão de obra e capítulos." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: SeriesEditor,
@@ -52,12 +54,12 @@ async function uploadFiles(seriesId: string, chapterNumber: string, files: File[
   return out;
 }
 
-function DropZone({ files, setFiles }: { files: File[]; setFiles: (f: File[]) => void }) {
+function DropZone({ files, setFiles, disabled = false }: { files: File[]; setFiles: (f: File[]) => void; disabled?: boolean }) {
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const handle = async (list: File[]) => {
-    if (!list.length) return;
+    if (!list.length || disabled || busy) return;
     setBusy(true);
     setProgress(null);
     try {
@@ -114,7 +116,7 @@ function DropZone({ files, setFiles }: { files: File[]; setFiles: (f: File[]) =>
         accept="image/*,.zip,application/zip,application/x-zip-compressed,.pdf,application/pdf"
         multiple
         className="hidden"
-        disabled={busy}
+        disabled={busy || disabled}
         onChange={(e) => {
           void handle(Array.from(e.target.files ?? []));
           e.target.value = "";
@@ -348,12 +350,14 @@ function ChaptersPanel({ seriesId, chapters, onChange, isAdmin }: { seriesId: st
   const [cloudProgress, setCloudProgress] = useState<{ done: number; total: number } | null>(null);
 
   const saveCloud = async () => {
+    if (cloudBusy || !isAdmin) return;
     if (!files.length) {
       toast.error("Selecione as imagens primeiro (arraste no campo acima).");
       return;
     }
     setCloudBusy(true);
     setCloudProgress({ done: 0, total: files.length });
+    const completed = new Set<File>();
     try {
       const sig = await signC();
       const ordered = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
@@ -369,17 +373,15 @@ function ChaptersPanel({ seriesId, chapters, onChange, isAdmin }: { seriesId: st
         const json = await res.json().catch(() => null);
         if (!res.ok || !json?.secure_url) throw new Error(json?.error?.message ?? "Falha no upload ao Cloudinary.");
         links.push(json.secure_url as string);
+        completed.add(ordered[i]);
+        setUrls((prev) => [...new Set([...prev.split("\n").map((line) => line.trim()).filter(Boolean), json.secure_url as string])].join("\n"));
         setCloudProgress({ done: i + 1, total: ordered.length });
       }
-      setUrls((prev) => {
-        const existing = new Set(prev.split("\n").map((l) => l.trim()).filter(Boolean));
-        const added = links.filter((l) => !existing.has(l));
-        return [...(prev.trim() ? prev.trim().replace(/\n+$/, "") + "\n" : ""), ...added].join("\n");
-      });
       toast.success(`${links.length} link(s) do Cloudinary adicionado(s).`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não foi possível guardar no Cloudinary.");
     } finally {
+      setFiles((pending) => pending.filter((file) => !completed.has(file)));
       setCloudBusy(false);
       setCloudProgress(null);
     }
@@ -437,6 +439,7 @@ function ChaptersPanel({ seriesId, chapters, onChange, isAdmin }: { seriesId: st
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          if (cloudBusy || publish.isPending) return;
           publish.mutate();
         }}
         className="h-fit space-y-4 rounded-2xl border border-border bg-surface p-5"
@@ -454,12 +457,26 @@ function ChaptersPanel({ seriesId, chapters, onChange, isAdmin }: { seriesId: st
             <Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-background" />
           </div>
         </div>
-        <DropZone files={files} setFiles={setFiles} />
+        <DropZone files={files} setFiles={setFiles} disabled={cloudBusy || publish.isPending} />
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!isAdmin || !files.length || cloudBusy || publish.isPending}
+          onClick={() => void saveCloud()}
+          title={!isAdmin ? "Somente administradores podem enviar ao Cloudinary" : undefined}
+          className="w-full whitespace-normal font-semibold"
+        >
+          <Cloud className="mr-2 h-4 w-4 shrink-0" />
+          {cloudBusy ? `Guardando… ${cloudProgress?.done ?? 0}/${cloudProgress?.total ?? 0}` : "Guardar imagens no Cloudinary"}
+        </Button>
+        {cloudBusy && cloudProgress ? (
+          <progress className="h-2 w-full accent-primary" value={cloudProgress.done} max={cloudProgress.total} aria-label="Envio ao Cloudinary" />
+        ) : null}
         <div className="space-y-1.5">
           <Label className="flex items-center gap-1.5"><Link2 className="h-3.5 w-3.5" /> Ou links das páginas (um por linha)</Label>
-          <Textarea value={urls} onChange={(e) => setUrls(e.target.value)} className="min-h-24 bg-background font-mono text-xs" placeholder={"https://…/01.jpg\nhttps://…/02.jpg"} />
+          <Textarea value={urls} disabled={cloudBusy || publish.isPending} onChange={(e) => setUrls(e.target.value)} className="min-h-24 bg-background font-mono text-xs" placeholder={"https://…/01.jpg\nhttps://…/02.jpg"} />
         </div>
-        <Button type="submit" disabled={publish.isPending || !number.trim()} className="w-full font-semibold">
+        <Button type="submit" disabled={cloudBusy || publish.isPending || !number.trim()} className="w-full font-semibold">
           {publish.isPending ? "Enviando…" : "Publicar capítulo"}
         </Button>
       </form>
