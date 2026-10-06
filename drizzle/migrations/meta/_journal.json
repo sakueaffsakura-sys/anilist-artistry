@@ -211,6 +211,13 @@
       "when": 1791251954709,
       "tag": "0029_cloudinary_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791313082182,
+      "tag": "0030_maintenance_settings",
+      "breakpoints": true
     }
   ]
 }

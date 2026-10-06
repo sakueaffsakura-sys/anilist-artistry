@@ -337,6 +337,36 @@ export type Database = {
         }
         Relationships: []
       }
+      maintenance_settings: {
+        Row: {
+          enabled: boolean
+          id: number
+          media_kind: string
+          media_path: string
+          message: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          enabled?: boolean
+          id?: number
+          media_kind?: string
+          media_path?: string
+          message?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          enabled?: boolean
+          id?: number
+          media_kind?: string
+          media_path?: string
+          message?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       media_settings: {
         Row: {
           api_key: string | null
