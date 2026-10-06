@@ -7,6 +7,7 @@ import {
   HeadContent,
   Scripts,
   useRouterState,
+  redirect,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
@@ -15,6 +16,8 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { SupportChat } from "@/components/SupportChat";
 import { supabase } from "@/integrations/supabase/client";
+import { getMaintenanceStatus, verifyMaintenanceAdmin } from "@/lib/maintenance.functions";
+import { maintenanceExemptPath } from "@/lib/maintenance-policy";
 
 function NotFoundComponent() {
   return (
@@ -78,6 +81,13 @@ function ErrorComponent({ error, reset }: import("@tanstack/react-router").Error
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   staticData: { sitemap: false },
+  beforeLoad: async ({ location }) => {
+    if (typeof window === "undefined" || maintenanceExemptPath(location.pathname)) return;
+    const status = await getMaintenanceStatus();
+    if (!status.enabled) return;
+    const access = await verifyMaintenanceAdmin();
+    if (!access.isAdmin) throw redirect({ to: "/manutencao" });
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
