@@ -337,12 +337,53 @@ function InfoForm({ obra, onSaved }: { obra: Obra; onSaved: () => void }) {
   );
 }
 
-function ChaptersPanel({ seriesId, chapters, onChange }: { seriesId: string; chapters: Chapter[]; onChange: () => void }) {
+function ChaptersPanel({ seriesId, chapters, onChange, isAdmin }: { seriesId: string; chapters: Chapter[]; onChange: () => void; isAdmin: boolean }) {
+  const signC = useServerFn(signCloudinaryUpload);
   const [number, setNumber] = useState("");
   const [title, setTitle] = useState("");
   const [urls, setUrls] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [editing, setEditing] = useState<Chapter | null>(null);
+  const [cloudBusy, setCloudBusy] = useState(false);
+  const [cloudProgress, setCloudProgress] = useState<{ done: number; total: number } | null>(null);
+
+  const saveCloud = async () => {
+    if (!files.length) {
+      toast.error("Selecione as imagens primeiro (arraste no campo acima).");
+      return;
+    }
+    setCloudBusy(true);
+    setCloudProgress({ done: 0, total: files.length });
+    try {
+      const sig = await signC();
+      const ordered = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+      const links: string[] = [];
+      for (let i = 0; i < ordered.length; i++) {
+        const fd = new FormData();
+        fd.append("file", ordered[i]);
+        fd.append("api_key", sig.api_key);
+        fd.append("timestamp", String(sig.timestamp));
+        fd.append("folder", sig.folder);
+        fd.append("signature", sig.signature);
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloud_name}/image/upload`, { method: "POST", body: fd });
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.secure_url) throw new Error(json?.error?.message ?? "Falha no upload ao Cloudinary.");
+        links.push(json.secure_url as string);
+        setCloudProgress({ done: i + 1, total: ordered.length });
+      }
+      setUrls((prev) => {
+        const existing = new Set(prev.split("\n").map((l) => l.trim()).filter(Boolean));
+        const added = links.filter((l) => !existing.has(l));
+        return [...(prev.trim() ? prev.trim().replace(/\n+$/, "") + "\n" : ""), ...added].join("\n");
+      });
+      toast.success(`${links.length} link(s) do Cloudinary adicionado(s).`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível guardar no Cloudinary.");
+    } finally {
+      setCloudBusy(false);
+      setCloudProgress(null);
+    }
+  };
 
   const publish = useMutation({
     mutationFn: async () => {
