@@ -824,6 +824,7 @@ export type Database = {
         Args: { _series_id: string }
         Returns: undefined
       }
+      maintenance_access_allowed: { Args: never; Returns: boolean }
       obra_ranking: {
         Args: { _metric: string }
         Returns: {

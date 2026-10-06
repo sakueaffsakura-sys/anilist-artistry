@@ -218,6 +218,13 @@
       "when": 1791313082182,
       "tag": "0030_maintenance_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791313108438,
+      "tag": "0031_maintenance_content_gate",
+      "breakpoints": true
     }
   ]
 }

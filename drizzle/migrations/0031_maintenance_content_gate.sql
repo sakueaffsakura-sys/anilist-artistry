@@ -1,0 +1,4 @@
+CREATE FUNCTION public.maintenance_access_allowed() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$ SELECT NOT EXISTS (SELECT 1 FROM public.maintenance_settings WHERE id = 1 AND enabled) OR public.has_role(auth.uid(), 'admin'); $$;
+REVOKE ALL ON FUNCTION public.maintenance_access_allowed() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.maintenance_access_allowed() TO anon, authenticated, service_role;
+DO $$ DECLARE t record; BEGIN FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename NOT IN ('maintenance_settings', 'user_roles', 'media_settings') LOOP EXECUTE format('CREATE POLICY maintenance_restriction ON public.%I AS RESTRICTIVE FOR ALL TO anon, authenticated USING (public.maintenance_access_allowed()) WITH CHECK (public.maintenance_access_allowed())', t.tablename); END LOOP; END $$;
