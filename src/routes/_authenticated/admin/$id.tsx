@@ -360,7 +360,7 @@ function ChaptersPanel({ seriesId, chapters, onChange, isAdmin }: { seriesId: st
       const links: string[] = [];
       for (let i = 0; i < ordered.length; i++) {
         const fd = new FormData();
-        fd.append("file", ordered[i]);
+        fd.append("file", ordered[i] as Blob);
         fd.append("api_key", sig.api_key);
         fd.append("timestamp", String(sig.timestamp));
         fd.append("folder", sig.folder);
