@@ -17,7 +17,6 @@ const NAV = [
   { to: "/admin/contas", label: "Contas", icon: Users, exact: true, adminOnly: true },
   { to: "/admin/molduras", label: "Molduras", icon: Frame, exact: true, adminOnly: true },
   { to: "/admin/selos", label: "Selos", icon: Award, exact: true, adminOnly: true },
-  { to: "/admin/imagens", label: "Imagens", icon: ImageIcon, exact: true, adminOnly: true },
   { to: "/admin/suporte", label: "Suporte", icon: Headset, exact: true, adminOnly: true },
 ] as const;
 
