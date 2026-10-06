@@ -362,9 +362,9 @@ function ChaptersPanel({ seriesId, chapters, onChange, isAdmin }: { seriesId: st
       const sig = await signC();
       const ordered = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
       const links: string[] = [];
-      for (let i = 0; i < ordered.length; i++) {
+      for (const [i, file] of ordered.entries()) {
         const fd = new FormData();
-        fd.append("file", ordered[i] as Blob);
+        fd.append("file", file);
         fd.append("api_key", sig.api_key);
         fd.append("timestamp", String(sig.timestamp));
         fd.append("folder", sig.folder);
@@ -373,7 +373,7 @@ function ChaptersPanel({ seriesId, chapters, onChange, isAdmin }: { seriesId: st
         const json = await res.json().catch(() => null);
         if (!res.ok || !json?.secure_url) throw new Error(json?.error?.message ?? "Falha no upload ao Cloudinary.");
         links.push(json.secure_url as string);
-        completed.add(ordered[i]);
+        completed.add(file);
         setUrls((prev) => [...new Set([...prev.split("\n").map((line) => line.trim()).filter(Boolean), json.secure_url as string])].join("\n"));
         setCloudProgress({ done: i + 1, total: ordered.length });
       }
