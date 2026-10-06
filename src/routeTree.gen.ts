@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CatalogoRouteImport } from './routes/catalogo'
+import { Route as ManutencaoRouteImport } from './routes/manutencao'
 import { Route as RankingRouteImport } from './routes/ranking'
 import { Route as RankingLeitoresRouteImport } from './routes/ranking-leitores'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
@@ -26,6 +27,7 @@ import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminIdRouteImport } from './routes/_authenticated/admin/$id'
 import { Route as AuthenticatedAdminContasRouteImport } from './routes/_authenticated/admin/contas'
 import { Route as AuthenticatedAdminImagensRouteImport } from './routes/_authenticated/admin/imagens'
+import { Route as AuthenticatedAdminManutencaoRouteImport } from './routes/_authenticated/admin/manutencao'
 import { Route as AuthenticatedAdminMoldurasRouteImport } from './routes/_authenticated/admin/molduras'
 import { Route as AuthenticatedAdminNovaRouteImport } from './routes/_authenticated/admin/nova'
 import { Route as AuthenticatedAdminNovelsRouteImport } from './routes/_authenticated/admin/novels'
@@ -52,6 +54,11 @@ const AuthRoute = AuthRouteImport.update({
 const CatalogoRoute = CatalogoRouteImport.update({
   id: '/catalogo',
   path: '/catalogo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ManutencaoRoute = ManutencaoRouteImport.update({
+  id: '/manutencao',
+  path: '/manutencao',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RankingRoute = RankingRouteImport.update({
@@ -121,6 +128,12 @@ const AuthenticatedAdminImagensRoute =
     path: '/admin/imagens',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminManutencaoRoute =
+  AuthenticatedAdminManutencaoRouteImport.update({
+    id: '/admin/manutencao',
+    path: '/admin/manutencao',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminMoldurasRoute =
   AuthenticatedAdminMoldurasRouteImport.update({
     id: '/admin/molduras',
@@ -169,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/catalogo': typeof CatalogoRoute
+  '/manutencao': typeof ManutencaoRoute
   '/ranking': typeof RankingRoute
   '/ranking-leitores': typeof RankingLeitoresRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -181,6 +195,7 @@ export interface FileRoutesByFullPath {
   '/admin/$id': typeof AuthenticatedAdminIdRoute
   '/admin/contas': typeof AuthenticatedAdminContasRoute
   '/admin/imagens': typeof AuthenticatedAdminImagensRoute
+  '/admin/manutencao': typeof AuthenticatedAdminManutencaoRoute
   '/admin/molduras': typeof AuthenticatedAdminMoldurasRoute
   '/admin/nova': typeof AuthenticatedAdminNovaRoute
   '/admin/novels': typeof AuthenticatedAdminNovelsRoute
@@ -195,6 +210,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/catalogo': typeof CatalogoRoute
+  '/manutencao': typeof ManutencaoRoute
   '/ranking': typeof RankingRoute
   '/ranking-leitores': typeof RankingLeitoresRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -207,6 +223,7 @@ export interface FileRoutesByTo {
   '/admin/$id': typeof AuthenticatedAdminIdRoute
   '/admin/contas': typeof AuthenticatedAdminContasRoute
   '/admin/imagens': typeof AuthenticatedAdminImagensRoute
+  '/admin/manutencao': typeof AuthenticatedAdminManutencaoRoute
   '/admin/molduras': typeof AuthenticatedAdminMoldurasRoute
   '/admin/nova': typeof AuthenticatedAdminNovaRoute
   '/admin/novels': typeof AuthenticatedAdminNovelsRoute
@@ -223,6 +240,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/catalogo': typeof CatalogoRoute
+  '/manutencao': typeof ManutencaoRoute
   '/ranking': typeof RankingRoute
   '/ranking-leitores': typeof RankingLeitoresRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -235,6 +253,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/$id': typeof AuthenticatedAdminIdRoute
   '/_authenticated/admin/contas': typeof AuthenticatedAdminContasRoute
   '/_authenticated/admin/imagens': typeof AuthenticatedAdminImagensRoute
+  '/_authenticated/admin/manutencao': typeof AuthenticatedAdminManutencaoRoute
   '/_authenticated/admin/molduras': typeof AuthenticatedAdminMoldurasRoute
   '/_authenticated/admin/nova': typeof AuthenticatedAdminNovaRoute
   '/_authenticated/admin/novels': typeof AuthenticatedAdminNovelsRoute
@@ -251,6 +270,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/catalogo'
+    | '/manutencao'
     | '/ranking'
     | '/ranking-leitores'
     | '/sitemap.xml'
@@ -263,6 +283,7 @@ export interface FileRouteTypes {
     | '/admin/$id'
     | '/admin/contas'
     | '/admin/imagens'
+    | '/admin/manutencao'
     | '/admin/molduras'
     | '/admin/nova'
     | '/admin/novels'
@@ -277,6 +298,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/catalogo'
+    | '/manutencao'
     | '/ranking'
     | '/ranking-leitores'
     | '/sitemap.xml'
@@ -289,6 +311,7 @@ export interface FileRouteTypes {
     | '/admin/$id'
     | '/admin/contas'
     | '/admin/imagens'
+    | '/admin/manutencao'
     | '/admin/molduras'
     | '/admin/nova'
     | '/admin/novels'
@@ -304,6 +327,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/catalogo'
+    | '/manutencao'
     | '/ranking'
     | '/ranking-leitores'
     | '/sitemap.xml'
@@ -316,6 +340,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/$id'
     | '/_authenticated/admin/contas'
     | '/_authenticated/admin/imagens'
+    | '/_authenticated/admin/manutencao'
     | '/_authenticated/admin/molduras'
     | '/_authenticated/admin/nova'
     | '/_authenticated/admin/novels'
@@ -332,6 +357,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   CatalogoRoute: typeof CatalogoRoute
+  ManutencaoRoute: typeof ManutencaoRoute
   RankingRoute: typeof RankingRoute
   RankingLeitoresRoute: typeof RankingLeitoresRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -371,6 +397,13 @@ declare module '@tanstack/react-router' {
       path: '/catalogo'
       fullPath: '/catalogo'
       preLoaderRoute: typeof CatalogoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/manutencao': {
+      id: '/manutencao'
+      path: '/manutencao'
+      fullPath: '/manutencao'
+      preLoaderRoute: typeof ManutencaoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ranking': {
@@ -464,6 +497,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminImagensRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/manutencao': {
+      id: '/_authenticated/admin/manutencao'
+      path: '/admin/manutencao'
+      fullPath: '/admin/manutencao'
+      preLoaderRoute: typeof AuthenticatedAdminManutencaoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/molduras': {
       id: '/_authenticated/admin/molduras'
       path: '/admin/molduras'
@@ -529,6 +569,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminIdRoute: typeof AuthenticatedAdminIdRoute
   AuthenticatedAdminContasRoute: typeof AuthenticatedAdminContasRoute
   AuthenticatedAdminImagensRoute: typeof AuthenticatedAdminImagensRoute
+  AuthenticatedAdminManutencaoRoute: typeof AuthenticatedAdminManutencaoRoute
   AuthenticatedAdminMoldurasRoute: typeof AuthenticatedAdminMoldurasRoute
   AuthenticatedAdminNovaRoute: typeof AuthenticatedAdminNovaRoute
   AuthenticatedAdminNovelsRoute: typeof AuthenticatedAdminNovelsRoute
@@ -544,6 +585,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminIdRoute: AuthenticatedAdminIdRoute,
   AuthenticatedAdminContasRoute: AuthenticatedAdminContasRoute,
   AuthenticatedAdminImagensRoute: AuthenticatedAdminImagensRoute,
+  AuthenticatedAdminManutencaoRoute: AuthenticatedAdminManutencaoRoute,
   AuthenticatedAdminMoldurasRoute: AuthenticatedAdminMoldurasRoute,
   AuthenticatedAdminNovaRoute: AuthenticatedAdminNovaRoute,
   AuthenticatedAdminNovelsRoute: AuthenticatedAdminNovelsRoute,
@@ -561,6 +603,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   CatalogoRoute: CatalogoRoute,
+  ManutencaoRoute: ManutencaoRoute,
   RankingRoute: RankingRoute,
   RankingLeitoresRoute: RankingLeitoresRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,

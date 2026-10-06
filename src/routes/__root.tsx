@@ -6,6 +6,8 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  useRouterState,
+  redirect,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
@@ -14,6 +16,8 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { SupportChat } from "@/components/SupportChat";
 import { supabase } from "@/integrations/supabase/client";
+import { getMaintenanceStatus, verifyMaintenanceAdmin } from "@/lib/maintenance.functions";
+import { maintenanceExemptPath } from "@/lib/maintenance-policy";
 
 function NotFoundComponent() {
   return (
@@ -77,6 +81,13 @@ function ErrorComponent({ error, reset }: import("@tanstack/react-router").Error
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   staticData: { sitemap: false },
+  beforeLoad: async ({ location }) => {
+    if (typeof window === "undefined" || maintenanceExemptPath(location.pathname)) return;
+    const status = await getMaintenanceStatus();
+    if (!status.enabled) return;
+    const access = await verifyMaintenanceAdmin();
+    if (!access.isAdmin) throw redirect({ to: "/manutencao" });
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -125,6 +136,20 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
+  const maintenancePage = useRouterState({ select: (s) => s.location.pathname === "/manutencao" });
+
+  useEffect(() => {
+    if (maintenancePage) return;
+    const timer = setInterval(() => {
+      if (document.hidden) return;
+      void getMaintenanceStatus().then(async (status) => {
+        if (!status.enabled || maintenanceExemptPath(window.location.pathname)) return;
+        const access = await verifyMaintenanceAdmin();
+        if (!access.isAdmin) await router.navigate({ to: "/manutencao", replace: true });
+      }).catch(() => undefined);
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [maintenancePage, router]);
 
   useEffect(() => {
     // Só recarrega dados quando a conta realmente muda (evita recarregar tudo
@@ -146,7 +171,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <Outlet />
       <Toaster position="top-center" />
-      <SupportChat />
+      {maintenancePage ? null : <SupportChat />}
     </QueryClientProvider>
   );
 }

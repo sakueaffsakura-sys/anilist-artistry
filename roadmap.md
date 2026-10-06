@@ -1,5 +1,8 @@
 # Tarefas
 
+- [ ] Criar modo de manutenção com aviso, upload de MP4/imagem e acesso apenas de administradores
+- [ ] Testar bloqueio, configuração e tela de manutenção sem controles de vídeo
+
 - [x] Preparação para produção — corrigir importação remota: destinos autorizados, redirects, prazo e limite de resposta; sete testes passaram
 - [ ] Preparação para produção — revisar imagens, URLs assinadas, primeiro administrador e permissões
 - [ ] Preparação para produção — concluir qualidade, testes e confirmar hospedagem; não publicar automaticamente
