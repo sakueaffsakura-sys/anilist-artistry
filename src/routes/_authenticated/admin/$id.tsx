@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { coverUrl, formatChapter, slugify, timeAgo } from "@/lib/media";
 import { KINDS } from "@/lib/queries";
 import { useRoles, useSession } from "@/hooks/useAuth";
+import { signCloudinaryUpload } from "@/lib/media.functions";
 
 const TEN_YEARS = 60 * 60 * 24 * 365 * 10;
 const STATUSES = ["Em andamento", "Completo", "Hiato", "Cancelado"];
