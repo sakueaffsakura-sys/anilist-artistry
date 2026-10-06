@@ -225,7 +225,7 @@ function Pesquisar() {
                 {(results.data?.rows ?? []).map((r) => (
                   <Link key={r.id} to="/obra/$slug" params={{ slug: r.slug }} className="group">
                     <div className="relative overflow-hidden rounded-xl border border-border">
-                      <img loading="lazy" decoding="async" src={coverUrl(r.cover_url)} alt={r.title} className="aspect-[2/3] w-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
+                      <img src={coverUrl(r.cover_url)} alt={r.title} className="aspect-[2/3] w-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
                       <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
                         <span className="flex items-center gap-1 rounded-md bg-background/85 px-2 py-0.5 text-[11px] font-bold">
                           <BookOpen className="h-3 w-3" /> {r.chapters.length} Capítulos
