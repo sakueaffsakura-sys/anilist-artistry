@@ -35,7 +35,10 @@ async function loadMaintenance(resolveMedia: boolean) {
   if (error) throw new Error("Não foi possível verificar a manutenção.");
   let media_url = "";
   if (resolveMedia && data?.media_path) {
-    const { data: media } = await client.storage.from("maintenance-media").createSignedUrl(data.media_path, 3600);
+    // Assinatura com o cliente privilegiado: o bucket não tem leitura pública,
+    // então visitantes só recebem um link temporário gerado no servidor.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: media } = await supabaseAdmin.storage.from("maintenance-media").createSignedUrl(data.media_path, 3600);
     media_url = media?.signedUrl ?? "";
   }
   return { enabled: data?.enabled ?? false, title: data?.title ?? "Voltamos em breve.",
