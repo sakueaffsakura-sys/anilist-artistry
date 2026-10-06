@@ -16,3 +16,4 @@
 - Keep novels on the shared work details route, but give them a dedicated text reader while manga/comics retain the image reader, so both formats share catalog data without compromising reading ergonomics.
 - Novel narration uses Lovable AI TTS via the signed-in /api/tts route with device speech as fallback, because AI voices sound natural while fallback keeps reading working.
 - Remote novel imports use an exact server-configured host allowlist and a server-only streaming fetch helper with a total deadline and byte budget; manual redirects revalidate every destination because hostname filtering alone cannot safely verify DNS in the hosted runtime.
+- Bun regression tests live in tests/ outside the application compiler inputs so test-runner globals do not change the hosted runtime's DOM types.

@@ -1,7 +1,6 @@
-/// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
-import { fetchNovelHtml } from "./novel-fetch.server";
-import { validateNovelImportUrl } from "./novel-import-policy";
+import { fetchNovelHtml } from "../src/lib/novel-fetch.server";
+import { validateNovelImportUrl } from "../src/lib/novel-import-policy";
 
 const chapterUrl = "https://mediocrescan.com/capitulo/285981";
 const html = (body: BodyInit | null) => new Response(body, { headers: { "content-type": "text/html; charset=utf-8" } });
