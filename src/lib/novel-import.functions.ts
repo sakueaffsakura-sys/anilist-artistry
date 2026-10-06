@@ -40,33 +40,19 @@ export function extractChapter(html: string) {
   return { title: h2 || null, number: num ? num.replace(",", ".") : null, content: paragraphs.join("\n\n") };
 }
 
-function assertPublicUrl(raw: string) {
-  const u = new URL(raw);
-  if (!/^https?:$/.test(u.protocol)) throw new Error("Use um link http(s).");
-  const h = u.hostname.toLowerCase();
-  if (h === "localhost" || h.endsWith(".local") || h.endsWith(".internal") || /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|0\.|\[)/.test(h))
-    throw new Error("Link não permitido.");
-  return u.toString();
-}
-
 export const importNovelChapter = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ url: z.string().url().max(2000) }).parse(d))
   .handler(async ({ data, context }) => {
     const { data: isAdmin } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
     if (!isAdmin) throw new Error("Sem permissão.");
-    const url = assertPublicUrl(data.url);
-    let res: Response;
+    const { fetchNovelHtml } = await import("./novel-fetch.server");
+    let html: string;
     try {
-      res = await fetch(url, {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; BetterMangaBot/1.0)", Accept: "text/html" },
-        redirect: "follow",
-      });
-    } catch {
-      return { ok: false as const, error: "Não foi possível abrir o link." };
+      html = await fetchNovelHtml(data.url);
+    } catch (error) {
+      return { ok: false as const, error: error instanceof Error ? error.message : "Não foi possível abrir o link." };
     }
-    if (!res.ok) return { ok: false as const, error: `O site respondeu com erro ${res.status}.` };
-    const html = (await res.text()).slice(0, 3_000_000);
     const result = extractChapter(html);
     if (result.content.length < 50)
       return {
