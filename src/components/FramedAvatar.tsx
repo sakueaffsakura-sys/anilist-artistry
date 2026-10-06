@@ -16,12 +16,12 @@ export function FramedAvatar({ src, frame, size, className = "" }: { src?: strin
         className="h-full w-full overflow-hidden rounded-full border-4 border-background bg-surface-2"
         style={ring ? { boxShadow: `0 0 0 2px ${ring}` } : undefined}
       >
-        {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : (
+        {src ? <img loading="lazy" decoding="async" src={src} alt="" className="h-full w-full object-cover" /> : (
           <div className="grid h-full w-full place-items-center"><User2 className="h-1/3 w-1/3 text-muted-foreground" /></div>
         )}
       </div>
       {url ? (
-        <img src={url} alt="" draggable={false} className="pointer-events-none absolute left-1/2 top-1/2 max-w-none -translate-x-1/2 -translate-y-1/2" style={{ width: size * 1.22, height: size * 1.22 }} />
+        <img loading="lazy" decoding="async" src={url} alt="" draggable={false} className="pointer-events-none absolute left-1/2 top-1/2 max-w-none -translate-x-1/2 -translate-y-1/2" style={{ width: size * 1.22, height: size * 1.22 }} />
       ) : null}
     </div>
   );

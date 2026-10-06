@@ -62,7 +62,7 @@ export function EventBadges() {
           const owned = mine.data?.has(ev.id);
           return (
             <div key={ev.id} className="flex items-center gap-3 rounded-lg border border-border bg-background/60 p-3">
-              <img src={ev.image_url} alt={ev.name} className="h-12 w-12 object-contain" />
+              <img loading="lazy" decoding="async" src={ev.image_url} alt={ev.name} className="h-12 w-12 object-contain" />
               <div className="min-w-0">
                 <p className="font-semibold">{ev.name}</p>
                 {ev.description ? <p className="text-xs text-muted-foreground">{ev.description}</p> : null}

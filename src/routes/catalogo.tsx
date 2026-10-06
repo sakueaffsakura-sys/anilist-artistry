@@ -154,7 +154,7 @@ function Pesquisar() {
                 className="flex items-center gap-3 rounded-xl border border-border bg-surface p-4 hover:border-primary/60"
               >
                 <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-surface-2">
-                  {u.avatar_url ? <img src={u.avatar_url} alt="" className="h-full w-full object-cover" /> : <User2 className="h-5 w-5" />}
+                  {u.avatar_url ? <img loading="lazy" decoding="async" src={u.avatar_url} alt="" className="h-full w-full object-cover" /> : <User2 className="h-5 w-5" />}
                 </span>
                 <span>
                   <span className="block font-bold">@{u.username}</span>
