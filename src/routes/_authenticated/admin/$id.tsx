@@ -220,7 +220,7 @@ function SeriesEditor() {
             ))}
           </div>
 
-          {tab === "info" ? <InfoForm obra={obra} onSaved={refresh} /> : <ChaptersPanel seriesId={id} chapters={chapters} onChange={refresh} />}
+          {tab === "info" ? <InfoForm obra={obra} onSaved={refresh} /> : <ChaptersPanel seriesId={id} chapters={chapters} onChange={refresh} isAdmin={isAdmin} />}
         </>
       ) : null}
     </AdminShell>
