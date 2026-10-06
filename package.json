@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "build:cpanel": "NITRO_PRESET=node-server vite build",
+    "build:cpanel": "CPANEL_BUILD=1 vite build",
     "start:cpanel": "node app.cjs"
   },
   "overrides": {
