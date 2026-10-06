@@ -139,6 +139,19 @@ function RootComponent() {
   const maintenancePage = useRouterState({ select: (s) => s.location.pathname === "/manutencao" });
 
   useEffect(() => {
+    if (maintenancePage) return;
+    const timer = setInterval(() => {
+      if (document.hidden) return;
+      void getMaintenanceStatus().then(async (status) => {
+        if (!status.enabled || maintenanceExemptPath(window.location.pathname)) return;
+        const access = await verifyMaintenanceAdmin();
+        if (!access.isAdmin) await router.navigate({ to: "/manutencao", replace: true });
+      }).catch(() => undefined);
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [maintenancePage, router]);
+
+  useEffect(() => {
     // Só recarrega dados quando a conta realmente muda (evita recarregar tudo
     // a cada troca de aba / renovação de sessão, que causava travadas).
     let lastUserId: string | null | undefined;

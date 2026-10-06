@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";
 import { getMaintenanceStatus, verifyMaintenanceAdmin } from "@/lib/maintenance.functions";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/manutencao")({
@@ -16,7 +16,8 @@ export const Route = createFileRoute("/manutencao")({
   component: MaintenancePage,
 });
 function MaintenancePage() {
-  const settings = Route.useLoaderData();
+  const initial = Route.useLoaderData();
+  const [settings, setSettings] = useState(initial);
   const verify = useServerFn(verifyMaintenanceAdmin);
   useEffect(() => {
     let cancelled = false;
@@ -25,8 +26,8 @@ function MaintenancePage() {
       const result = await verify();
       if (result.isAdmin && !cancelled && settings.enabled) window.location.replace("/");
     }).catch(() => undefined);
-    const interval = setInterval(() => { void getMaintenanceStatus().then((s) => { if (!s.enabled && settings.enabled) window.location.replace("/"); }).catch(() => undefined); }, 30000);
+    const interval = setInterval(() => { void getMaintenanceStatus().then((s) => { if (!s.enabled && initial.enabled) window.location.replace("/"); else setSettings(s); }).catch(() => undefined); }, 30000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [verify, settings.enabled]);
+  }, [verify, initial.enabled]);
   return <MaintenanceScreen settings={settings} />;
 }

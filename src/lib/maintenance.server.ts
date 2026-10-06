@@ -17,12 +17,12 @@ export function maintenanceClient(token?: string) {
   });
 }
 
-export async function readMaintenance() {
+export async function readMaintenance(resolveMedia = true) {
   const client = maintenanceClient();
   const { data, error } = await client.from("maintenance_settings").select("*").eq("id", 1).maybeSingle();
   if (error) throw new Error("Não foi possível verificar a manutenção.");
   let media_url = "";
-  if (data?.media_path) {
+  if (resolveMedia && data?.media_path) {
     const { data: media } = await client.storage.from("maintenance-media").createSignedUrl(data.media_path, 3600);
     media_url = media?.signedUrl ?? "";
   }
