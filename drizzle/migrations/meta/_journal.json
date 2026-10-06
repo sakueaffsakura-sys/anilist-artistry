@@ -225,6 +225,13 @@
       "when": 1791313108438,
       "tag": "0031_maintenance_content_gate",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791313337765,
+      "tag": "0032_maintenance_media_validation",
+      "breakpoints": true
     }
   ]
 }
