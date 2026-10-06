@@ -16,6 +16,8 @@ Corrigir e testar IMP-01, IMP-02 e IMP-03 sem importar/publicar capítulos nem t
 
 ## Verificações ainda pendentes
 
+IMP-01, IMP-02 e IMP-03 implementados: sete testes automatizados passaram, incluindo resposta de exatamente 3 MB, rejeição de um byte adicional, redirect proibido e cancelamento do corpo após 10 segundos. Testes usam respostas simuladas, sem copiar capítulos externos. Metadados ausentes de páginas privadas também foram completados, sem incluí-las no sitemap.
+
 - Limitação persistente de frequência por administrador (não substituir por contador em memória).
 - Uploads: limite de 5 MB, MIME, dimensões, cotas e autorização no armazenamento.
 - Renovação de URLs assinadas sem quebrar conteúdo existente.

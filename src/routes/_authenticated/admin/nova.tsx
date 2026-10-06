@@ -23,6 +23,8 @@ export const Route = createFileRoute("/_authenticated/admin/nova")({
       { name: "description", content: "Cadastre manualmente uma obra no catálogo do Better Mangá." },
       { property: "og:title", content: "Nova obra — Better Mangá" },
       { property: "og:description", content: "Cadastro manual de obras." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: NovaObra,

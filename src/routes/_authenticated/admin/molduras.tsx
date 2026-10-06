@@ -11,7 +11,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/admin/molduras")({
   staticData: { sitemap: false },
-  head: () => ({ meta: [{ title: "Molduras — Painel" }] }),
+  head: () => ({ meta: [
+    { title: "Molduras — Painel Better Mangá" },
+    { name: "description", content: "Gerencie as molduras de perfil do Better Mangá." },
+    { property: "og:title", content: "Molduras — Painel Better Mangá" },
+    { property: "og:description", content: "Gestão das molduras de perfil do Better Mangá." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: FramesAdmin,
 });
 

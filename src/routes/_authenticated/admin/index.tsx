@@ -22,6 +22,8 @@ export const Route = createFileRoute("/_authenticated/admin/")({
       { name: "description", content: "Visão geral do site, importação do AniList e gestão do catálogo." },
       { property: "og:title", content: "Painel — Better Mangá" },
       { property: "og:description", content: "Visão geral e importação AniList." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AdminPage,
