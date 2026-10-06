@@ -24,6 +24,8 @@ export const Route = createFileRoute("/_authenticated/admin/novels")({
       { name: "description", content: "Cadastre novels e publique capítulos em texto." },
       { property: "og:title", content: "Novels — Painel Better Mangá" },
       { property: "og:description", content: "Gestão de novels e capítulos em texto." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AdminNovels,

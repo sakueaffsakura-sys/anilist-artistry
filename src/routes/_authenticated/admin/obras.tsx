@@ -91,6 +91,8 @@ export const Route = createFileRoute("/_authenticated/admin/obras")({
       { name: "description", content: "Edite, publique, despublique ou apague obras do catálogo." },
       { property: "og:title", content: "Gerenciar obras — Better Mangá" },
       { property: "og:description", content: "Gestão do catálogo de obras." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: ObrasAdmin,

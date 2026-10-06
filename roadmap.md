@@ -1,5 +1,9 @@
 # Tarefas
 
+- [x] Preparação para produção — corrigir importação remota: destinos autorizados, redirects, prazo e limite de resposta; sete testes passaram
+- [ ] Preparação para produção — revisar imagens, URLs assinadas, primeiro administrador e permissões
+- [ ] Preparação para produção — concluir qualidade, testes e confirmar hospedagem; não publicar automaticamente
+
 - [x] Curtidas nos comentários (tabela comment_likes + botões na obra e no leitor)
 - [x] Marcar capítulo como lido/não lido na lista de capítulos
 

@@ -17,6 +17,8 @@ export const Route = createFileRoute("/_authenticated/biblioteca")({
       { name: "description", content: "Favoritos, obras em leitura e status de leitura da sua conta." },
       { property: "og:title", content: "Minha Coleção — Better Mangá" },
       { property: "og:description", content: "Favoritos e histórico de leitura." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Colecao,

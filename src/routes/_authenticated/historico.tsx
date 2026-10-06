@@ -18,6 +18,8 @@ export const Route = createFileRoute("/_authenticated/historico")({
       { name: "description", content: "As últimas obras e capítulos que você abriu no Better Mangá." },
       { property: "og:title", content: "Histórico — Better Mangá" },
       { property: "og:description", content: "Últimas obras que você abriu." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Historico,
