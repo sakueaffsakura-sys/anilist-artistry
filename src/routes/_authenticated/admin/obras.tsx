@@ -234,9 +234,14 @@ function ObrasAdmin() {
             <Button variant="ghost" size="icon" title={r.published ? "Despublicar" : "Publicar"} onClick={() => toggle.mutate(r)}>
               {r.published ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
             </Button>
-            <Button asChild variant="outline" size="sm" className="font-semibold">
+            <Button asChild variant="outline" size="sm" className="border-primary/50 font-semibold text-primary hover:bg-primary/10">
+              <Link to="/admin/$id" params={{ id: r.id }} title="Publicar novo capítulo">
+                <Plus className="mr-1 h-3.5 w-3.5" /> Novo capítulo
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="icon" title="Editar obra">
               <Link to="/admin/$id" params={{ id: r.id }}>
-                <Pencil className="mr-1.5 h-3.5 w-3.5" /> Editar
+                <Pencil className="h-4 w-4" />
               </Link>
             </Button>
             {isAdmin ? (
