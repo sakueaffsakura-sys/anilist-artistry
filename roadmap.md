@@ -10,3 +10,4 @@
 - [x] Atualizar as categorias de cadastro, edição e importação no painel
 - [x] Criar modo de leitura dedicado para novels com controles de texto responsivos
 - [x] Melhorar publicação de novels com editor, prévia, rascunhos e gestão de capítulos
+- [x] Concluir botão Cloudinary no novo capítulo, com progresso e links automáticos; botão conferido no painel, envio real não testado
