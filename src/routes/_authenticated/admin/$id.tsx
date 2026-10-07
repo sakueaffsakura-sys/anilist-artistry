@@ -342,10 +342,18 @@ function InfoForm({ obra, onSaved }: { obra: Obra; onSaved: () => void }) {
 function ChaptersPanel({ seriesId, chapters, onChange, isAdmin }: { seriesId: string; chapters: Chapter[]; onChange: () => void; isAdmin: boolean }) {
   const signC = useServerFn(signCloudinaryUpload);
   const [number, setNumber] = useState("");
+  const [numberTouched, setNumberTouched] = useState(false);
   const [title, setTitle] = useState("");
   const [urls, setUrls] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [editing, setEditing] = useState<Chapter | null>(null);
+
+  // Preenche automaticamente o próximo número de capítulo disponível
+  useEffect(() => {
+    if (numberTouched || editing) return;
+    const next = chapters.length ? Math.max(...chapters.map((c) => Number(c.number))) + 1 : 1;
+    setNumber(String(next));
+  }, [chapters, numberTouched, editing]);
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudProgress, setCloudProgress] = useState<{ done: number; total: number } | null>(null);
 
