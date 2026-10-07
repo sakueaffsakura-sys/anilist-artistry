@@ -10,7 +10,7 @@ const INTERVAL = 6000;
 const CATEGORY_LABELS = [...KINDS];
 
 export function HeroCarousel({ items }: { items: SeriesRow[] }) {
-  const allSlides = items.slice(0, 10);
+  const allSlides = useMemo(() => items.slice(0, 10), [items]);
   const kinds = useMemo(() => new Set(allSlides.map((item) => item.kind).filter(Boolean)), [allSlides]);
   const [kind, setKind] = useState(() => allSlides[0]?.kind ?? "");
   const slides = useMemo(

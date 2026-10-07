@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Trophy } from "lucide-react";
@@ -11,7 +10,7 @@ import { Releases } from "@/components/Releases";
 import { RecentlyUpdated } from "@/components/RecentlyUpdated";
 import { HScroll, SectionRow } from "@/components/SectionRow";
 import { Button } from "@/components/ui/button";
-import { fetchFavorites, fetchHistory, fetchSeries, KINDS } from "@/lib/queries";
+import { fetchFavorites, fetchHistory, fetchSeries } from "@/lib/queries";
 import { useSession } from "@/hooks/useAuth";
 import { EventBadges } from "@/components/EventBadges";
 
@@ -41,16 +40,6 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const { user } = useSession();
-  const [kind, setKind] = useState<string>("Manga");
-
-  const byKind = useQuery({
-    queryKey: ["series", "kind", kind],
-    queryFn: () => fetchSeries({ kind, limit: 10, pinnedFirst: true }),
-  });
-  const topRated = useQuery({
-    queryKey: ["series", "rating"],
-    queryFn: () => fetchSeries({ order: "rating", limit: 8 }),
-  });
   const recent = useQuery({
     queryKey: ["series", "created"],
     queryFn: () => fetchSeries({ order: "created_at", limit: 14 }),
@@ -71,18 +60,17 @@ function Home() {
   const favorites = useQuery({
     queryKey: ["favorites", user?.id],
     enabled: Boolean(user),
-    queryFn: () => fetchFavorites(user!.id),
+    queryFn: () => user ? fetchFavorites(user.id) : Promise.resolve([]),
   });
   const favoriteIds = new Set((favorites.data ?? []).map((item) => item.id));
   const history = useQuery({
     queryKey: ["history", user?.id],
     enabled: Boolean(user),
-    queryFn: () => fetchHistory(user!.id),
+    queryFn: () => user ? fetchHistory(user.id) : Promise.resolve([]),
   });
 
   const empty =
-    !byKind.isLoading &&
-    (byKind.data?.length ?? 0) === 0 &&
+    recent.isSuccess && updated.isSuccess &&
     (recent.data?.length ?? 0) === 0 &&
     (updated.data?.length ?? 0) === 0;
 
@@ -106,16 +94,16 @@ function Home() {
         ) : null}
 
         {user && (history.data?.length ?? 0) > 0 ? (
-          <ContinueReading rows={history.data!} userId={user.id} />
+          <ContinueReading rows={history.data ?? []} userId={user.id} />
         ) : null}
 
         {user && (favorites.data?.length ?? 0) > 0 ? (
-          <FavoritesUpdated rows={favorites.data!} />
+          <FavoritesUpdated rows={favorites.data ?? []} />
         ) : null}
 
-        {(releases.data?.length ?? 0) > 0 ? <Releases rows={releases.data!} /> : null}
+        {(releases.data?.length ?? 0) > 0 ? <Releases rows={releases.data ?? []} /> : null}
 
-        {(updated.data?.length ?? 0) > 0 ? <RecentlyUpdated rows={updated.data!} /> : null}
+        {(updated.data?.length ?? 0) > 0 ? <RecentlyUpdated rows={updated.data ?? []} /> : null}
 
         {(ranking.data?.length ?? 0) > 0 ? (
           <SectionRow
@@ -129,7 +117,7 @@ function Home() {
             }
           >
             <HScroll>
-              {ranking.data!.map((item, index) => (
+              {(ranking.data ?? []).map((item, index) => (
                 <div key={item.id} className="w-[150px] shrink-0">
                   <div className="flex items-start gap-1">
                     <span className="font-display text-2xl font-black text-primary">

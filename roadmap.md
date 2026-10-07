@@ -1,5 +1,7 @@
 # Tarefas
 
+- [ ] Otimizar carregamento inicial e sessões compartilhadas; verificar consultas e navegação sem alterar dados
+
 - [ ] Criar modo de manutenção com aviso, upload de MP4/imagem e acesso apenas de administradores
 - [ ] Testar bloqueio, configuração e tela de manutenção sem controles de vídeo
 
