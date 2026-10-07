@@ -246,7 +246,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
   const [number, setNumber] = useState(String(nextNumber));
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [published, setPublished] = useState(false);
+  const [published, setPublished] = useState(true);
   const [search, setSearch] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [importUrl, setImportUrl] = useState("");
@@ -277,7 +277,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
   }
   const [htmlPaste, setHtmlPaste] = useState("");
   const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null);
-  const [bulkPublish, setBulkPublish] = useState(false);
+  const [bulkPublish, setBulkPublish] = useState(true);
   async function runBulk(files: File[]) {
     const taken = new Set(novel.chapters.map((c) => Number(c.number)));
     let ok = 0;
@@ -316,7 +316,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
     setNumber(String(Math.max(nextNumber, 1)));
     setTitle("");
     setContent("");
-    setPublished(false);
+    setPublished(true);
     setShowPreview(false);
   };
 
