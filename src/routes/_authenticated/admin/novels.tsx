@@ -275,6 +275,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
       setImporting(false);
     }
   }
+  const [htmlPaste, setHtmlPaste] = useState("");
   const [bulk, setBulk] = useState<{ done: number; total: number } | null>(null);
   const [bulkPublish, setBulkPublish] = useState(false);
   async function runBulk(files: File[]) {
