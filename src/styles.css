@@ -155,3 +155,7 @@
     display: none;
   }
 }
+
+.hero-reference-shade {
+  background: linear-gradient(90deg, color-mix(in oklab, var(--background) 96%, transparent), color-mix(in oklab, var(--background) 88%, transparent) 60%, color-mix(in oklab, var(--background) 72%, transparent)), var(--gradient-hero-vertical);
+}
