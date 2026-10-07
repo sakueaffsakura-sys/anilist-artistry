@@ -329,7 +329,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
       setNumber(draft.number || String(nextNumber));
       setTitle(draft.title || "");
       setContent(draft.content || "");
-      setPublished(Boolean(draft.published));
+      setPublished(draft.published !== false);
     } catch {
       window.localStorage.removeItem(draftKey);
     }
@@ -437,9 +437,12 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
                   <span className="block truncate text-sm font-bold">Cap. {formatChapter(chapter.number)}</span>
                   <span className="block truncate text-xs text-muted-foreground">{chapter.title || "Sem título"}</span>
                 </button>
-                <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${chapter.published ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
-                  {chapter.published ? "Publicado" : "Rascunho"}
-                </span>
+                <button type="button" title={chapter.published ? "Clique para voltar a rascunho" : "Clique para publicar"} onClick={async () => {
+                  const { error } = await supabase.from("chapters").update({ published: !chapter.published }).eq("id", chapter.id).eq("series_id", novel.id);
+                  if (error) toast.error(error.message); else { toast.success(chapter.published ? "Voltou para rascunho" : "Capítulo publicado!"); refresh(); }
+                }} className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${chapter.published ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground hover:bg-primary/20"}`}>
+                  {chapter.published ? "Publicado" : "Rascunho · Publicar"}
+                </button>
               </div>
               <div className="mt-2 flex justify-end gap-1">
                 <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => editChapter(chapter)} aria-label="Editar capítulo" title="Editar capítulo">
