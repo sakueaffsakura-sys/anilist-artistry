@@ -519,8 +519,9 @@ function SeriesPage() {
                     ].map(([label, value]) => <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-4"><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 break-words font-medium">{value}</dd></div>)}
                   </dl>
                 </TabsContent>
-                <TabsContent value="chapters" className="mt-0">
-              <div className="flex flex-col gap-4 py-5">
+                <TabsContent value="chapters" className="mt-6">
+              <div className="rounded-2xl border border-border bg-surface/60 p-4 md:p-5">
+              <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                    <span className="text-sm text-muted-foreground">{obra.chapters.length} capítulos</span>
                   <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
@@ -552,7 +553,7 @@ function SeriesPage() {
                   {lastChapter ? <Button asChild variant="outline" className="h-11 gap-2 border-primary/40 text-primary"><Link to="/obra/$slug/$chapter" params={{ slug: obra.slug, chapter: formatChapter(lastChapter.number) }}><Forward className="h-4 w-4" />Capítulo mais recente</Link></Button> : null}
                 </div>
               </div>
-              <ul className="max-h-[70vh] divide-y divide-border/60 overflow-y-auto border-y border-border">
+              <ul className="mt-4 max-h-[70vh] divide-y divide-border/60 overflow-y-auto rounded-xl border border-border bg-background/40">
                 {visibleChapters.map((chapter) => {
                   const isRead = readIds.has(chapter.id);
                   const commentCount = chapterCommentCounts.data?.get(chapter.id) ?? 0;
@@ -606,7 +607,8 @@ function SeriesPage() {
                   </li>
                 ) : null}
               </ul>
-              <p className="py-4 text-center text-xs text-muted-foreground">Total de capítulos encontrados: {visibleChapters.length}</p>
+              <p className="pt-4 text-center text-xs text-muted-foreground">Total de capítulos encontrados: {visibleChapters.length}</p>
+              </div>
               </TabsContent>
               </Tabs>
             </section>
