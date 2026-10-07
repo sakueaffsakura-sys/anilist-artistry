@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Bell, BookMarked, Headset, LogOut, Search, Shield, User2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +30,33 @@ export function SiteHeader() {
   const { isStaff } = useRoles(user?.id);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [headerHidden, setHeaderHidden] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    let previousY = window.scrollY;
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const y = Math.max(0, window.scrollY);
+        const focused = headerRef.current?.contains(document.activeElement);
+        if (y < 80 || focused) {
+          setHeaderHidden(false);
+          previousY = y;
+        } else if (Math.abs(y - previousY) > 12) {
+          setHeaderHidden(y > previousY);
+          previousY = y;
+        }
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
 
   async function signOut() {
     await queryClient.cancelQueries();
@@ -39,17 +67,21 @@ export function SiteHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-foreground/5 bg-background/95 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-2 gap-y-0 px-3 py-2 sm:h-28 sm:flex-nowrap sm:gap-4 sm:px-4 sm:py-0 md:px-8">
+      <header
+        ref={headerRef}
+        onFocusCapture={() => setHeaderHidden(false)}
+        className={`sticky top-0 z-40 border-b border-foreground/5 bg-background/95 backdrop-blur-xl transition-transform duration-200 motion-reduce:transition-none ${headerHidden ? "-translate-y-full" : "translate-y-0"}`}
+      >
+        <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-3 sm:h-20 sm:gap-3 sm:px-4 md:px-8">
           <Link to="/" className="flex shrink-0 items-center" aria-label="Better Mangá — início">
             <img
               src="https://cdn.mediocrescan.com/usuarios/156358/056c603c2288529c82b19ad4906b02c7f5a67be8.webp"
               alt="Better Mangá"
-              className="h-20 w-auto object-contain drop-shadow-[0_0_14px_color-mix(in_oklab,var(--primary)_45%,transparent)] sm:h-28"
+              className="h-16 w-auto object-contain drop-shadow-[0_0_14px_color-mix(in_oklab,var(--primary)_45%,transparent)] sm:h-20"
             />
           </Link>
 
-          <div className="flex-1 sm:hidden" />
+          <div className="min-w-0 flex-1 lg:hidden" />
 
           <nav className="hidden items-center gap-1 text-sm font-medium lg:order-none lg:flex lg:w-auto lg:min-w-0 lg:flex-1">
             {NAV.map((item) => (
@@ -57,7 +89,7 @@ export function SiteHeader() {
                 key={item.to}
                 to={item.to}
                 activeOptions={{ exact: false }}
-                className="group relative flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 transition-all"
+                className="group relative flex items-center gap-2 whitespace-nowrap rounded-md px-2 py-2 transition-all"
                 activeProps={{ className: "text-foreground" }}
                 inactiveProps={{ className: "text-muted-foreground hover:bg-foreground/5 hover:text-foreground" }}
               >
@@ -80,7 +112,7 @@ export function SiteHeader() {
           <Button
             asChild
             variant="ghost"
-            className="group hidden h-9 w-52 shrink-0 items-center gap-2.5 rounded-full border border-foreground/10 bg-foreground/[0.03] px-4 text-muted-foreground transition-all hover:border-foreground/15 hover:bg-foreground/[0.06] hover:text-foreground lg:flex"
+            className="group hidden h-9 w-40 shrink-0 items-center gap-2.5 rounded-full border border-foreground/10 bg-foreground/[0.03] px-4 text-muted-foreground transition-all hover:border-foreground/15 hover:bg-foreground/[0.06] hover:text-foreground lg:flex xl:w-52"
           >
             <Link to="/catalogo" search={{ q: "", kind: "Todos" }}>
               <Search className="h-3.5 w-3.5 shrink-0" />
