@@ -607,7 +607,8 @@ function SeriesPage() {
                   </li>
                 ) : null}
               </ul>
-              <p className="py-4 text-center text-xs text-muted-foreground">Total de capítulos encontrados: {visibleChapters.length}</p>
+              <p className="pt-4 text-center text-xs text-muted-foreground">Total de capítulos encontrados: {visibleChapters.length}</p>
+              </div>
               </TabsContent>
               </Tabs>
             </section>
