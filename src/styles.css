@@ -94,7 +94,14 @@
   --shadow-card: 0 12px 30px -14px oklch(0 0 0 / 0.75);
   --shadow-glow: 0 0 0 1px color-mix(in oklab, var(--primary) 45%, transparent), 0 14px 40px -18px color-mix(in oklab, var(--primary) 55%, transparent);
   --shadow-hero: 0 28px 70px -34px oklch(0 0 0 / 0.9);
+  --reading-overlay: oklch(0 0 0);
 }
+
+.continue-reading-card:hover { box-shadow: var(--shadow-card); }
+.continue-reading-shade { background: linear-gradient(to top, color-mix(in oklab, var(--reading-overlay) 40%, transparent), transparent 50%, color-mix(in oklab, var(--reading-overlay) 10%, transparent)); }
+.continue-reading-hide { background: color-mix(in oklab, var(--reading-overlay) 45%, transparent); }
+.continue-reading-hide:hover { background: color-mix(in oklab, var(--reading-overlay) 70%, transparent); }
+.continue-reading-counter { background: color-mix(in oklab, var(--reading-overlay) 30%, transparent); }
 
 @layer base {
   * {

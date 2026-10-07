@@ -5,6 +5,7 @@ import { BookMarked, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { coverUrl, formatChapter } from "@/lib/media";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
 export type ContinueRow = {
   progress: number;
@@ -49,30 +50,36 @@ export function ContinueReading({ rows, userId }: { rows: ContinueRow[]; userId:
           <h2 className="shrink-0 text-lg font-bold">Continue Lendo</h2>
         </div>
         <div className="hidden shrink-0 items-center gap-2 md:flex">
-          <button
+           <Button
+             variant="ghost"
+             size="icon"
             type="button"
             title="Anterior"
+             aria-label="Anterior"
             onClick={() => scrollBy(-420)}
-            className="cursor-pointer rounded-full border border-foreground/10 bg-card/40 p-2 text-muted-foreground shadow-sm transition-all duration-200 hover:scale-110 hover:border-foreground/20 hover:bg-card/60 hover:text-foreground active:scale-95"
+             className="h-[38px] w-[38px] rounded-full border border-foreground/10 bg-card/40 text-muted-foreground shadow-sm transition-all duration-200 hover:scale-110 hover:border-foreground/20 hover:bg-card/60 hover:text-foreground active:scale-95 motion-reduce:transform-none motion-reduce:transition-none [&_svg]:size-5"
           >
             <ChevronLeft className="h-5 w-5" />
-          </button>
-          <button
+           </Button>
+           <Button
+             variant="ghost"
+             size="icon"
             type="button"
             title="Próximo"
+             aria-label="Próximo"
             onClick={() => scrollBy(420)}
-            className="cursor-pointer rounded-full border border-foreground/10 bg-card/40 p-2 text-muted-foreground shadow-sm transition-all duration-200 hover:scale-110 hover:border-foreground/20 hover:bg-card/60 hover:text-foreground active:scale-95"
+             className="h-[38px] w-[38px] rounded-full border border-foreground/10 bg-card/40 text-muted-foreground shadow-sm transition-all duration-200 hover:scale-110 hover:border-foreground/20 hover:bg-card/60 hover:text-foreground active:scale-95 motion-reduce:transform-none motion-reduce:transition-none [&_svg]:size-5"
           >
             <ChevronRight className="h-5 w-5" />
-          </button>
+           </Button>
         </div>
       </div>
 
-      <div className="relative -mx-4 py-3">
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-14 bg-gradient-to-l from-background to-transparent md:w-16" />
+       <div className="relative -mx-4 py-3 md:-mx-8">
+         <div className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-16 bg-gradient-to-l from-background to-transparent md:block" />
         <div
           ref={scroller}
-          className="no-scrollbar overflow-x-auto pb-4 pl-4 pr-2 pt-1"
+           className="no-scrollbar overflow-x-auto overscroll-x-contain pb-4 pl-4 pr-2 pt-1 sm:pr-4 md:px-8 md:pt-3"
         >
           <div className="flex gap-4 sm:gap-6">
             {rows.map((row) => {
@@ -82,7 +89,7 @@ export function ContinueReading({ rows, userId }: { rows: ContinueRow[]; userId:
               return (
                 <div
                   key={row.series.id}
-                  className="group flex h-full w-[160px] min-w-[160px] max-w-[160px] shrink-0 cursor-pointer flex-col rounded-[1.35rem] transition-all duration-200 ease-out hover:z-[5] hover:-translate-y-1.5 hover:shadow-xl hover:shadow-black/50"
+                   className="continue-reading-card group relative flex h-full w-[160px] min-w-[160px] max-w-[160px] shrink-0 flex-col rounded-[1.35rem] transition-[transform,box-shadow] duration-200 ease-out hover:z-[5] hover:-translate-y-1.5 motion-reduce:transform-none motion-reduce:transition-none"
                 >
                   <Link
                     to="/obra/$slug"
@@ -92,31 +99,34 @@ export function ContinueReading({ rows, userId }: { rows: ContinueRow[]; userId:
                     <img
                       src={coverUrl(row.series.cover_url)}
                       alt={row.series.title}
-                      loading="eager"
+                       loading="lazy"
                       decoding="async"
                       className="h-full w-full object-cover transition-[transform,filter] duration-300 ease-out group-hover:scale-[1.04] group-hover:brightness-110"
                     />
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
-                    <button
+                     <div className="continue-reading-shade pointer-events-none absolute inset-0" />
+                   </Link>
+                     <Button
+                       variant="ghost"
+                       size="icon"
                       type="button"
                       title="Ocultar do Continue lendo"
+                       aria-label={`Ocultar ${row.series.title} do Continue lendo`}
                       disabled={hiding === row.series.id}
                       onClick={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
                         void hide(row.series.id);
                       }}
-                      className="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-foreground/10 bg-black/45 text-foreground/60 shadow-md backdrop-blur-md transition-all hover:border-destructive/40 hover:bg-black/70 hover:text-destructive md:opacity-0 md:group-hover:opacity-100"
+                       className="continue-reading-hide absolute right-2 top-2 z-20 h-8 w-8 rounded-full border border-foreground/10 text-foreground/60 shadow-md backdrop-blur-md transition-all hover:border-destructive/40 hover:text-destructive md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 motion-reduce:transition-none [&_svg]:size-3.5"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                    <span className="pointer-events-none absolute bottom-2 left-2 z-[12] inline-flex items-center gap-1.5 rounded-full border border-foreground/15 bg-black/30 px-2 py-1 shadow-[0_2px_14px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
-                      <BookMarked className="h-2.5 w-2.5 shrink-0 text-white" strokeWidth={2.5} />
-                      <span className="text-[10px] font-extrabold tabular-nums leading-none text-white">
+                     </Button>
+                     <span className="continue-reading-counter pointer-events-none absolute left-2 top-[210px] z-[12] inline-flex items-center gap-1.5 rounded-full border border-foreground/15 px-2 py-1 text-foreground shadow-sm backdrop-blur-2xl">
+                       <BookMarked className="h-2.5 w-2.5 shrink-0" strokeWidth={2.5} />
+                       <span className="text-[10px] font-extrabold tabular-nums leading-none">
                         {formatChapter(current)}/{formatChapter(total)}
                       </span>
                     </span>
-                  </Link>
                   <div className="mt-2 px-0.5">
                     <div className="h-1 w-full overflow-hidden rounded-full bg-foreground/10">
                       <div
