@@ -1,5 +1,4 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Bell, BookMarked, Headset, LogOut, Search, Shield, User2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,33 +29,6 @@ export function SiteHeader() {
   const { isStaff } = useRoles(user?.id);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [headerHidden, setHeaderHidden] = useState(false);
-  const headerRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    let previousY = window.scrollY;
-    let frame = 0;
-    const onScroll = () => {
-      if (frame) return;
-      frame = window.requestAnimationFrame(() => {
-        frame = 0;
-        const y = Math.max(0, window.scrollY);
-        const focused = headerRef.current?.contains(document.activeElement);
-        if (y < 80 || focused) {
-          setHeaderHidden(false);
-          previousY = y;
-        } else if (Math.abs(y - previousY) > 12) {
-          setHeaderHidden(y > previousY);
-          previousY = y;
-        }
-      });
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.cancelAnimationFrame(frame);
-    };
-  }, []);
 
   async function signOut() {
     await queryClient.cancelQueries();
@@ -68,9 +40,7 @@ export function SiteHeader() {
   return (
     <>
       <header
-        ref={headerRef}
-        onFocusCapture={() => setHeaderHidden(false)}
-        className={`sticky top-0 z-40 border-b border-foreground/5 bg-background/95 backdrop-blur-xl transition-transform duration-200 motion-reduce:transition-none ${headerHidden ? "-translate-y-full" : "translate-y-0"}`}
+        className="sticky top-0 z-40 border-b border-foreground/5 bg-background/75 backdrop-blur-sm"
       >
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-3 sm:h-20 sm:gap-3 sm:px-4 md:px-8">
           <Link to="/" className="flex shrink-0 items-center" aria-label="Better Mangá — início">
