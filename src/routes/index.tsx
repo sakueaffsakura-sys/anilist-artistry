@@ -77,7 +77,7 @@ function Home() {
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <HeroCarousel items={(slider.data?.length ? slider.data : updated.data) ?? []} />
+      <HeroCarousel items={(slider.data?.length ? slider.data : updated.data) ?? []} favoriteIds={favoriteIds} />
       <main className="mx-auto max-w-7xl px-4 py-8">
         <h1 className="sr-only">Better Mangá — ler mangás, manhwas e comics online</h1>
         {empty ? (

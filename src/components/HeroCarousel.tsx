@@ -1,15 +1,32 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { BookOpen, ChevronLeft, ChevronRight, Play, Star } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Bookmark, Star } from "lucide-react";
 import type { SeriesRow } from "@/lib/queries";
 import { KINDS } from "@/lib/queries";
-import { coverUrl, formatChapter } from "@/lib/media";
+import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
 import { Button } from "@/components/ui/button";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const INTERVAL = 6000;
 const CATEGORY_LABELS = [...KINDS];
 
-export function HeroCarousel({ items }: { items: SeriesRow[] }) {
+export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favoriteIds: Set<string> }) {
+  const { user } = useSession();
+  const queryClient = useQueryClient();
+  const toggleFavorite = useMutation({
+    mutationFn: async ({ id, saved }: { id: string; saved: boolean }) => {
+      if (!user) throw new Error("Entre na sua conta para favoritar.");
+      const { error } = saved
+        ? await supabase.from("favorites").delete().eq("user_id", user.id).eq("series_id", id)
+        : await supabase.from("favorites").insert({ user_id: user.id, series_id: id });
+      if (error) throw error;
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["favorites"] }); },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Não foi possível atualizar os favoritos."),
+  });
   const allSlides = useMemo(() => items.slice(0, 10), [items]);
   const kinds = useMemo(() => new Set(allSlides.map((item) => item.kind).filter(Boolean)), [allSlides]);
   const [kind, setKind] = useState(() => allSlides[0]?.kind ?? "");
@@ -38,10 +55,11 @@ export function HeroCarousel({ items }: { items: SeriesRow[] }) {
     };
   }, [paused, slides.length]);
 
+  const touchStart = useRef<number | null>(null);
+
   if (allSlides.length === 0) return null;
 
   const active = slides[index] ?? slides[0] ?? null;
-  const latest = active?.chapters[0];
   const go = (delta: number) =>
     setIndex((current) => (current + delta + slides.length) % slides.length);
 
@@ -98,159 +116,47 @@ export function HeroCarousel({ items }: { items: SeriesRow[] }) {
     >
       {kinds.size > 0 ? categoryBar : null}
 
-      <div className="mx-auto max-w-7xl px-4 md:px-6">
-        <div className="relative overflow-hidden md:min-h-[25rem]">
-          <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(70%_80%_at_30%_50%,color-mix(in_oklab,var(--primary)_22%,transparent),transparent_75%)] md:block" />
-
-          <div key={active.id} className="relative z-10 flex flex-col items-center gap-4 py-2 md:min-h-[25rem] md:flex-row md:gap-8 md:py-8 lg:gap-10">
-            <div className="relative w-[11.25rem] shrink-0 overflow-hidden rounded-xl shadow-[var(--shadow-hero)] ring-1 ring-primary/30 md:w-[14.5rem] lg:w-[17rem]">
-              <img
-                src={coverUrl(active.cover_url)}
-                alt={`Capa de ${active.title}`}
-                className="aspect-[3/4] h-full w-full object-cover"
-                decoding="async"
-                fetchPriority="high"
-                draggable={false}
-              />
-              <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-foreground/10" />
+      <div className="relative isolate" onTouchStart={(event) => { touchStart.current = event.touches[0]?.clientX ?? null; }} onTouchEnd={(event) => {
+        const end = event.changedTouches[0]?.clientX;
+        if (touchStart.current !== null && end !== undefined && Math.abs(end - touchStart.current) > 55 && slides.length > 1) go(end < touchStart.current ? 1 : -1);
+        touchStart.current = null;
+      }}>
+        {active.banner_url ? <img src={coverUrl(active.banner_url)} alt="" aria-hidden="true" decoding="async" className="absolute inset-0 -z-20 h-full w-full object-cover" /> : null}
+        <div className="hero-reference-shade absolute inset-0 -z-10" />
+        <div className="mx-auto grid max-w-7xl grid-cols-[110px_minmax(0,1fr)] gap-5 px-4 py-7 md:grid-cols-[240px_minmax(0,1fr)] md:gap-10 md:px-6 md:py-10 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <Link to="/obra/$slug" params={{ slug: active.slug }} className="relative self-start overflow-hidden rounded-lg shadow-[var(--shadow-hero)]">
+            <img src={coverUrl(active.cover_url)} alt={`Capa de ${active.title}`} className="aspect-[2/3] w-full object-cover" decoding="async" fetchPriority="high" draggable={false} />
+            <span className="absolute left-2 top-2 flex items-center gap-1 rounded bg-background/90 px-2 py-1 text-xs font-bold text-gold"><Star className="h-3 w-3 fill-current" />{Number(active.rating).toFixed(1)}</span>
+          </Link>
+          <div className="min-w-0 self-center">
+            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+              <span className="font-bold text-primary">{active.status}</span>
+              {(active.genres ?? []).slice(0, 3).map((genre) => <span key={genre} className="text-muted-foreground">{genre}</span>)}
             </div>
-
-            <div className="flex w-full min-w-0 flex-1 flex-col items-center gap-3 text-center md:items-start md:gap-4 md:text-left lg:max-w-none">
-              <div className="flex flex-wrap justify-center gap-1.5 md:justify-start">
-                {[active.kind, ...(active.genres ?? []).slice(0, 3)].filter(Boolean).map((label, genreIndex) => (
-                  <span
-                    key={`${label}-${genreIndex}`}
-                    className="rounded-full border border-foreground/15 bg-foreground/5 px-3 py-1 text-[0.65rem] font-semibold text-foreground/70"
-                  >
-                    {label}
-                  </span>
-                ))}
-              </div>
-
-              <h2 className="line-clamp-2 font-display text-lg font-black leading-tight md:text-3xl lg:text-4xl">
-                {active.title}
-              </h2>
-
-              {active.synopsis ? (
-                <p className="line-clamp-2 max-w-lg text-xs leading-relaxed text-muted-foreground md:line-clamp-3 md:text-sm">
-                  {active.synopsis.replace(/<[^>]*>/g, "")}
-                </p>
-              ) : null}
-
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground md:text-sm">
-                <BookOpen className="h-4 w-4 text-primary" />
-                <span>
-                  {active.chapters.length} {active.chapters.length === 1 ? "capítulo disponível" : "capítulos disponíveis"}
-                </span>
-              </div>
-
-              <div className="mt-1 flex flex-wrap justify-center gap-2 md:justify-start">
-                {latest ? (
-                  <Button asChild size="sm" className="rounded-full px-4 text-xs font-black uppercase shadow-[var(--shadow-glow)]">
-                    <Link
-                      to="/obra/$slug/$chapter"
-                      params={{ slug: active.slug, chapter: formatChapter(latest.number) }}
-                    >
-                      <Play className="h-3.5 w-3.5 fill-current" />
-                      Começar a ler
-                    </Link>
-                  </Button>
-                ) : null}
-                <Button
-                  asChild
-                  size="sm"
-                  variant="ghost"
-                  className="rounded-full bg-foreground/5 px-4 text-xs font-black uppercase text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
-                >
-                  <Link to="/obra/$slug" params={{ slug: active.slug }}>
-                    <BookOpen className="h-3.5 w-3.5" />
-                    Ver detalhes
-                  </Link>
-                </Button>
-              </div>
+            <h2 className="break-words font-display text-xl font-extrabold leading-tight md:text-3xl lg:text-4xl"><Link to="/obra/$slug" params={{ slug: active.slug }}>{active.title}</Link></h2>
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground md:text-sm">
+              <span className="flex items-center gap-2 text-gold"><span className="flex gap-0.5" aria-hidden="true">{Array.from({ length: 5 }, (_, star) => <Star key={star} className={`h-3.5 w-3.5 ${star < Math.round(Number(active.rating) / 2) ? "fill-current" : "fill-none opacity-40"}`} />)}</span>{Number(active.rating).toFixed(1)}</span>
+              <span className="inline-flex items-center gap-1.5"><BookOpen className="h-4 w-4" />{active.kind}</span>
+              <span>{active.chapters.length} capítulos disponíveis</span>
             </div>
-
-            <div className="hidden w-56 shrink-0 flex-col gap-2.5 xl:flex">
-              <div className="flex items-center justify-between rounded-xl border border-foreground/10 bg-card/60 px-4 py-2.5 backdrop-blur-sm">
-                <span className="text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">Nota</span>
-                <span className="flex items-center gap-1 font-display text-base font-black text-primary">
-                  <Star className="h-4 w-4 fill-current" />
-                  {active.rating.toFixed(1)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between rounded-xl border border-foreground/10 bg-card/60 px-4 py-2.5 backdrop-blur-sm">
-                <span className="text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">Status</span>
-                <span className="text-xs font-bold capitalize text-foreground/90">{active.status}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-xl border border-foreground/10 bg-card/60 px-4 py-2.5 backdrop-blur-sm">
-                <span className="text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">Capítulos</span>
-                <span className="text-xs font-bold text-foreground/90">{active.chapters.length}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-xl border border-foreground/10 bg-card/60 px-4 py-2.5 backdrop-blur-sm">
-                <span className="text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">Views</span>
-                <span className="text-xs font-bold text-foreground/90">
-                  {new Intl.NumberFormat("pt-BR", { notation: "compact" }).format(active.views ?? 0)}
-                </span>
-              </div>
+            {active.synopsis ? <p className="mt-4 hidden max-w-3xl text-sm leading-7 text-foreground/80 line-clamp-3 md:[display:-webkit-box]">{active.synopsis.replace(/<[^>]*>/g, "")}</p> : null}
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <Button asChild className="rounded-md font-bold"><Link to="/obra/$slug" params={{ slug: active.slug }}><BookOpen className="h-4 w-4" /><span className="md:hidden">Capítulos</span><span className="hidden md:inline">Ver todos os capítulos</span></Link></Button>
+              <Button variant="outline" size="icon" className={`shrink-0 rounded-md bg-background/60 ${favoriteIds.has(active.id) ? "text-primary" : "text-foreground"}`} title={favoriteIds.has(active.id) ? "Remover dos favoritos" : "Favoritar"} aria-label={favoriteIds.has(active.id) ? "Remover dos favoritos" : "Favoritar"} aria-pressed={favoriteIds.has(active.id)} disabled={toggleFavorite.isPending} onClick={() => toggleFavorite.mutate({ id: active.id, saved: favoriteIds.has(active.id) })}><Bookmark className={`h-4 w-4 ${favoriteIds.has(active.id) ? "fill-current" : ""}`} /></Button>
             </div>
-
-            {slides.length > 1 ? (
-              <div className="hidden shrink-0 flex-col items-center gap-3 md:flex">
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  aria-label="Destaque anterior"
-                  onClick={() => go(-1)}
-                  className="h-9 w-9 rounded-full border-foreground/15 bg-foreground/5 text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <div className="flex flex-col items-center gap-1.5">
-                  {slides.map((item, dotIndex) => (
-                    <Button
-                      key={item.id}
-                      type="button"
-                      variant="ghost"
-                      aria-label={`Ir para destaque ${dotIndex + 1}`}
-                      onClick={() => setIndex(dotIndex)}
-                      className={`min-h-0 min-w-0 rounded-full p-0 transition-all ${
-                        dotIndex === index ? "h-5 w-1.5 bg-primary" : "h-1.5 w-1.5 bg-foreground/25 hover:bg-foreground/55"
-                      }`}
-                    />
-                  ))}
-                </div>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  aria-label="Próximo destaque"
-                  onClick={() => go(1)}
-                  className="h-9 w-9 rounded-full border-foreground/15 bg-foreground/5 text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : null}
           </div>
-
-          {slides.length > 1 ? (
-            <div className="mt-3 flex items-center justify-center gap-1.5 md:hidden">
-              {slides.map((item, dotIndex) => (
-                <Button
-                  key={item.id}
-                  type="button"
-                  variant="ghost"
-                  aria-label={`Ir para destaque ${dotIndex + 1}`}
-                  onClick={() => setIndex(dotIndex)}
-                  className={`h-1.5 min-w-0 rounded-full p-0 transition-all ${
-                    dotIndex === index ? "w-6 bg-primary" : "w-1.5 bg-foreground/25 hover:bg-foreground/55"
-                  }`}
-                />
-              ))}
-            </div>
-          ) : null}
+          <div className="col-span-2 md:col-start-2 md:col-span-1">
+            {active.synopsis ? <p className="mb-5 line-clamp-3 text-sm leading-6 text-muted-foreground md:hidden">{active.synopsis.replace(/<[^>]*>/g, "")}</p> : null}
+            {active.chapters.length ? <div className="max-w-3xl divide-y divide-border border-y border-border">
+              {active.chapters.slice(0, 2).map((chapter) => <Link key={chapter.id} to="/obra/$slug/$chapter" params={{ slug: active.slug, chapter: formatChapter(chapter.number) }} className="flex items-center justify-between gap-4 py-3 text-xs transition-colors hover:text-primary md:text-sm"><span className="truncate font-semibold">Cap. {formatChapter(chapter.number)}{chapter.title ? ` — ${chapter.title}` : ""}</span><span className="shrink-0 text-xs text-muted-foreground">{timeAgo(chapter.created_at)}</span></Link>)}
+            </div> : null}
+          </div>
         </div>
+        {slides.length > 1 ? <div className="mx-auto flex max-w-7xl items-center justify-end gap-3 px-4 pb-4 md:px-6">
+          <Button size="icon" variant="ghost" aria-label="Destaque anterior" onClick={() => go(-1)}><ChevronLeft className="h-4 w-4" /></Button>
+          <span className="text-xs tabular-nums text-muted-foreground">{index + 1} / {slides.length}</span>
+          <Button size="icon" variant="ghost" aria-label="Próximo destaque" onClick={() => go(1)}><ChevronRight className="h-4 w-4" /></Button>
+        </div> : null}
       </div>
     </section>
   );
