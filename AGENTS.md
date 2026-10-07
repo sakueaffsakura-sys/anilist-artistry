@@ -21,3 +21,4 @@
 - `npm run build:cpanel` (CPANEL_BUILD=1) switches nitro to the node-server preset with app.cjs as Passenger entry; Lovable builds ignore it so publishing stays on its own target.
 - Session state is provided once by SessionProvider in the root; useSession consumes that shared state so repeated catalog cards do not create individual auth subscriptions.
 - Global click audio uses one client-only player and delegated document listener mounted in the root, so navigation preserves playback without per-control subscriptions.
+- The shared header uses CSS sticky positioning without scroll-driven React state; the hero pauses its timer outside the viewport to avoid unnecessary work during scrolling.

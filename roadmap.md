@@ -1,5 +1,7 @@
 # Tarefas
 
+- [ ] Fechar espaço acima do slide, manter barra translúcida visível e reduzir trabalho do slide fora da tela; verificar rolagem
+
 - [x] Otimizar carregamento inicial e sessões compartilhadas; consultas de catálogo na home reduzidas de 6 para 4, navegação pública conferida; teste de conta conectada e medição em produção pendentes
 
 - [ ] Criar modo de manutenção com aviso, upload de MP4/imagem e acesso apenas de administradores

@@ -28,14 +28,26 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
   const slides = useMemo(() => items.slice(0, 10), [items]);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const sectionRef = useRef<HTMLElement>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      setVisible(entry?.isIntersecting ?? false);
+    });
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, [slides.length > 0]);
 
   useEffect(() => {
     if (index >= slides.length) setIndex(0);
   }, [slides.length, index]);
 
   useEffect(() => {
-    if (paused || slides.length < 2) return;
+    if (paused || !visible || slides.length < 2) return;
     timer.current = setInterval(() => {
       if (document.hidden) return; // não trabalha com a aba em segundo plano
       setIndex((current) => (current + 1) % slides.length);
@@ -43,7 +55,7 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
     return () => {
       if (timer.current) clearInterval(timer.current);
     };
-  }, [paused, slides.length]);
+  }, [paused, visible, slides.length]);
 
   const touchStart = useRef<number | null>(null);
 
@@ -57,8 +69,9 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
 
   return (
     <section
+      ref={sectionRef}
       aria-label="Destaques"
-      className="hero-model w-full overflow-hidden pb-6 pt-4 md:pb-8 md:pt-5"
+      className="hero-model w-full overflow-hidden pb-6 md:pb-8"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
