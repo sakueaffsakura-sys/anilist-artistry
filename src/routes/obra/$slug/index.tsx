@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchComments, fetchSeriesBySlug } from "@/lib/queries";
-import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
+import { coverUrl, formatChapter } from "@/lib/media";
 import { useSession } from "@/hooks/useAuth";
 import { AddToListButton, StatusButton } from "@/components/SeriesActions";
 import { CommentThreads } from "@/components/CommentThreads";
