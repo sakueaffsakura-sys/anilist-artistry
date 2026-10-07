@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Trophy } from "lucide-react";
+import { RotateCw, Trophy } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
 import { SeriesCard } from "@/components/SeriesCard";
 import { HeroCarousel } from "@/components/HeroCarousel";
@@ -74,12 +74,42 @@ function Home() {
     (recent.data?.length ?? 0) === 0 &&
     (updated.data?.length ?? 0) === 0;
 
+  const heroItems = (slider.data?.length ? slider.data : updated.data) ?? [];
+  const heroLoading = heroItems.length === 0 && (slider.isPending || updated.isPending);
+  const catalogFailed = recent.isError || updated.isError || ranking.isError;
+
+  function retryCatalog() {
+    void recent.refetch();
+    void updated.refetch();
+    void slider.refetch();
+    void ranking.refetch();
+  }
+
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <HeroCarousel items={(slider.data?.length ? slider.data : updated.data) ?? []} favoriteIds={favoriteIds} />
-      <main className="mx-auto max-w-7xl px-4 py-8">
+      {heroLoading ? (
+        <section aria-label="Carregando destaques" aria-busy="true" className="pb-6 md:pb-8">
+          <div className="hero-model-layout mx-auto grid max-w-[1400px] grid-cols-[110px_minmax(0,1fr)] items-start gap-5 px-4 py-7 md:grid-cols-[220px_minmax(0,1fr)] md:items-center md:gap-10 md:px-10 md:py-12 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-12">
+            <div className="aspect-[2/3] rounded-lg bg-muted motion-safe:animate-pulse" />
+            <div className="space-y-5" aria-hidden="true">
+              <div className="h-4 w-24 rounded bg-muted motion-safe:animate-pulse" />
+              <div className="h-9 w-4/5 rounded bg-muted motion-safe:animate-pulse" />
+              <div className="h-6 w-2/3 rounded bg-muted motion-safe:animate-pulse" />
+              <div className="hidden h-20 w-full rounded bg-muted motion-safe:animate-pulse md:block" />
+              <div className="h-12 w-3/4 rounded-full bg-muted motion-safe:animate-pulse" />
+            </div>
+          </div>
+        </section>
+      ) : <HeroCarousel items={heroItems} favoriteIds={favoriteIds} />}
+      <main className="mx-auto min-h-[60vh] max-w-7xl px-4 py-8">
         <h1 className="sr-only">Better Mangá — ler mangás, manhwas e comics online</h1>
+        {catalogFailed ? (
+          <div role="alert" className="mb-8 flex flex-wrap items-center justify-between gap-4 border-y border-border py-5">
+            <p className="text-sm text-muted-foreground">Não foi possível carregar algumas obras. Tente novamente.</p>
+            <Button variant="outline" onClick={retryCatalog}><RotateCw className="h-4 w-4" />Tentar novamente</Button>
+          </div>
+        ) : null}
         {empty ? (
           <div className="rounded-2xl border border-border bg-surface p-10 text-center">
             <h1 className="font-display text-2xl font-extrabold">Nenhuma obra publicada ainda</h1>
@@ -101,10 +131,13 @@ function Home() {
           <FavoritesUpdated rows={favorites.data ?? []} />
         ) : null}
 
+        {releases.isPending ? <LoadingShelf label="Carregando lançamentos" /> : null}
         {(releases.data?.length ?? 0) > 0 ? <Releases rows={releases.data ?? []} /> : null}
 
+        {updated.isPending ? <LoadingShelf label="Carregando atualizações" /> : null}
         {(updated.data?.length ?? 0) > 0 ? <RecentlyUpdated rows={updated.data ?? []} /> : null}
 
+        {ranking.isPending ? <LoadingShelf label="Carregando ranking" /> : null}
         {(ranking.data?.length ?? 0) > 0 ? (
           <SectionRow
             icon={<Trophy className="h-5 w-5" />}
@@ -144,5 +177,21 @@ function Home() {
       </main>
       <SiteFooter />
     </div>
+  );
+}
+
+function LoadingShelf({ label }: { label: string }) {
+  return (
+    <section aria-label={label} aria-busy="true" className="overflow-hidden pb-8">
+      <div aria-hidden="true" className="mb-5 h-7 w-48 rounded bg-muted motion-safe:animate-pulse" />
+      <div aria-hidden="true" className="flex gap-4 sm:gap-6">
+        {Array.from({ length: 7 }, (_, index) => (
+          <div key={index} className="w-[160px] shrink-0 space-y-3">
+            <div className="aspect-[2/3] rounded-lg bg-muted motion-safe:animate-pulse" />
+            <div className="h-4 w-4/5 rounded bg-muted motion-safe:animate-pulse" />
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
