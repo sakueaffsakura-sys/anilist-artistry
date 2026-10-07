@@ -414,6 +414,7 @@ function ChaptersPanel({ seriesId, chapters, onChange, isAdmin }: { seriesId: st
     onSuccess: () => {
       toast.success("Capítulo publicado!");
       setNumber("");
+      setNumberTouched(false);
       setTitle("");
       setUrls("");
       setFiles([]);
@@ -458,7 +459,7 @@ function ChaptersPanel({ seriesId, chapters, onChange, isAdmin }: { seriesId: st
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1.5">
             <Label>Número</Label>
-            <Input required value={number} onChange={(e) => setNumber(e.target.value)} placeholder={String((chapters[0]?.number ?? 0) + 1)} inputMode="decimal" className="bg-background" />
+            <Input required value={number} onChange={(e) => { setNumberTouched(true); setNumber(e.target.value); }} placeholder={String((chapters[0]?.number ?? 0) + 1)} inputMode="decimal" className="bg-background" />
           </div>
           <div className="col-span-2 space-y-1.5">
             <Label>Título (opcional)</Label>
