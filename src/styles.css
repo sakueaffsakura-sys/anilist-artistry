@@ -156,6 +156,39 @@
   }
 }
 
-.hero-reference-shade {
-  background: linear-gradient(90deg, color-mix(in oklab, var(--background) 96%, transparent), color-mix(in oklab, var(--background) 88%, transparent) 60%, color-mix(in oklab, var(--background) 72%, transparent)), var(--gradient-hero-vertical);
+.hero-model {
+  --hero-background: oklch(0.18 0.035 285);
+  --hero-foreground: oklch(0.97 0.005 285);
+  --hero-muted: oklch(0.69 0.014 285);
+  --hero-accent: oklch(0.7 0.2 48);
+  --hero-rating: oklch(0.78 0.16 70);
+  --hero-action-ink: oklch(0.08 0.01 285);
+  --hero-surface: oklch(0.24 0.028 285);
+  --hero-bookmark: oklch(0.75 0.19 160);
+  background: var(--hero-background);
+  color: var(--hero-foreground);
+}
+.hero-model .hero-reference-shade {
+  background: linear-gradient(0deg, var(--hero-background), color-mix(in oklab, var(--hero-background) 86%, transparent) 35%, color-mix(in oklab, var(--hero-background) 80%, transparent));
+}
+.hero-model-layout { min-height: 520px; align-items: center; }
+.hero-model-status, .hero-model-nav { color: var(--hero-accent); }
+.hero-model-tag, .hero-model-nav { background: color-mix(in oklab, var(--hero-surface) 85%, transparent); }
+.hero-model-tag { color: var(--hero-foreground); }
+.hero-model-synopsis { color: var(--hero-muted); }
+.hero-model-rating { color: var(--hero-rating); }
+.hero-model-chapter { background: color-mix(in oklab, var(--hero-surface) 70%, transparent); }
+.hero-model-chapter-icon, .hero-model-read, .hero-model-dot { background: var(--hero-accent); color: var(--hero-action-ink); }
+.hero-model-read:hover { background: color-mix(in oklab, var(--hero-accent) 85%, var(--hero-foreground)); }
+.hero-model-action-icon { background: var(--hero-action-ink); color: var(--hero-accent); }
+.hero-model-favorite { background: color-mix(in oklab, var(--hero-surface) 45%, transparent); color: var(--hero-muted); }
+.hero-model-favorite:hover, .hero-model-nav:hover { background: var(--hero-surface); color: var(--hero-foreground); }
+.hero-model-bookmark { color: var(--hero-bookmark); }
+.hero-model-nav { border-color: color-mix(in oklab, var(--hero-foreground) 6%, transparent); }
+@media (max-width: 767px) {
+  .hero-model-layout { min-height: 0; align-items: start; }
+  .hero-model-layout > div { display: contents; }
+  .hero-model-layout > div > h2, .hero-model-layout > div > p:first-child, .hero-model-layout > div > div:first-of-type { grid-column: 2; }
+  .hero-model-layout > a { grid-row: 1 / 4; }
+  .hero-model-layout > div > div:nth-of-type(n+2) { grid-column: 1 / -1; margin-top: 0; }
 }

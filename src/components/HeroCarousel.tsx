@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { BookOpen, ChevronLeft, ChevronRight, Bookmark, Star } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Bookmark, Star, Quote, CirclePlus } from "lucide-react";
 import type { SeriesRow } from "@/lib/queries";
 import { KINDS } from "@/lib/queries";
 import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
@@ -110,7 +110,7 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
   return (
     <section
       aria-label="Destaques"
-      className="w-full overflow-hidden bg-background pb-6 pt-4 md:pb-8 md:pt-5"
+      className="hero-model w-full overflow-hidden pb-6 pt-4 md:pb-8 md:pt-5"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -123,40 +123,38 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
       }}>
         {active.banner_url ? <img src={coverUrl(active.banner_url)} alt="" aria-hidden="true" decoding="async" className="absolute inset-0 -z-20 h-full w-full object-cover" /> : null}
         <div className="hero-reference-shade absolute inset-0 -z-10" />
-        <div className="mx-auto grid max-w-7xl grid-cols-[110px_minmax(0,1fr)] gap-5 px-4 py-7 md:grid-cols-[240px_minmax(0,1fr)] md:gap-10 md:px-6 md:py-10 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="hero-model-layout mx-auto grid max-w-[1400px] grid-cols-[110px_minmax(0,1fr)] gap-5 px-4 py-7 md:grid-cols-[220px_minmax(0,1fr)] md:gap-10 md:px-10 md:py-12 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-12">
           <Link to="/obra/$slug" params={{ slug: active.slug }} className="relative self-start overflow-hidden rounded-lg shadow-[var(--shadow-hero)]">
             <img src={coverUrl(active.cover_url)} alt={`Capa de ${active.title}`} className="aspect-[2/3] w-full object-cover" decoding="async" fetchPriority="high" draggable={false} />
-            <span className="absolute left-2 top-2 flex items-center gap-1 rounded bg-background/90 px-2 py-1 text-xs font-bold text-gold"><Star className="h-3 w-3 fill-current" />{Number(active.rating).toFixed(1)}</span>
           </Link>
-          <div className="min-w-0 self-center">
-            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
-              <span className="font-bold text-primary">{active.status}</span>
-              {(active.genres ?? []).slice(0, 3).map((genre) => <span key={genre} className="text-muted-foreground">{genre}</span>)}
-            </div>
+          <div className="min-w-0">
+            <p className="hero-model-status mb-1 text-sm font-bold md:text-base">{active.status}</p>
             <h2 className="break-words font-display text-xl font-extrabold leading-tight md:text-3xl lg:text-4xl"><Link to="/obra/$slug" params={{ slug: active.slug }}>{active.title}</Link></h2>
-            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground md:text-sm">
-              <span className="flex items-center gap-2 text-gold"><span className="flex gap-0.5" aria-hidden="true">{Array.from({ length: 5 }, (_, star) => <Star key={star} className={`h-3.5 w-3.5 ${star < Math.round(Number(active.rating) / 2) ? "fill-current" : "fill-none opacity-40"}`} />)}</span>{Number(active.rating).toFixed(1)}</span>
-              <span className="inline-flex items-center gap-1.5"><BookOpen className="h-4 w-4" />{active.kind}</span>
-              <span>{active.chapters.length} capítulos disponíveis</span>
+            <div className="mt-5 flex flex-wrap gap-2 text-xs md:text-sm">
+              {(active.genres ?? []).slice(0, 3).map((genre) => <span key={genre} className="hero-model-tag rounded-lg px-2.5 py-1">{genre}</span>)}
             </div>
-            {active.synopsis ? <p className="mt-4 hidden max-w-3xl text-sm leading-7 text-foreground/80 line-clamp-3 md:[display:-webkit-box]">{active.synopsis.replace(/<[^>]*>/g, "")}</p> : null}
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-              <Button asChild className="rounded-md font-bold"><Link to="/obra/$slug" params={{ slug: active.slug }}><BookOpen className="h-4 w-4" /><span className="md:hidden">Capítulos</span><span className="hidden md:inline">Ver todos os capítulos</span></Link></Button>
-              <Button variant="outline" size="icon" className={`shrink-0 rounded-md bg-background/60 ${favoriteIds.has(active.id) ? "text-primary" : "text-foreground"}`} title={favoriteIds.has(active.id) ? "Remover dos favoritos" : "Favoritar"} aria-label={favoriteIds.has(active.id) ? "Remover dos favoritos" : "Favoritar"} aria-pressed={favoriteIds.has(active.id)} disabled={toggleFavorite.isPending} onClick={() => toggleFavorite.mutate({ id: active.id, saved: favoriteIds.has(active.id) })}><Bookmark className={`h-4 w-4 ${favoriteIds.has(active.id) ? "fill-current" : ""}`} /></Button>
+            {active.synopsis ? <p className="hero-model-synopsis mt-5 hidden text-sm font-semibold italic leading-relaxed line-clamp-3 md:[display:-webkit-box] md:text-base"><Quote className="mr-1 inline h-4 w-4" />{active.synopsis.replace(/<[^>]*>/g, "")}</p> : null}
+            <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3 text-xs md:text-sm">
+              <span className="hero-model-rating flex items-center gap-2 text-xl font-extrabold md:text-2xl"><span className="flex gap-0.5" aria-hidden="true">{Array.from({ length: 5 }, (_, star) => <Star key={star} className={`h-4 w-4 md:h-5 md:w-5 ${star < Math.round(Number(active.rating) / 2) ? "fill-current" : "fill-none opacity-40"}`} />)}</span>{Number(active.rating).toFixed(1)}</span>
+              <span className="hero-model-tag inline-flex items-center gap-2 rounded-full px-3 py-0.5"><CirclePlus className="hero-model-status h-3 w-3" />{active.chapters.length} capítulos</span>
+              <span className="hero-model-tag inline-flex items-center gap-2 rounded-full px-3 py-0.5"><CirclePlus className="hero-model-status h-3 w-3" />{active.kind}</span>
             </div>
-          </div>
-          <div className="col-span-2 md:col-start-2 md:col-span-1">
-            {active.synopsis ? <p className="mb-5 line-clamp-3 text-sm leading-6 text-muted-foreground md:hidden">{active.synopsis.replace(/<[^>]*>/g, "")}</p> : null}
-            {active.chapters.length ? <div className="max-w-3xl divide-y divide-border border-y border-border">
-              {active.chapters.slice(0, 2).map((chapter) => <Link key={chapter.id} to="/obra/$slug/$chapter" params={{ slug: active.slug, chapter: formatChapter(chapter.number) }} className="flex items-center justify-between gap-4 py-3 text-xs transition-colors hover:text-primary md:text-sm"><span className="truncate font-semibold">Cap. {formatChapter(chapter.number)}{chapter.title ? ` — ${chapter.title}` : ""}</span><span className="shrink-0 text-xs text-muted-foreground">{timeAgo(chapter.created_at)}</span></Link>)}
+            {active.chapters.length ? <div className="mt-5 flex flex-wrap gap-3">
+              {active.chapters.slice(0, 2).map((chapter) => <Link key={chapter.id} to="/obra/$slug/$chapter" params={{ slug: active.slug, chapter: formatChapter(chapter.number) }} className="hero-model-chapter inline-flex items-center overflow-hidden rounded-lg text-xs" title={chapter.title ?? `Capítulo ${formatChapter(chapter.number)}`}><span className="hero-model-chapter-icon px-2 py-2"><BookOpen className="h-3.5 w-3.5" /></span><span className="px-1.5 font-semibold">Cap. {formatChapter(chapter.number)}</span><span className="hero-model-synopsis pr-2 text-[10px]">{timeAgo(chapter.created_at)}</span></Link>)}
             </div> : null}
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-5 md:mt-10">
+              <div className="flex flex-wrap items-center gap-3">
+                <Button asChild className="hero-model-read h-12 rounded-full pl-1.5 pr-5 text-sm font-medium md:h-14 md:text-base"><Link to="/obra/$slug" params={{ slug: active.slug }}><span className="hero-model-action-icon mr-1 grid h-9 w-9 place-items-center rounded-full md:h-10 md:w-10"><BookOpen className="h-5 w-5" /></span>Ver todos os capítulos</Link></Button>
+                <Button variant="ghost" className="hero-model-favorite h-12 rounded-full pl-1.5 pr-4 text-sm md:h-14 md:text-base" aria-label={favoriteIds.has(active.id) ? "Remover dos favoritos" : "Favoritar"} aria-pressed={favoriteIds.has(active.id)} disabled={toggleFavorite.isPending} onClick={() => toggleFavorite.mutate({ id: active.id, saved: favoriteIds.has(active.id) })}><span className="hero-model-action-icon grid h-9 w-9 place-items-center rounded-full md:h-10 md:w-10"><Bookmark className={`hero-model-bookmark h-5 w-5 ${favoriteIds.has(active.id) ? "fill-current" : ""}`} /></span>{favoriteIds.has(active.id) ? "Nos favoritos" : "Add aos Favoritos"}</Button>
+              </div>
+              {slides.length > 1 ? <div className="ml-auto flex items-end gap-3">
+                <span className="hero-model-dot mb-0.5 mr-5 h-2 w-4 rounded-full" aria-label={`Destaque ${index + 1} de ${slides.length}`} />
+                <Button size="icon" variant="outline" className="hero-model-nav h-12 w-12 rounded-full" aria-label="Destaque anterior" onClick={() => go(-1)}><ChevronLeft className="h-4 w-4" /></Button>
+                <Button size="icon" variant="outline" className="hero-model-nav h-12 w-12 rounded-full" aria-label="Próximo destaque" onClick={() => go(1)}><ChevronRight className="h-4 w-4" /></Button>
+              </div> : null}
+            </div>
           </div>
         </div>
-        {slides.length > 1 ? <div className="mx-auto flex max-w-7xl items-center justify-end gap-3 px-4 pb-4 md:px-6">
-          <Button size="icon" variant="ghost" aria-label="Destaque anterior" onClick={() => go(-1)}><ChevronLeft className="h-4 w-4" /></Button>
-          <span className="text-xs tabular-nums text-muted-foreground">{index + 1} / {slides.length}</span>
-          <Button size="icon" variant="ghost" aria-label="Próximo destaque" onClick={() => go(1)}><ChevronRight className="h-4 w-4" /></Button>
-        </div> : null}
       </div>
     </section>
   );
