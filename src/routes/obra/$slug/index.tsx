@@ -611,8 +611,8 @@ function SeriesPage() {
                 ) : null}
               </ul>
               <p className="pt-4 text-center text-xs text-muted-foreground">Total de capítulos encontrados: {visibleChapters.length}</p>
-              </div>
               </TabsContent>
+              </div>
               </Tabs>
             </section>
 
