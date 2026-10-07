@@ -20,3 +20,4 @@
 - Maintenance is persisted in a singleton settings row, enforced by restrictive content RLS and request middleware; verified admin bearer sessions bridge hard refresh via an HTTP-only short-lived cookie, never a client role flag. Maintenance media stays in its own private bucket and uses renewable signed URLs.
 - `npm run build:cpanel` (CPANEL_BUILD=1) switches nitro to the node-server preset with app.cjs as Passenger entry; Lovable builds ignore it so publishing stays on its own target.
 - Session state is provided once by SessionProvider in the root; useSession consumes that shared state so repeated catalog cards do not create individual auth subscriptions.
+- Global click audio uses one client-only player and delegated document listener mounted in the root, so navigation preserves playback without per-control subscriptions.

@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getMaintenanceStatus, verifyMaintenanceAdmin } from "@/lib/maintenance.functions";
 import { maintenanceExemptPath } from "@/lib/maintenance-policy";
 import { SessionProvider } from "@/hooks/useAuth";
+import { ClickSound } from "@/components/ClickSound";
 
 function NotFoundComponent() {
   return (
@@ -171,6 +172,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
+      <ClickSound />
       <Outlet />
       <Toaster position="top-center" />
       {maintenancePage ? null : <SupportChat />}
