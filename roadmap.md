@@ -1,5 +1,7 @@
 # Tarefas
 
+- [x] Verificar página inicial ao entrar/recarregar: obras carregaram, conexão lenta mostrou quatro áreas de carregamento, falha mostrou aviso e “Tentar novamente” recuperou as obras sem erros; sem alterar dados nem publicar
+
 - [x] Fechar espaço acima do slide, manter barra translúcida visível e reduzir trabalho do slide fora da tela; rolagem conferida no navegador sem erros, ganho de velocidade em produção não medido
 
 - [x] Otimizar carregamento inicial e sessões compartilhadas; consultas de catálogo na home reduzidas de 6 para 4, navegação pública conferida; teste de conta conectada e medição em produção pendentes
