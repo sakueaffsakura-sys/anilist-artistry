@@ -519,8 +519,9 @@ function SeriesPage() {
                     ].map(([label, value]) => <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-4"><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 break-words font-medium">{value}</dd></div>)}
                   </dl>
                 </TabsContent>
-                <TabsContent value="chapters" className="mt-0">
-              <div className="flex flex-col gap-4 py-5">
+                <TabsContent value="chapters" className="mt-6">
+              <div className="rounded-2xl border border-border bg-surface/60 p-4 md:p-5">
+              <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                    <span className="text-sm text-muted-foreground">{obra.chapters.length} capítulos</span>
                   <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
