@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { BookOpen, ChevronLeft, ChevronRight, Bookmark, Star, Quote, CirclePlus } from "lucide-react";
 import type { SeriesRow } from "@/lib/queries";
-import { KINDS } from "@/lib/queries";
 import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
 import { Button } from "@/components/ui/button";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,7 +10,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const INTERVAL = 6000;
-const CATEGORY_LABELS = [...KINDS];
 
 export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favoriteIds: Set<string> }) {
   const { user } = useSession();
@@ -27,18 +25,10 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["favorites"] }); },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Não foi possível atualizar os favoritos."),
   });
-  const allSlides = useMemo(() => items.slice(0, 10), [items]);
-  const kinds = useMemo(() => new Set(allSlides.map((item) => item.kind).filter(Boolean)), [allSlides]);
-  const [kind, setKind] = useState(() => allSlides[0]?.kind ?? "");
-  const slides = useMemo(
-    () => (kind ? allSlides.filter((item) => item.kind === kind) : allSlides),
-    [allSlides, kind],
-  );
+  const slides = useMemo(() => items.slice(0, 10), [items]);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => setIndex(0), [kind]);
 
   useEffect(() => {
     if (index >= slides.length) setIndex(0);
@@ -57,55 +47,13 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
 
   const touchStart = useRef<number | null>(null);
 
-  if (allSlides.length === 0) return null;
+  if (slides.length === 0) return null;
 
   const active = slides[index] ?? slides[0] ?? null;
   const go = (delta: number) =>
     setIndex((current) => (current + delta + slides.length) % slides.length);
 
-  const categoryBar = (
-    <div className="mx-auto mb-5 hidden w-full max-w-[1400px] justify-center px-6 md:flex">
-      <div className="no-scrollbar inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-foreground/10 bg-card/70 px-1 py-1 backdrop-blur-sm">
-        {CATEGORY_LABELS.map((label) => (
-          <Button
-            key={label}
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => setKind(label)}
-            className={`h-8 shrink-0 rounded-full px-4 text-[11px] font-semibold whitespace-nowrap transition-all duration-200 ease-out active:scale-[0.97] ${
-              kind === label
-                ? "ring-1 ring-foreground/80 bg-primary text-primary-foreground shadow-[var(--shadow-glow)] hover:bg-primary"
-                : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
-            }`}
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
-    </div>
-  );
-
-  if (!active) {
-    return (
-      <section aria-label="Destaques" className="w-full overflow-hidden bg-background pb-6 pt-4 md:pb-8 md:pt-5">
-        {categoryBar}
-        <div className="mx-auto max-w-7xl px-4 md:px-6">
-          <div className="flex min-h-[16rem] flex-col items-center justify-center gap-4 rounded-2xl border border-foreground/10 bg-card/60 py-10 text-center backdrop-blur-sm">
-            <BookOpen className="h-8 w-8 text-muted-foreground" />
-            <p className="max-w-sm text-sm text-muted-foreground">
-              Nenhuma obra de <span className="font-bold text-foreground">{kind}</span> no slide ainda.
-            </p>
-            <Button asChild size="sm" className="rounded-full px-5 text-xs font-black uppercase shadow-[var(--shadow-glow)]">
-              <Link to="/catalogo" search={{ kind }}>
-                Explorar {kind} no catálogo
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  if (!active) return null;
 
   return (
     <section
@@ -114,8 +62,6 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {kinds.size > 0 ? categoryBar : null}
-
       <div className="relative isolate" onTouchStart={(event) => { touchStart.current = event.touches[0]?.clientX ?? null; }} onTouchEnd={(event) => {
         const end = event.changedTouches[0]?.clientX;
         if (touchStart.current !== null && end !== undefined && Math.abs(end - touchStart.current) > 55 && slides.length > 1) go(end < touchStart.current ? 1 : -1);
