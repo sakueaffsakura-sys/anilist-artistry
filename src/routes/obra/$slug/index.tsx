@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import {
   ArrowDownWideNarrow,
+  ArrowRight,
   BookOpen,
   Check,
   CheckCheck,
