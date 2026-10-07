@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import {
   ArrowDownWideNarrow,
+  ArrowRight,
   BookOpen,
   Check,
   CheckCheck,
@@ -26,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchComments, fetchSeriesBySlug } from "@/lib/queries";
-import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
+import { coverUrl, formatChapter } from "@/lib/media";
 import { useSession } from "@/hooks/useAuth";
 import { AddToListButton, StatusButton } from "@/components/SeriesActions";
 import { CommentThreads } from "@/components/CommentThreads";
@@ -561,31 +562,35 @@ function SeriesPage() {
                   const isRead = readIds.has(chapter.id);
                   const commentCount = chapterCommentCounts.data?.get(chapter.id) ?? 0;
                   return (
-                    <li key={chapter.id} className={`flex items-center gap-4 px-4 py-3.5 transition hover:bg-foreground/[0.02] ${isRead ? "opacity-60 hover:opacity-90" : ""}`}>
+                    <li key={chapter.id} className={`group relative flex items-center gap-4 px-4 py-3.5 transition hover:bg-foreground/[0.04] ${isRead ? "opacity-60 hover:opacity-90" : ""}`}>
                       <Link
                         to="/obra/$slug/$chapter"
                         params={{ slug: obra.slug, chapter: formatChapter(chapter.number) }}
                         className="flex min-w-0 flex-1 items-center gap-4 text-left"
                       >
-                         <span className="relative h-14 w-11 shrink-0 overflow-hidden rounded-md bg-surface-2">
-                           <img src={coverUrl(obra.cover_url)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
-                           {isRead ? <span className="absolute inset-0 grid place-items-center bg-background/70 text-primary"><Check className="h-[18px] w-[18px]" strokeWidth={2.5} /></span> : null}
+                        <span className="relative h-14 w-11 shrink-0 overflow-hidden rounded-md bg-surface-2 shadow-md transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110">
+                          <img src={coverUrl(obra.cover_url)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                          {isRead ? <span className="absolute inset-0 grid place-items-center bg-background/70 text-primary"><Check className="h-[18px] w-[18px]" strokeWidth={2.5} /></span> : null}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className={`block truncate font-medium ${isRead ? "text-emerald-500/90" : ""}`}>
-                            Capítulo {formatChapter(chapter.number)}
-                            {chapter.title ? <span className="ml-2 font-normal text-muted-foreground">{chapter.title}</span> : null}
+                          <span className="flex items-center gap-1.5">
+                            <BookOpen className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                            <ArrowRight className="h-3.5 w-3.5 shrink-0 -translate-x-1.5 text-primary opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100" />
+                            <span className={`truncate font-bold transition-colors group-hover:text-primary ${isRead ? "text-emerald-500/90" : ""}`}>
+                              Cap. #{formatChapter(chapter.number)}
+                              {chapter.title ? <span className="ml-2 font-semibold text-muted-foreground transition-colors group-hover:text-primary">| {chapter.title}</span> : null}
+                            </span>
                           </span>
-                          <span className="mt-1 flex flex-wrap items-center gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground/70">{timeAgo(chapter.created_at)}</span>
-                            {isRead ? (
-                              <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-400">Lido</span>
-                            ) : null}
-                          </span>
+                          {isRead ? (
+                            <span className="mt-1 inline-block rounded border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-400">Lido</span>
+                          ) : null}
+                        </span>
+                        <span className="shrink-0 text-xs font-medium text-muted-foreground/70 transition-colors group-hover:text-primary">
+                          {new Date(chapter.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
                         </span>
                       </Link>
                       {commentCount > 0 ? (
-                        <span className="inline-flex items-center gap-1 text-xs tabular-nums text-muted-foreground/60" title="Comentários">
+                        <span className="inline-flex shrink-0 items-center gap-1 text-xs tabular-nums text-muted-foreground/60 transition-colors group-hover:text-primary" title="Comentários">
                           <MessageSquare className="h-3.5 w-3.5" /> {commentCount}
                         </span>
                       ) : null}
