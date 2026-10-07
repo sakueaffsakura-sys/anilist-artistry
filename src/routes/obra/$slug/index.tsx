@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchComments, fetchSeriesBySlug } from "@/lib/queries";
 import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
@@ -496,12 +497,32 @@ function SeriesPage() {
         </main>
 
         <div className="relative z-10 mx-auto max-w-7xl px-4 pb-10 pt-4 md:px-8 md:pt-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
+          <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-12">
             {/* Chapters */}
-            <section className="min-w-0 flex-1 overflow-hidden rounded-2xl border border-border bg-surface/60 shadow-xl backdrop-blur">
-              <div className="flex flex-col gap-3 border-b border-border px-4 py-4">
+            <section className="min-w-0">
+              <Tabs defaultValue="chapters">
+                <TabsList className="h-12 w-full justify-start gap-6 rounded-none border-b border-border bg-transparent p-0">
+                  <TabsTrigger value="chapters" className="h-full gap-2 rounded-none border-b-2 border-transparent px-1 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"><BookOpen className="h-4 w-4" />Capítulos</TabsTrigger>
+                  <TabsTrigger value="information" className="h-full gap-2 rounded-none border-b-2 border-transparent px-1 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"><Eye className="h-4 w-4" />Informações</TabsTrigger>
+                </TabsList>
+                <TabsContent value="information" className="mt-6">
+                  <h2 className="mb-5 font-display text-lg font-bold">{obra.title}</h2>
+                  <dl className="divide-y divide-border text-sm">
+                    {[
+                      ["Tipo", obra.kind],
+                      ["Status", obra.status],
+                      ["Capítulos", String(obra.chapters.length)],
+                      ["Autor", obra.author || "Não informado"],
+                      ["Artista", obra.artist || "Não informado"],
+                      ["Gêneros", obra.genres.join(", ") || "Não informado"],
+                      ["Última atualização", new Date(obra.updated_at).toLocaleDateString("pt-BR")],
+                    ].map(([label, value]) => <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-4"><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 break-words font-medium">{value}</dd></div>)}
+                  </dl>
+                </TabsContent>
+                <TabsContent value="chapters" className="mt-0">
+              <div className="flex flex-col gap-4 py-5">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <h2 className="font-display font-bold">Capítulos</h2>
+                   <span className="text-sm text-muted-foreground">{obra.chapters.length} capítulos</span>
                   <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
                     {user ? (
                       <>
@@ -521,12 +542,17 @@ function SeriesPage() {
                   <input
                     value={chapterSearch}
                     onChange={(e) => setChapterSearch(e.target.value)}
-                    placeholder="Buscar capítulo..."
-                    className="w-full rounded-full border border-border bg-foreground/[0.03] py-2.5 pl-10 pr-4 text-[13px] outline-none transition placeholder:text-muted-foreground/50 focus:border-primary/40 focus:bg-foreground/[0.06]"
+                    placeholder="Escolher capítulo..."
+                    aria-label="Buscar capítulo"
+                    className="w-full rounded-md border border-border bg-surface py-3 pl-10 pr-4 text-[13px] outline-none transition placeholder:text-muted-foreground/50 focus:border-primary/40 focus:bg-surface-2"
                   />
                 </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {firstChapter ? <Button asChild className="h-11 gap-2"><Link to="/obra/$slug/$chapter" params={{ slug: obra.slug, chapter: formatChapter(firstChapter.number) }}><Play className="h-4 w-4" />Primeiro capítulo</Link></Button> : null}
+                  {lastChapter ? <Button asChild variant="outline" className="h-11 gap-2 border-primary/40 text-primary"><Link to="/obra/$slug/$chapter" params={{ slug: obra.slug, chapter: formatChapter(lastChapter.number) }}><Forward className="h-4 w-4" />Capítulo mais recente</Link></Button> : null}
+                </div>
               </div>
-              <ul className="max-h-[60vh] divide-y divide-border/40 overflow-y-auto">
+              <ul className="max-h-[70vh] divide-y divide-border/60 overflow-y-auto border-y border-border">
                 {visibleChapters.map((chapter) => {
                   const isRead = readIds.has(chapter.id);
                   const commentCount = chapterCommentCounts.data?.get(chapter.id) ?? 0;
@@ -537,8 +563,9 @@ function SeriesPage() {
                         params={{ slug: obra.slug, chapter: formatChapter(chapter.number) }}
                         className="flex min-w-0 flex-1 items-center gap-4 text-left"
                       >
-                        <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border text-sm font-bold ${isRead ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400" : "border-border bg-foreground/[0.04] text-muted-foreground"}`}>
-                          {isRead ? <Check className="h-[18px] w-[18px]" strokeWidth={2.5} /> : formatChapter(chapter.number)}
+                         <span className="relative h-14 w-11 shrink-0 overflow-hidden rounded-md bg-surface-2">
+                           <img src={coverUrl(obra.cover_url)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                           {isRead ? <span className="absolute inset-0 grid place-items-center bg-background/70 text-primary"><Check className="h-[18px] w-[18px]" strokeWidth={2.5} /></span> : null}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className={`block truncate font-medium ${isRead ? "text-emerald-500/90" : ""}`}>
@@ -579,11 +606,26 @@ function SeriesPage() {
                   </li>
                 ) : null}
               </ul>
+              <p className="py-4 text-center text-xs text-muted-foreground">Total de capítulos encontrados: {visibleChapters.length}</p>
+              </TabsContent>
+              </Tabs>
             </section>
 
             {/* Sidebar */}
-            <aside className="w-full space-y-5 lg:w-[320px] lg:shrink-0">
-              <div className="rounded-2xl border border-border bg-surface/60 p-5">
+            <aside className="min-w-0 space-y-8">
+              <section>
+                <h2 className="flex items-center gap-3 border-b border-border pb-4 font-display text-base font-bold"><Sparkles className="h-4 w-4 text-primary" />Obras relacionadas</h2>
+                <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-6">
+                  {(recommended.data ?? []).map((r) => (
+                    <Link key={r.id} to="/obra/$slug" params={{ slug: r.slug }} className="group min-w-0">
+                      <div className="aspect-[2/3] overflow-hidden rounded-md bg-surface-2"><img src={coverUrl(r.cover_url)} alt={r.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-300 motion-reduce:transition-none group-hover:scale-105" /></div>
+                      <p className="mt-2 line-clamp-2 text-[13px] font-bold leading-snug group-hover:text-primary">{r.title}</p>
+                    </Link>
+                  ))}
+                </div>
+                {!recommended.isLoading && !recommended.data?.length ? <p className="py-4 text-sm text-muted-foreground">Nenhuma obra relacionada disponível.</p> : null}
+              </section>
+              <div className="border-t border-border pt-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-bold">Avaliar</h3>
@@ -614,7 +656,7 @@ function SeriesPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-border bg-surface/60 p-5">
+              <div className="border-t border-border pt-5">
                 <div className="flex items-start gap-3">
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-rose-500/10 text-rose-400"><Heart className="h-4 w-4" /></span>
                   <div>
@@ -632,26 +674,6 @@ function SeriesPage() {
               </div>
             </aside>
           </div>
-
-          {/* Recommendations */}
-          {(recommended.data ?? []).length > 0 ? (
-            <section className="mt-14">
-              <h2 className="flex items-center gap-3 font-display text-lg font-bold">
-                <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><Sparkles className="h-4 w-4" /></span>
-                Recomendadas para você
-              </h2>
-              <div className="mt-5 grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6">
-                {(recommended.data ?? []).map((r) => (
-                  <Link key={r.id} to="/obra/$slug" params={{ slug: r.slug }} className="group">
-                    <div className="aspect-[2/3] overflow-hidden rounded-2xl border border-border">
-                      <img src={coverUrl(r.cover_url)} alt={r.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                    </div>
-                    <p className="mt-2 line-clamp-2 text-[13px] font-bold leading-snug group-hover:text-primary">{r.title}</p>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ) : null}
 
           {/* Comments */}
           <section className="mx-auto mt-14 max-w-4xl rounded-2xl border border-border bg-surface/60 p-5 md:p-8">
