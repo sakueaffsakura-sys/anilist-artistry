@@ -61,3 +61,16 @@ export const importNovelChapter = createServerFn({ method: "POST" })
       };
     return { ok: true as const, ...result };
   });
+
+/** Ajusta o texto para publicar: converte HTML colado, remove avisos de tradução e normaliza espaços/parágrafos. */
+export function prepareChapterText(raw: string) {
+  const isHtml = /<\/?(p|div|br|h[1-6]|em|strong|span)[\s>/]/i.test(raw);
+  const base = isHtml ? extractChapter(raw) : { title: null, number: null, content: raw };
+  const paras = base.content
+    .replace(/\r\n?/g, "\n")
+    .replace(/\u00a0/g, " ")
+    .split(/\n{2,}|\n/)
+    .map((p) => decode(p).replace(/[ \t]+/g, " ").replace(/\s+([,.;:!?…])/g, "$1").trim())
+    .filter((p) => p && !/^traduzido (usando|por)/i.test(p));
+  return { title: base.title, number: base.number, content: paras.join("\n\n") };
+}

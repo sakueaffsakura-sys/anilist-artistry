@@ -14,7 +14,7 @@ import { uniqueSlug } from "@/lib/series-import";
 import { coverUrl, formatChapter } from "@/lib/media";
 import { useSession } from "@/hooks/useAuth";
 import { useServerFn } from "@tanstack/react-start";
-import { extractChapter, importNovelChapter } from "@/lib/novel-import.functions";
+import { extractChapter, importNovelChapter, prepareChapterText } from "@/lib/novel-import.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/novels")({
   staticData: { sitemap: false },
@@ -288,7 +288,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
       try {
         const raw = await file.text();
         const isHtml = /<\/?(p|div|html|body)[\s>]/i.test(raw);
-        const r = isHtml ? extractChapter(raw) : { title: null, number: null, content: raw.trim() };
+        void isHtml; const r = prepareChapterText(raw);
         const fromName = file.name.match(/(\d+(?:[.,]\d+)?)/)?.[1]?.replace(",", ".");
         const num = Number(r.number ?? fromName);
         if (!Number.isFinite(num) || r.content.length < 10) { skipped.push(`${file.name} (sem número ou texto)`); continue; }
@@ -366,15 +366,16 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
     mutationFn: async () => {
       const num = Number(number);
       if (!Number.isFinite(num) || num < 0) throw new Error("Número de capítulo inválido.");
-      if (content.trim().length < 10) throw new Error("Escreva o texto do capítulo.");
+      const prepared = prepareChapterText(content);
+      if (prepared.content.length < 10) throw new Error("Escreva o texto do capítulo.");
       if (novel.chapters.some((chapter) => Number(chapter.number) === num && chapter.id !== editingId)) {
         throw new Error(`O capítulo ${formatChapter(num)} já existe.`);
       }
       const values = {
         series_id: novel.id,
         number: num,
-        title: title.trim() || null,
-        content: content.trim(),
+        title: title.trim() || prepared.title || null,
+        content: prepared.content,
         pages: [],
         published,
       };
@@ -515,9 +516,9 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
               onChange={(e) => setContent(e.target.value)}
               onPaste={(e) => {
                 const html = e.clipboardData.getData("text/plain");
-                if (/<p[\s>]/i.test(html) && /<\/p>/i.test(html)) {
+                if (/<\/?(p|div|br|h[1-6])[\s>/]/i.test(html)) {
                   e.preventDefault();
-                  applyImport(extractChapter(html));
+                  applyImport(prepareChapterText(html));
                 }
               }}
               placeholder="Cole ou escreva o texto aqui. Separe os parágrafos com uma linha em branco."
