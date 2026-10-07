@@ -520,35 +520,37 @@ function SeriesPage() {
                     ].map(([label, value]) => <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-4"><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 break-words font-medium">{value}</dd></div>)}
                   </dl>
                 </TabsContent>
-                <TabsContent value="chapters" className="mt-6">
-              <div className="rounded-2xl border border-border bg-surface/60 p-4 md:p-5">
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                   <span className="text-sm text-muted-foreground">{obra.chapters.length} capítulos</span>
-                  <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
-                    {user ? (
-                      <>
-                        <ToolbarButton disabled={markAll.isPending || chapters.length === 0} onClick={() => markAll.mutate("read")} icon={<CheckCheck className="h-3.5 w-3.5" />} label="Marcar todos" />
-                        <ToolbarButton disabled={markAll.isPending || readIds.size === 0} onClick={() => markAll.mutate("unread")} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Desmarcar todos" />
-                      </>
-                    ) : null}
-                    <ToolbarButton
-                      onClick={() => setOrder(order === "asc" ? "desc" : "asc")}
-                      icon={<ArrowDownWideNarrow className={`h-3.5 w-3.5 text-primary ${order === "asc" ? "rotate-180" : ""}`} />}
-                      label={order === "desc" ? "Recentes" : "Antigos"}
+                <TabsContent value="chapters" className="mt-0 p-4 md:p-5">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/60" />
+                    <input
+                      value={chapterSearch}
+                      onChange={(e) => setChapterSearch(e.target.value)}
+                      placeholder="Escolher capítulo..."
+                      aria-label="Buscar capítulo"
+                      className="w-full rounded-md border border-border bg-surface py-3 pl-10 pr-4 text-[13px] outline-none transition placeholder:text-muted-foreground/50 focus:border-primary/40 focus:bg-surface-2"
                     />
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setOrder(order === "asc" ? "desc" : "asc")}
+                    title={order === "desc" ? "Mais recentes primeiro" : "Mais antigos primeiro"}
+                    aria-label="Alternar ordem dos capítulos"
+                    className="grid h-[46px] w-[46px] shrink-0 place-items-center rounded-md border border-border bg-surface text-primary transition hover:border-primary/40 hover:bg-surface-2"
+                  >
+                    <ArrowDownWideNarrow className={`h-4 w-4 ${order === "asc" ? "rotate-180" : ""}`} />
+                  </button>
                 </div>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/60" />
-                  <input
-                    value={chapterSearch}
-                    onChange={(e) => setChapterSearch(e.target.value)}
-                    placeholder="Escolher capítulo..."
-                    aria-label="Buscar capítulo"
-                    className="w-full rounded-md border border-border bg-surface py-3 pl-10 pr-4 text-[13px] outline-none transition placeholder:text-muted-foreground/50 focus:border-primary/40 focus:bg-surface-2"
-                  />
-                </div>
+                {user ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{obra.chapters.length} capítulos</span>
+                    <span className="flex-1" />
+                    <ToolbarButton disabled={markAll.isPending || chapters.length === 0} onClick={() => markAll.mutate("read")} icon={<CheckCheck className="h-3.5 w-3.5" />} label="Marcar todos" />
+                    <ToolbarButton disabled={markAll.isPending || readIds.size === 0} onClick={() => markAll.mutate("unread")} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Desmarcar todos" />
+                  </div>
+                ) : null}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {firstChapter ? <Button asChild className="h-11 gap-2"><Link to="/obra/$slug/$chapter" params={{ slug: obra.slug, chapter: formatChapter(firstChapter.number) }}><Play className="h-4 w-4" />Primeiro capítulo</Link></Button> : null}
                   {lastChapter ? <Button asChild variant="outline" className="h-11 gap-2 border-primary/40 text-primary"><Link to="/obra/$slug/$chapter" params={{ slug: obra.slug, chapter: formatChapter(lastChapter.number) }}><Forward className="h-4 w-4" />Capítulo mais recente</Link></Button> : null}
