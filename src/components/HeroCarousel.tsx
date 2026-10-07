@@ -139,7 +139,7 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
               <span className="inline-flex items-center gap-1.5"><BookOpen className="h-4 w-4" />{active.kind}</span>
               <span>{active.chapters.length} capítulos disponíveis</span>
             </div>
-            {active.synopsis ? <p className="mt-4 hidden max-w-3xl text-sm leading-7 text-foreground/80 line-clamp-3 md:block">{active.synopsis.replace(/<[^>]*>/g, "")}</p> : null}
+            {active.synopsis ? <p className="mt-4 hidden max-w-3xl text-sm leading-7 text-foreground/80 line-clamp-3 md:[display:-webkit-box]">{active.synopsis.replace(/<[^>]*>/g, "")}</p> : null}
             <div className="mt-5 flex flex-wrap items-center gap-2">
               <Button asChild className="rounded-md font-bold"><Link to="/obra/$slug" params={{ slug: active.slug }}><BookOpen className="h-4 w-4" /><span className="md:hidden">Capítulos</span><span className="hidden md:inline">Ver todos os capítulos</span></Link></Button>
               <Button variant="outline" size="icon" className={`shrink-0 rounded-md bg-background/60 ${favoriteIds.has(active.id) ? "text-primary" : "text-foreground"}`} title={favoriteIds.has(active.id) ? "Remover dos favoritos" : "Favoritar"} aria-label={favoriteIds.has(active.id) ? "Remover dos favoritos" : "Favoritar"} aria-pressed={favoriteIds.has(active.id)} disabled={toggleFavorite.isPending} onClick={() => toggleFavorite.mutate({ id: active.id, saved: favoriteIds.has(active.id) })}><Bookmark className={`h-4 w-4 ${favoriteIds.has(active.id) ? "fill-current" : ""}`} /></Button>
