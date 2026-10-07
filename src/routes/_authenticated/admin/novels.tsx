@@ -14,7 +14,7 @@ import { uniqueSlug } from "@/lib/series-import";
 import { coverUrl, formatChapter } from "@/lib/media";
 import { useSession } from "@/hooks/useAuth";
 import { useServerFn } from "@tanstack/react-start";
-import { extractChapter, importNovelChapter } from "@/lib/novel-import.functions";
+import { extractChapter, importNovelChapter, prepareChapterText } from "@/lib/novel-import.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/novels")({
   staticData: { sitemap: false },
@@ -288,7 +288,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
       try {
         const raw = await file.text();
         const isHtml = /<\/?(p|div|html|body)[\s>]/i.test(raw);
-        const r = isHtml ? prepareChapterText(raw) : prepareChapterText(raw);
+        void isHtml; const r = prepareChapterText(raw);
         const fromName = file.name.match(/(\d+(?:[.,]\d+)?)/)?.[1]?.replace(",", ".");
         const num = Number(r.number ?? fromName);
         if (!Number.isFinite(num) || r.content.length < 10) { skipped.push(`${file.name} (sem número ou texto)`); continue; }
