@@ -320,6 +320,33 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
     setShowPreview(false);
   };
 
+  // Publica automaticamente um capítulo a partir de HTML colado.
+  async function publishHtml(raw: string) {
+    const r = prepareChapterText(raw);
+    if (r.content.length < 10) { toast.error("Não encontrei texto de capítulo nesse HTML."); return; }
+    const parsed = r.number ? Number(r.number.replace(",", ".")) : NaN;
+    const num = Number.isFinite(parsed) ? parsed : Number(number);
+    if (!Number.isFinite(num) || num < 0) { toast.error("Número de capítulo inválido."); return; }
+    if (novel.chapters.some((chapter) => Number(chapter.number) === num)) {
+      toast.error(`O capítulo ${formatChapter(num)} já existe.`);
+      return;
+    }
+    const { error } = await supabase.from("chapters").insert({
+      series_id: novel.id,
+      number: num,
+      title: r.title,
+      content: r.content,
+      pages: [],
+      published: true,
+    });
+    if (error) { toast.error(error.message); return; }
+    setHtmlPaste("");
+    window.localStorage.removeItem(draftKey);
+    resetEditor();
+    refresh();
+    toast.success(`Capítulo ${formatChapter(num)} publicado automaticamente!`);
+  }
+
   useEffect(() => {
     if (editingId) return;
     const saved = window.localStorage.getItem(draftKey);
@@ -507,20 +534,15 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
               maxLength={2000000}
             />
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[11px] text-muted-foreground">O sistema tira só o texto do capítulo e preenche número, título e texto.</p>
+              <p className="text-[11px] text-muted-foreground">O sistema tira o texto do HTML e já publica o capítulo automaticamente.</p>
               <Button
                 type="button"
                 variant="outline"
                 className="shrink-0"
                 disabled={!htmlPaste.trim()}
-                onClick={() => {
-                  const r = prepareChapterText(htmlPaste);
-                  if (r.content.length < 10) { toast.error("Não encontrei texto de capítulo nesse HTML."); return; }
-                  applyImport(r);
-                  setHtmlPaste("");
-                }}
+                onClick={() => { void publishHtml(htmlPaste); }}
               >
-                Extrair texto
+                Extrair e publicar
               </Button>
             </div>
           </div>
@@ -534,7 +556,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
             </label>
           </div>
           <label className="flex items-center gap-2 text-[11px] text-muted-foreground"><input type="checkbox" checked={bulkPublish} onChange={(e) => setBulkPublish(e.target.checked)} /> Publicar direto os capítulos enviados em lote</label>
-          <p className="text-[11px] text-muted-foreground">Também pode colar o HTML da página salva no campo de texto: ele é convertido automaticamente.</p>
+          <p className="text-[11px] text-muted-foreground">Também pode colar o HTML da página salva no campo de texto: o capítulo é extraído e publicado automaticamente.</p>
           <Label className="sr-only">Texto do capítulo</Label>
           {showPreview ? (
             <article className="min-h-[420px] flex-1 rounded-md border border-border bg-surface px-5 py-8 text-[17px] leading-8 text-foreground/90 sm:px-10 lg:min-h-[520px]">
@@ -548,7 +570,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
                 const html = e.clipboardData.getData("text/plain");
                 if (/<\/?(p|div|br|h[1-6])[\s>/]/i.test(html)) {
                   e.preventDefault();
-                  applyImport(prepareChapterText(html));
+                  void publishHtml(html);
                 }
               }}
               placeholder="Cole ou escreva o texto aqui. Separe os parágrafos com uma linha em branco."
