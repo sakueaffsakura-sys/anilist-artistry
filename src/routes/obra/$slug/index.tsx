@@ -553,7 +553,7 @@ function SeriesPage() {
                   {lastChapter ? <Button asChild variant="outline" className="h-11 gap-2 border-primary/40 text-primary"><Link to="/obra/$slug/$chapter" params={{ slug: obra.slug, chapter: formatChapter(lastChapter.number) }}><Forward className="h-4 w-4" />Capítulo mais recente</Link></Button> : null}
                 </div>
               </div>
-              <ul className="max-h-[70vh] divide-y divide-border/60 overflow-y-auto border-y border-border">
+              <ul className="mt-4 max-h-[70vh] divide-y divide-border/60 overflow-y-auto rounded-xl border border-border bg-background/40">
                 {visibleChapters.map((chapter) => {
                   const isRead = readIds.has(chapter.id);
                   const commentCount = chapterCommentCounts.data?.get(chapter.id) ?? 0;
