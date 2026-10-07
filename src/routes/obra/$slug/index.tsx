@@ -501,11 +501,12 @@ function SeriesPage() {
             {/* Chapters */}
             <section className="min-w-0">
               <Tabs defaultValue="chapters">
-                <TabsList className="h-12 w-full justify-start gap-6 rounded-none border-b border-border bg-transparent p-0">
+                <div className="overflow-hidden rounded-2xl border border-border bg-surface/60">
+                <TabsList className="h-12 w-full justify-start gap-6 rounded-none border-b border-border bg-transparent px-4 md:px-5">
                   <TabsTrigger value="chapters" className="h-full gap-2 rounded-none border-b-2 border-transparent px-1 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"><BookOpen className="h-4 w-4" />Capítulos</TabsTrigger>
                   <TabsTrigger value="information" className="h-full gap-2 rounded-none border-b-2 border-transparent px-1 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"><Eye className="h-4 w-4" />Informações</TabsTrigger>
                 </TabsList>
-                <TabsContent value="information" className="mt-6">
+                <TabsContent value="information" className="mt-0 p-4 md:p-5">
                   <h2 className="mb-5 font-display text-lg font-bold">{obra.title}</h2>
                   <dl className="divide-y divide-border text-sm">
                     {[
