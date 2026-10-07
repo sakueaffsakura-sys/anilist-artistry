@@ -494,6 +494,32 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
               {importing ? "Importando..." : "Importar do link"}
             </Button>
           </div>
+          <div className="space-y-2 rounded-md border border-border bg-surface/60 p-2">
+            <Textarea
+              value={htmlPaste}
+              onChange={(e) => setHtmlPaste(e.target.value)}
+              placeholder="Cole aqui o código HTML da página do capítulo (Ctrl+A, Ctrl+C na página salva)"
+              className="min-h-[90px] resize-y bg-background font-mono text-[11px]"
+              maxLength={2000000}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] text-muted-foreground">O sistema tira só o texto do capítulo e preenche número, título e texto.</p>
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0"
+                disabled={!htmlPaste.trim()}
+                onClick={() => {
+                  const r = prepareChapterText(htmlPaste);
+                  if (r.content.length < 10) { toast.error("Não encontrei texto de capítulo nesse HTML."); return; }
+                  applyImport(r);
+                  setHtmlPaste("");
+                }}
+              >
+                Extrair texto
+              </Button>
+            </div>
+          </div>
           <div className="flex flex-col gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2 sm:flex-row sm:items-center">
             <p className="min-w-0 flex-1 text-[11px] text-muted-foreground">
               {bulk ? `Cadastrando ${bulk.done}/${bulk.total}...` : "Envie várias páginas salvas (.html ou .txt) para cadastrar vários capítulos de uma vez."}
