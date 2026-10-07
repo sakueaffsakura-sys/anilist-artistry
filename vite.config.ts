@@ -8,7 +8,7 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 // `npm run build:cpanel` sets CPANEL_BUILD=1 to produce a Node.js server in .output/
 // (used by cPanel "Setup Node.js App"). Lovable publishing ignores this and keeps its own target.
-const cpanel = process.env.CPANEL_BUILD === "1";
+const cpanel = process.env["CPANEL_BUILD"] === "1";
 
 export default defineConfig({
   tanstackStart: {
