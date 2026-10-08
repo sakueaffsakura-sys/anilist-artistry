@@ -1,5 +1,7 @@
 # Tarefas
 
+- [x] Ampliar categorias no catálogo, painel e pedidos com Manhwa, Manhua, Webtoon, One-shot, Doujinshi e HQ; nove testes passaram e filtros conferidos no computador/celular, sem reclassificar obras existentes nem publicar
+
 - [ ] Mostrar no slide somente obras ativadas no painel, sem alternativa automática
 - [ ] Reduzir consultas repetidas e trabalho do carregamento da home
 - [ ] Criar pedidos de obras, atendimento administrativo e notificações de publicação

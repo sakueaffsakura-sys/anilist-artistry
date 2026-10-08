@@ -1,0 +1,2 @@
+ALTER TABLE public.work_requests DROP CONSTRAINT work_requests_kind_check;
+ALTER TABLE public.work_requests ADD CONSTRAINT work_requests_kind_check CHECK (kind IN ('Comic','Comic2','Shoujo','Shoujo2','Manga','Manhwa','Manhua','Webtoon','One-shot','Doujinshi','HQ','Yaoi','Yuri','Hentai','English','Novel'));

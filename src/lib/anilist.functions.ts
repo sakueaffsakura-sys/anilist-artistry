@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { suggestWorkKind } from "@/lib/work-categories";
 
 export type AnilistResult = {
   anilistId: number;
@@ -147,20 +148,7 @@ async function runAnilistSearch(data: { search: string }): Promise<AnilistResult
         status: STATUS_PT[item.status ?? ""] ?? "Em andamento",
         author: findRole("story") || findRole("original") || "",
         artist: findRole("art") || "",
-        suggestedKind:
-          item.format === "NOVEL"
-            ? "Novel"
-            : item.genres?.includes("Boys' Love")
-              ? "Yaoi"
-              : item.genres?.includes("Girls' Love")
-                ? "Yuri"
-                : item.countryOfOrigin === "KR"
-                  ? "Comic"
-                  : item.countryOfOrigin === "CN" || item.countryOfOrigin === "TW"
-                    ? "Comic2"
-                    : item.countryOfOrigin === "US"
-                      ? "English"
-                      : "Manga",
+        suggestedKind: suggestWorkKind(item),
         averageScore: item.averageScore ? Math.round((item.averageScore / 10) * 10) / 10 : 0,
       };
     });
