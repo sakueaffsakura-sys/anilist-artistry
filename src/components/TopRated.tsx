@@ -46,11 +46,11 @@ export function TopRated({ rows }: { rows: SeriesRow[] }) {
                   {item.title}
                 </h3>
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex max-w-full items-center gap-1 rounded-md bg-black/55 px-2 py-1 text-[11px] font-semibold text-white/90 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--primary)_33%,transparent)] backdrop-blur-sm">
+                  <span className="inline-flex max-w-full items-center gap-1 rounded-md bg-black/55 px-2 py-1 text-[11px] font-semibold text-white/90 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--primary)_33%,transparent)]">
                     <BookOpen className="h-3 w-3 shrink-0 opacity-80" />
                     <span className="truncate">{item.kind}</span>
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-md bg-black/55 px-2 py-1 text-[11px] font-semibold tabular-nums text-amber-50 backdrop-blur-sm">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-black/55 px-2 py-1 text-[11px] font-semibold tabular-nums text-amber-50">
                     <Star className="h-3 w-3 shrink-0 fill-gold text-gold" />
                     {Number(item.rating).toFixed(1).replace(".", ",")}
                   </span>

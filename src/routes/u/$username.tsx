@@ -391,12 +391,12 @@ function Perfil() {
                               <div className="relative aspect-[2/3] overflow-hidden rounded-lg border border-border bg-surface shadow-[var(--shadow-card)] transition group-hover:border-primary/60">
                                 <img src={coverUrl(series.cover_url)} alt={series.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" loading="lazy" />
                                 <span className="cover-fade" />
-                                <div className="absolute left-2 top-2 flex items-center gap-1.5 rounded-md bg-background/85 px-2 py-1 text-[11px] font-extrabold backdrop-blur">
+                                <div className="absolute left-2 top-2 flex items-center gap-1.5 rounded-md bg-background/85 px-2 py-1 text-[11px] font-extrabold">
                                   <span className="flex items-center gap-1"><BookOpen className="h-3 w-3 text-primary" />{chapters.length}</span>
                                   <span className="h-3 w-px bg-border" />
                                   <span className="flex items-center gap-1 text-gold"><Star className="h-3 w-3 fill-current" />{Number(series.rating || 0).toFixed(1).replace(".", ",")}</span>
                                 </div>
-                                <span className="absolute bottom-2 left-2 rounded-md border border-primary/50 bg-background/85 px-2 py-1 text-[10px] font-extrabold uppercase text-primary backdrop-blur">{series.kind || "Mangá"}</span>
+                                <span className="absolute bottom-2 left-2 rounded-md border border-primary/50 bg-background/85 px-2 py-1 text-[10px] font-extrabold uppercase text-primary">{series.kind || "Mangá"}</span>
                               </div>
                               <h3 className="mt-2 line-clamp-2 text-sm font-bold leading-tight transition group-hover:text-primary">{series.title}</h3>
                               <p className="mt-1 text-xs text-muted-foreground">{latest > 0 ? `Cap. ${latest}` : `${chapters.length} capítulos`}</p>
