@@ -1,5 +1,9 @@
 # Tarefas
 
+- [x] Preservar imagens intercaladas na importação, prévia e leitor de novels, sem narrar URLs; cinco testes passaram e as quatro imagens do HTML enviado foram preservadas
+- [x] Criar seção exclusiva de novels na home; seção, filtro e leitor ilustrado com dados simulados conferidos no navegador sem erros, build OK, sem publicar ou alterar dados existentes
+- [ ] Confirmar salvamento e prévia ilustrada com conta administrativa; imagens removidas em importações antigas exigem reimportação do HTML original
+
 - [x] Ampliar categorias no catálogo, painel e pedidos com Manhwa, Manhua, Webtoon, One-shot, Doujinshi e HQ; nove testes passaram e filtros conferidos no computador/celular, sem reclassificar obras existentes nem publicar
 
 - [ ] Mostrar no slide somente obras ativadas no painel, sem alternativa automática

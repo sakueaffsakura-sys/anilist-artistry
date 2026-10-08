@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { RotateCw, Trophy } from "lucide-react";
+import { BookOpenText, RotateCw, Trophy } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
 import { SeriesCard } from "@/components/SeriesCard";
 import { HeroCarousel } from "@/components/HeroCarousel";
@@ -55,6 +55,11 @@ function Home() {
     queryFn: () => fetchSeries({ order: "updated_at", limit: 100, inSlider: true }),
     staleTime: 30_000,
   });
+  const novels = useQuery({
+    queryKey: ["series", "novels", "updated"],
+    queryFn: () => fetchSeries({ kind: "Novel", order: "updated_at", limit: 12 }),
+    staleTime: 30_000,
+  });
   const ranking = useQuery({
     queryKey: ["series", "views"],
     queryFn: () => fetchSeries({ order: "views", limit: 10 }),
@@ -78,13 +83,14 @@ function Home() {
 
   const heroItems = slider.data ?? [];
   const heroLoading = slider.isPending;
-  const catalogFailed = recent.isError || updated.isError || ranking.isError || slider.isError;
+  const catalogFailed = recent.isError || updated.isError || ranking.isError || slider.isError || novels.isError;
 
   function retryCatalog() {
     void recent.refetch();
     void updated.refetch();
     void slider.refetch();
     void ranking.refetch();
+    void novels.refetch();
   }
 
   return (
@@ -138,6 +144,20 @@ function Home() {
 
         {updated.isPending ? <LoadingShelf label="Carregando atualizações" /> : null}
         {(updated.data?.length ?? 0) > 0 ? <RecentlyUpdated rows={updated.data ?? []} /> : null}
+
+        {novels.isPending ? <LoadingShelf label="Carregando novels" /> : null}
+        {novels.isSuccess ? (
+          <SectionRow icon={<BookOpenText className="h-5 w-5" />} title="Novels"
+            subtitle="Últimos capítulos em texto"
+            action={<Button asChild variant="ghost" size="sm" className="text-primary"><Link to="/catalogo" search={{ kind: "Novel" }}>Ver todas</Link></Button>}>
+            {novels.data.length ? <HScroll>
+              {novels.data.map((item) => <div key={item.id} className="w-[160px] shrink-0">
+                <SeriesCard slug={item.slug} title={item.title} cover={item.cover_url} rating={item.rating}
+                  favorite={favoriteIds.has(item.id)} seriesId={item.id} />
+              </div>)}
+            </HScroll> : <p className="py-6 text-sm text-muted-foreground">Nenhuma novel publicada ainda.</p>}
+          </SectionRow>
+        ) : null}
 
         {ranking.isPending ? <LoadingShelf label="Carregando ranking" /> : null}
         {(ranking.data?.length ?? 0) > 0 ? (

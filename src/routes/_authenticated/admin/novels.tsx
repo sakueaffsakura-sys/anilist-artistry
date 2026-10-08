@@ -14,7 +14,8 @@ import { uniqueSlug } from "@/lib/series-import";
 import { coverUrl, formatChapter } from "@/lib/media";
 import { useSession } from "@/hooks/useAuth";
 import { useServerFn } from "@tanstack/react-start";
-import { extractChapter, importNovelChapter, prepareChapterText } from "@/lib/novel-import.functions";
+import { importNovelChapter } from "@/lib/novel-import.functions";
+import { parseNovelContent, prepareChapterText } from "@/lib/novel-content";
 
 export const Route = createFileRoute("/_authenticated/admin/novels")({
   staticData: { sitemap: false },
@@ -374,9 +375,10 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
     return () => window.clearTimeout(timer);
   }, [content, draftKey, editingId, number, published, title]);
 
-  const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+  const blocks = parseNovelContent(prepareChapterText(content).content);
+  const textOnly = blocks.flatMap((block) => block.type === "text" ? [block.text] : []).join(" ");
+  const wordCount = textOnly ? textOnly.split(/\s+/).length : 0;
   const readingMinutes = wordCount ? Math.max(1, Math.ceil(wordCount / 220)) : 0;
-  const paragraphs = content.split(/\n{2,}|\r?\n/).map((part) => part.trim()).filter(Boolean);
 
   const visibleChapters = useMemo(() => {
     const term = search.trim().toLocaleLowerCase("pt-BR");
@@ -560,7 +562,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
           <Label className="sr-only">Texto do capítulo</Label>
           {showPreview ? (
             <article className="min-h-[420px] flex-1 rounded-md border border-border bg-surface px-5 py-8 text-[17px] leading-8 text-foreground/90 sm:px-10 lg:min-h-[520px]">
-              {paragraphs.length ? paragraphs.map((paragraph, index) => <p key={index} className="mb-5 text-justify last:mb-0">{paragraph}</p>) : <p className="text-center text-sm text-muted-foreground">A prévia aparecerá aqui.</p>}
+              {blocks.length ? blocks.map((block, index) => block.type === "image" ? <img key={index} src={block.src} alt="Ilustração do capítulo" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="mx-auto mb-5 h-auto max-w-full rounded-md" /> : <p key={index} className="mb-5 text-justify last:mb-0">{block.text}</p>) : <p className="text-center text-sm text-muted-foreground">A prévia aparecerá aqui.</p>}
             </article>
           ) : (
             <Textarea
@@ -568,7 +570,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
               onChange={(e) => setContent(e.target.value)}
               onPaste={(e) => {
                 const html = e.clipboardData.getData("text/plain");
-                if (/<\/?(p|div|br|h[1-6])[\s>/]/i.test(html)) {
+                if (/<\/?(p|div|br|h[1-6]|img)[\s>/]/i.test(html)) {
                   e.preventDefault();
                   void publishHtml(html);
                 }
