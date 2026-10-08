@@ -79,7 +79,7 @@ export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
                 {item.pinned ? (
                   <span
                     title="Fixada pelo admin"
-                    className="pointer-events-none absolute left-2 top-2 z-[25] inline-flex items-center gap-1 rounded-full border border-gold/40 bg-black/50 px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider text-gold shadow-[0_2px_10px_rgba(0,0,0,0.4)] backdrop-blur-md"
+                    className="pointer-events-none absolute left-2 top-2 z-[25] inline-flex items-center gap-1 rounded-full border border-gold/40 bg-black/50 px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider text-gold shadow-[0_2px_10px_rgba(0,0,0,0.4)]"
                   >
                     <Pin className="h-[11px] w-[11px] shrink-0 fill-gold" strokeWidth={2.5} />
                     Fixada
@@ -90,7 +90,7 @@ export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
                   title="Adicionar aos favoritos"
                   aria-label="Favoritar obra"
                   onClick={(e) => onHeart(e, item.id, false)}
-                  className="group/fav absolute right-2 top-2 z-[30] flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/40 text-white/80 backdrop-blur-md transition-[transform,colors,box-shadow,background-color] duration-200 ease-out hover:scale-110 hover:border-red-400/50 hover:bg-red-500/20 hover:text-red-300 hover:shadow-[0_0_18px_rgba(239,68,68,0.5)] active:scale-95 disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-none motion-reduce:hover:scale-100"
+                  className="group/fav absolute right-2 top-2 z-[30] flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/40 text-white/80 transition-[transform,colors,box-shadow,background-color] duration-200 ease-out hover:scale-110 hover:border-red-400/50 hover:bg-red-500/20 hover:text-red-300 hover:shadow-[0_0_18px_rgba(239,68,68,0.5)] active:scale-95 disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-none motion-reduce:hover:scale-100"
                 >
                   <Heart
                     className="h-[18px] w-[18px] fill-transparent transition-[fill,transform] duration-200 group-hover/fav:scale-110 group-hover/fav:fill-red-400/60"
@@ -99,7 +99,7 @@ export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
                 </button>
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/10 opacity-90" />
                 <span
-                  className="pointer-events-none absolute bottom-2 left-2 z-[12] inline-flex max-w-[calc(100%-1rem)] items-center gap-2 rounded-full border border-white/15 bg-black/25 px-2 py-1 shadow-[0_2px_14px_rgba(0,0,0,0.45)] backdrop-blur-2xl"
+                  className="pointer-events-none absolute bottom-2 left-2 z-[12] inline-flex max-w-[calc(100%-1rem)] items-center gap-2 rounded-full border border-white/15 bg-black/25 px-2 py-1 shadow-[0_2px_14px_rgba(0,0,0,0.45)]"
                   title={`${item.chapters?.length ?? 0} capítulos · média ${Number(item.rating).toFixed(1).replace(".", ",")}/10`}
                 >
                   <span className="inline-flex shrink-0 items-center gap-1">

@@ -198,3 +198,5 @@
   .hero-model-layout > a { grid-row: 1 / 4; }
   .hero-model-layout > div > div:nth-of-type(n+2) { grid-column: 1 / -1; margin-top: 0; }
 }
+
+.cv-auto { content-visibility: auto; contain-intrinsic-size: auto 600px; }
