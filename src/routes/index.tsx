@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { RotateCw, Trophy } from "lucide-react";
@@ -51,7 +52,8 @@ function Home() {
   const releases = recent;
   const slider = useQuery({
     queryKey: ["series", "slider"],
-    queryFn: () => fetchSeries({ order: "updated_at", limit: 10, inSlider: true }),
+    queryFn: () => fetchSeries({ order: "updated_at", limit: 100, inSlider: true }),
+    staleTime: 30_000,
   });
   const ranking = useQuery({
     queryKey: ["series", "views"],
@@ -62,7 +64,7 @@ function Home() {
     enabled: Boolean(user),
     queryFn: () => user ? fetchFavorites(user.id) : Promise.resolve([]),
   });
-  const favoriteIds = new Set((favorites.data ?? []).map((item) => item.id));
+  const favoriteIds = useMemo(() => new Set((favorites.data ?? []).map((item) => item.id)), [favorites.data]);
   const history = useQuery({
     queryKey: ["history", user?.id],
     enabled: Boolean(user),
@@ -74,9 +76,9 @@ function Home() {
     (recent.data?.length ?? 0) === 0 &&
     (updated.data?.length ?? 0) === 0;
 
-  const heroItems = (slider.data?.length ? slider.data : updated.data) ?? [];
-  const heroLoading = heroItems.length === 0 && (slider.isPending || updated.isPending);
-  const catalogFailed = recent.isError || updated.isError || ranking.isError;
+  const heroItems = slider.data ?? [];
+  const heroLoading = slider.isPending;
+  const catalogFailed = recent.isError || updated.isError || ranking.isError || slider.isError;
 
   function retryCatalog() {
     void recent.refetch();

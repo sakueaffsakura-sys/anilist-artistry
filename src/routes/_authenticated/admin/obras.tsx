@@ -134,7 +134,7 @@ function ObrasAdmin() {
       const { error } = await supabase.from("series").update({ published: !r.published }).eq("id", r.id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-series"] }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["admin-series"] }); void qc.invalidateQueries({ queryKey: ["series"] }); void qc.invalidateQueries({ queryKey: ["admin-work-requests"] }); },
     onError: () => toast.error("Não foi possível alterar."),
   });
 
@@ -160,6 +160,7 @@ function ObrasAdmin() {
     onSuccess: () => {
       toast.success("Obra apagada.");
       qc.invalidateQueries({ queryKey: ["admin-series"] });
+      qc.invalidateQueries({ queryKey: ["series"] });
     },
     onError: () => toast.error("Não foi possível apagar."),
   });

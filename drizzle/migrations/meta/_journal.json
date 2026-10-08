@@ -239,6 +239,13 @@
       "when": 1791321478043,
       "tag": "0033_maintenance_media_read_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791422757337,
+      "tag": "0034_work_requests_and_notifications",
+      "breakpoints": true
     }
   ]
 }

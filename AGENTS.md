@@ -22,3 +22,4 @@
 - Session state is provided once by SessionProvider in the root; useSession consumes that shared state so repeated catalog cards do not create individual auth subscriptions.
 - Global click audio uses one client-only player and delegated document listener mounted in the root, so navigation preserves playback without per-control subscriptions.
 - The shared header uses CSS sticky positioning without scroll-driven React state; the hero pauses its timer outside the viewport to avoid unnecessary work during scrolling.
+- Work requests and availability notifications are user-scoped tables; database triggers fulfill exact title/type matches on publication and an admin-only RPC resolves other matches atomically, so imports and manual publications share one notification path.

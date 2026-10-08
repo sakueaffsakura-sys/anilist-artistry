@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bell, BookMarked, Headset, LogOut, Search, Shield, User2 } from "lucide-react";
+import { BookPlus, BookMarked, Headset, LogOut, Search, Shield, User2 } from "lucide-react";
+import { WorkNotifications } from "@/components/WorkNotifications";
 import { supabase } from "@/integrations/supabase/client";
 import { MobileNav } from "@/components/MobileNav";
 import { openSupportChat } from "@/components/SupportChat";
@@ -95,16 +96,8 @@ export function SiteHeader() {
           </Button>
 
 
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            title="Notificações"
-            className="relative hidden h-9 w-9 shrink-0 rounded-md text-muted-foreground hover:bg-foreground/5 hover:text-foreground sm:flex"
-          >
-            <Bell className="h-[18px] w-[18px]" />
-            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-background bg-primary" />
-          </Button>
+          <Button asChild size="icon" variant="ghost" title="Pedir uma obra" className="shrink-0"><Link to="/pedidos" aria-label="Pedir uma obra"><BookPlus className="h-[18px] w-[18px]" /></Link></Button>
+          <WorkNotifications />
 
           {user ? (
             <DropdownMenu>
@@ -138,6 +131,7 @@ export function SiteHeader() {
                     <BookMarked className="h-4 w-4" /> Minha biblioteca
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to="/pedidos" className="flex items-center gap-2"><BookPlus className="h-4 w-4" /> Meus pedidos</Link></DropdownMenuItem>
                 {isStaff ? (
                   <DropdownMenuItem asChild>
                     <Link to="/admin" className="flex items-center gap-2">
@@ -191,6 +185,7 @@ export function SiteFooter() {
               Navegação
             </h3>
             <nav className="flex flex-col gap-2.5">
+              <Link to="/pedidos" className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary">Pedir uma obra</Link>
               <Link
                 to="/"
                 className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary"

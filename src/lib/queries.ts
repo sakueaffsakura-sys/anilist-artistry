@@ -33,13 +33,14 @@ export type SeriesRow = {
   rating: number;
   views: number;
   pinned: boolean;
+  in_slider: boolean;
   created_at: string;
   updated_at: string;
   chapters: ChapterLite[];
 };
 
 const SERIES_SELECT =
-  "id, slug, title, cover_url, banner_url, synopsis, genres, kind, status, rating, views, pinned, created_at, updated_at, chapters(id, number, title, created_at)";
+  "id, slug, title, cover_url, banner_url, synopsis, genres, kind, status, rating, views, pinned, in_slider, created_at, updated_at, chapters(id, number, title, created_at)";
 
 function normalize(rows: unknown): SeriesRow[] {
   return ((rows ?? []) as SeriesRow[]).map((row) => ({
@@ -64,6 +65,7 @@ export async function fetchSeries(options: {
   if (options.pinnedFirst) query = query.order("pinned", { ascending: false });
 
   query = query.order(options.order ?? "updated_at", { ascending: false }).limit(options.limit ?? 24);
+  query = query.eq("chapters.published", true);
 
   const { data, error } = await query;
   if (error) throw error;

@@ -768,6 +768,112 @@ export type Database = {
         }
         Relationships: []
       }
+      work_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          read_at: string | null
+          request_id: string
+          series_id: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          request_id: string
+          series_id: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          request_id?: string
+          series_id?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_notifications_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "work_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_notifications_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "series"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_requests: {
+        Row: {
+          admin_note: string
+          created_at: string
+          id: string
+          kind: string
+          notes: string
+          series_id: string | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          notes?: string
+          series_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_note?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          notes?: string
+          series_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_requests_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "series"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       xp_events: {
         Row: {
           amount: number
@@ -835,6 +941,10 @@ export type Database = {
           title: string
           total: number
         }[]
+      }
+      resolve_work_request: {
+        Args: { _note?: string; _request: string; _series?: string }
+        Returns: undefined
       }
       xp_ranking: {
         Args: { _period: string }
