@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { publishTxtChapters } from "@/lib/txt-chapters";
 
-type Entry = { name: string; file?: File; status: "pending" | "saved" | "error"; error?: string };
+type Entry = { name: string; file?: File | undefined; status: "pending" | "saved" | "error"; error?: string | undefined };
 
 export function TxtChapterImport({ seriesId, onChange }: { seriesId: string; onChange: () => void }) {
   const [entries, setEntries] = useState<Entry[]>([]);

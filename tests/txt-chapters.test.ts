@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { readFile } from "node:fs/promises";
 import { parseTxtChapter, publishTxtChapters } from "../src/lib/txt-chapters";
 
 describe("work TXT chapters", () => {
