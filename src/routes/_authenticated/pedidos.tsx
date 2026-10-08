@@ -13,6 +13,7 @@ import { fetchWorkRequests, REQUEST_STATUS } from "@/lib/work-requests";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/pedidos")({
+  staticData: { sitemap: false },
   head: () => ({ meta: [{ title: "Meus pedidos de obras — Better Mangá" }, { name: "description", content: "Solicite mangás, comics e novels e acompanhe seus pedidos." }, { property: "og:title", content: "Meus pedidos — Better Mangá" }, { property: "og:description", content: "Pedidos e acompanhamento de novas obras." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   component: RequestsPage,
 });

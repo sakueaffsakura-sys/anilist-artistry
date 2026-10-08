@@ -12,6 +12,7 @@ import { fetchWorkRequests, REQUEST_STATUS } from "@/lib/work-requests";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/admin/pedidos")({
+  staticData: { sitemap: false },
   head: () => ({ meta: [{ title: "Pedidos dos leitores — Painel Better Mangá" }, { name: "description", content: "Atenda solicitações de obras e avise os leitores." }, { property: "og:title", content: "Pedidos dos leitores — Better Mangá" }, { property: "og:description", content: "Gerenciamento de pedidos de mangás, comics e novels." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   component: AdminRequests,
 });
@@ -32,7 +33,7 @@ function AdminRequests() {
     return data;
   } });
   const resolve = useMutation({ mutationFn: async (accept: boolean) => {
-    const { error } = await supabase.rpc("resolve_work_request", { _request: selected, _series: accept ? series : undefined, _note: note.trim() });
+    const { error } = await supabase.rpc("resolve_work_request", { _request: selected, ...(accept ? { _series: series } : {}), _note: note.trim() });
     if (error) throw new Error("Não foi possível atender o pedido. Atualize a página e tente novamente.");
   }, onSuccess: () => { setSelected(""); setSeries(""); setNote(""); toast.success("Pedido atualizado."); void qc.invalidateQueries({ queryKey: ["admin-work-requests"] }); void qc.invalidateQueries({ queryKey: ["work-requests"] }); void qc.invalidateQueries({ queryKey: ["work-notifications"] }); }, onError: (error) => toast.error(error.message) });
   const rows = (requests.data ?? []).filter((item) => status === "all" || item.status === status);

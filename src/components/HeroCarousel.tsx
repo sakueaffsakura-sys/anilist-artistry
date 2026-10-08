@@ -8,6 +8,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { selectHeroItems } from "@/lib/hero-policy";
 
 const INTERVAL = 6000;
 
@@ -25,7 +26,7 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["favorites"] }); },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Não foi possível atualizar os favoritos."),
   });
-  const slides = useMemo(() => items.slice(0, 10), [items]);
+  const slides = useMemo(() => selectHeroItems(items), [items]);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [visible, setVisible] = useState(true);
