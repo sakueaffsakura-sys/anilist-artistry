@@ -11,6 +11,7 @@ import { useSession } from "@/hooks/useAuth";
 import { CommentThreads } from "@/components/CommentThreads";
 import { CommentComposer, type CommentDraft } from "@/components/CommentComposer";
 import { uploadCommentImage } from "@/lib/comments";
+import { parseNovelContent } from "@/lib/novel-content";
 import { NovelNarrator } from "@/components/NovelNarrator";
 
 export const Route = createFileRoute("/obra/$slug/$chapter")({
@@ -74,16 +75,12 @@ function Reader() {
   }, [current]);
 
   const isNovel = obra?.kind === "Novel";
-  const paragraphs = useMemo(
-    () =>
-      isNovel
-        ? ((current as { content?: string | null } | undefined)?.content ?? "")
-            .split(/\n{2,}|\r?\n/)
-            .map((p) => p.trim())
-            .filter(Boolean)
-        : [],
+  const novelBlocks = useMemo(
+    () => isNovel ? parseNovelContent(current?.content ?? "") : [],
     [current, isNovel],
   );
+  // Empty entries preserve DOM paragraph indexes while narration skips illustrations.
+  const paragraphs = useMemo(() => novelBlocks.map((block) => block.type === "text" ? block.text : ""), [novelBlocks]);
   const [fontSize, setFontSize] = useState(18);
   const [lineHeight, setLineHeight] = useState(1.9);
   const [readingWidth, setReadingWidth] = useState<"narrow" | "comfortable" | "wide">("comfortable");
@@ -472,14 +469,20 @@ function Reader() {
                   className="space-y-6 text-foreground/90 [&_p]:text-justify"
                   style={{ fontSize: `${fontSize}px`, lineHeight }}
                 >
-                  {paragraphs.map((paragraph, paragraphIndex) => (
+                  {novelBlocks.map((block, paragraphIndex) => block.type === "image" ? (
+                    <figure key={paragraphIndex} className="my-8">
+                      <img src={block.src} alt={`Ilustração do capítulo ${formatChapter(current.number)}`}
+                        loading="lazy" decoding="async" referrerPolicy="no-referrer"
+                        className="mx-auto h-auto max-w-full rounded-md" />
+                    </figure>
+                  ) : (
                     <p
                       key={paragraphIndex}
                       id={`novel-p-${paragraphIndex}`}
                       onClick={() => setSpeakingIndex(paragraphIndex)}
                       className={`cursor-pointer rounded-md transition-colors ${speakingIndex === paragraphIndex ? "bg-primary/15 text-foreground" : ""}`}
                     >
-                      {paragraph}
+                      {block.text}
                     </p>
                   ))}
                 </div>
