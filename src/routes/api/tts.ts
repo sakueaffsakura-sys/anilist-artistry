@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 const MODEL = "google/gemini-3.1-flash-tts-preview";
 const VOICES = new Set(["Kore", "Charon", "Aoede", "Puck", "Fenrir", "Leda", "Orus", "Zephyr"]);
+const FISH_VOICE = "240c6c29d4a54e35983a8982eeae3d66";
 
 export const Route = createFileRoute("/api/tts")({
   staticData: { sitemap: false },
@@ -22,6 +23,30 @@ export const Route = createFileRoute("/api/tts")({
         const body = (await request.json().catch(() => null)) as { text?: string; voice?: string } | null;
         const text = body?.text?.trim().slice(0, 1200);
         if (!text) return new Response("Texto vazio", { status: 400 });
+        if (body?.voice === FISH_VOICE) {
+          const fishKey = process.env["FISH_AUDIO_API_KEY"];
+          if (!fishKey) return new Response("Voz Fish Audio não configurada", { status: 500 });
+          try {
+            const up = await fetch("https://api.fish.audio/v1/tts", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${fishKey}`, "Content-Type": "application/json", model: "s1" },
+              body: JSON.stringify({ text, reference_id: FISH_VOICE, format: "pcm", sample_rate: 24000 }),
+              signal: request.signal,
+            });
+            if (!up.ok) {
+              const msg = await up.text().catch(() => "");
+              const status = up.status === 402 ? 402 : up.status === 429 ? 429 : 502;
+              return new Response(
+                up.status === 402 ? "Saldo de API da Fish Audio esgotado" : msg || "Falha na Fish Audio",
+                { status },
+              );
+            }
+            return new Response(up.body, { headers: { "Content-Type": "audio/pcm", "Cache-Control": "no-cache" } });
+          } catch (e) {
+            if (request.signal.aborted) return new Response(null, { status: 499 });
+            throw e;
+          }
+        }
         const voice = body?.voice && VOICES.has(body.voice) ? body.voice : "Kore";
 
         try {
