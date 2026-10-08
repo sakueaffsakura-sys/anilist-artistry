@@ -1,7 +1,7 @@
 # Tarefas
 
-- [ ] Ajustar inicialização e preparação do pacote para cPanel sem mudar a conexão atual
-- [ ] Verificar inicialização com testes locais e documentar requisitos e limites da hospedagem
+- [x] Ajustar inicialização e preparação do pacote para cPanel sem mudar a conexão atual
+- [x] Verificar salvaguardas de inicialização com quatro testes locais e documentar requisitos e limites; conjunto de 28 testes passou, build Lovable OK, versão Node real ainda não gerada/testada
 - [ ] Confirmar instalação real no cPanel — depende de acesso à hospedagem e suporte a Node.js/Passenger
 
 - [x] Preservar imagens intercaladas na importação, prévia e leitor de novels, sem narrar URLs; cinco testes passaram e as quatro imagens do HTML enviado foram preservadas

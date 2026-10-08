@@ -47,9 +47,10 @@ Adicione nas variáveis do aplicativo:
 | `SUPABASE_PUBLISHABLE_KEY` | Chave pública desse banco |
 | `SUPABASE_SERVICE_ROLE_KEY` | Somente credencial administrativa do seu banco próprio; nunca uma chave pública |
 | `FISH_AUDIO_API_KEY` | Opcional: sua chave Fish Audio e saldo de API para Rudeus |
-| `NOVEL_IMPORT_ALLOWED_HOSTS` | Opcional: lista de hosts de importação autorizados, conforme a configuração existente |
 
 Guarde credenciais privadas apenas nas variáveis do aplicativo, nunca em arquivos públicos ou em variáveis `VITE_`. As credenciais administrativas e a chave gerenciada Lovable não são exportáveis. Sem elas, algumas ações administrativas, Cloudinary e mídia privada de manutenção não funcionarão ao manter o banco atual. A voz do aparelho continua disponível; Fish Audio depende de chave própria e saldo.
+
+A importação remota continua restrita aos hosts autorizados no código; não existe uma variável de ambiente para ampliar essa lista automaticamente.
 
 Não fixe `PORT` ou `NITRO_PORT`: mantenha o valor escolhido pela hospedagem. Depois clique em **Restart**. Se o cPanel oferecer um terminal, com as variáveis do aplicativo carregadas execute:
 
