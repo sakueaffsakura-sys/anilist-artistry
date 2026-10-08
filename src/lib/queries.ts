@@ -1,17 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export const KINDS = [
-  "Comic",
-  "Comic2",
-  "Shoujo",
-  "Shoujo2",
-  "Manga",
-  "Yaoi",
-  "Yuri",
-  "Hentai",
-  "English",
-  "Novel",
-] as const;
+export { KINDS } from "@/lib/work-categories";
 
 export type ChapterLite = {
   id: string;
