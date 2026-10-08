@@ -1,5 +1,10 @@
 # Tarefas
 
+- [ ] Mostrar no slide somente obras ativadas no painel, sem alternativa automática
+- [ ] Reduzir consultas repetidas e trabalho do carregamento da home
+- [ ] Criar pedidos de obras, atendimento administrativo e notificações de publicação
+- [ ] Verificar permissões e fluxo de pedidos sem excluir dados nem publicar o site
+
 - [x] Verificar página inicial ao entrar/recarregar: obras carregaram, conexão lenta mostrou quatro áreas de carregamento, falha mostrou aviso e “Tentar novamente” recuperou as obras sem erros; sem alterar dados nem publicar
 
 - [x] Fechar espaço acima do slide, manter barra translúcida visível e reduzir trabalho do slide fora da tela; rolagem conferida no navegador sem erros, ganho de velocidade em produção não medido
