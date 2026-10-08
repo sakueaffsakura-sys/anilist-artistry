@@ -36,6 +36,7 @@ function find(nodes: Node[], predicate: (node: Node) => boolean): Node | undefin
       if (match) return match;
     }
   }
+  return undefined;
 }
 
 /** Extract text and images in document order without retaining executable HTML. */
@@ -44,7 +45,7 @@ export function extractChapter(html: string, sourceUrl?: string) {
   let scope: Node = doc;
   for (const marker of markers) {
     const match = find(doc.children, (node) => "attribs" in node &&
-      `${node.attribs.id ?? ""} ${node.attribs.class ?? ""}`.split(/\s+/).includes(marker));
+      `${node.attribs["id"] ?? ""} ${node.attribs["class"] ?? ""}`.split(/\s+/).includes(marker));
     if (match) { scope = match; break; }
   }
   const titleText = (tag: string, nodes: Node[]) => {
@@ -55,8 +56,8 @@ export function extractChapter(html: string, sourceUrl?: string) {
   const h1 = titleText("h1", nodes);
   const h2 = titleText("h2", nodes);
   const canonical = find(doc.children, (node) => "attribs" in node && "name" in node &&
-    node.name === "link" && node.attribs.rel === "canonical");
-  const baseUrl = sourceUrl ?? (canonical && "attribs" in canonical ? canonical.attribs.href : undefined);
+    node.name === "link" && node.attribs["rel"] === "canonical");
+  const baseUrl = sourceUrl ?? (canonical && "attribs" in canonical ? canonical.attribs["href"] : undefined);
   const paragraphs: string[] = [];
   let buffer = "";
   const flush = () => {
@@ -66,15 +67,15 @@ export function extractChapter(html: string, sourceUrl?: string) {
   };
   const walk = (node: Node) => {
     if (node.type === "text") { buffer += node.data; return; }
-    if (!("name" in node)) {
+    if (!("attribs" in node)) {
       if ("children" in node) node.children.forEach(walk);
       return;
     }
     if (ignored.has(node.name) || /^h[1-6]$/.test(node.name) ||
-      /comment|text-(xs|sm)|break-words|author|meta/i.test(`${node.attribs.class ?? ""} ${node.attribs.id ?? ""}`)) return;
+      /comment|text-(xs|sm)|break-words|author|meta/i.test(`${node.attribs["class"] ?? ""} ${node.attribs["id"] ?? ""}`)) return;
     if (node.name === "img") {
-      const raw = node.attribs["data-src"] || node.attribs["data-lazy-src"] || node.attribs.src ||
-        node.attribs.srcset?.split(",")[0]?.trim().split(/\s+/)[0] || "";
+      const raw = node.attribs["data-src"] || node.attribs["data-lazy-src"] || node.attribs["src"] ||
+        node.attribs["srcset"]?.split(",")[0]?.trim().split(/\s+/)[0] || "";
       const src = safeNovelImage(raw, baseUrl);
       if (src) { flush(); paragraphs.push(`[img:${src}]`); }
       return;
