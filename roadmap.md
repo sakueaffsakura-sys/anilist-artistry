@@ -1,5 +1,8 @@
 # Tarefas
 
+- [ ] Preservar imagens intercaladas na importação, prévia e leitor de novels, sem narrar URLs
+- [ ] Criar seção exclusiva de novels na home e verificar sem publicar ou alterar dados existentes
+
 - [x] Ampliar categorias no catálogo, painel e pedidos com Manhwa, Manhua, Webtoon, One-shot, Doujinshi e HQ; nove testes passaram e filtros conferidos no computador/celular, sem reclassificar obras existentes nem publicar
 
 - [ ] Mostrar no slide somente obras ativadas no painel, sem alternativa automática
