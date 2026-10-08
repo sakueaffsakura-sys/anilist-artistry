@@ -34,6 +34,14 @@ export async function fetchSpeech(text: string, voice: string, signal: AbortSign
     }
     throw new SpeechError(parsed || `Erro ${res.status}`, res.status);
   }
+  if (res.headers.get("content-type")?.includes("audio/pcm")) {
+    const raw = new Uint8Array(await res.arrayBuffer());
+    if (raw.length < 2) throw new SpeechError("Áudio vazio", 502);
+    const v = new DataView(raw.buffer, 0, raw.length - (raw.length % 2));
+    const pcm = new Float32Array(v.byteLength / 2);
+    for (let i = 0; i < pcm.length; i++) pcm[i] = v.getInt16(i * 2, true) / 32768;
+    return pcm;
+  }
   const parts: Uint8Array[] = [];
   let total = 0;
   let done = false;
