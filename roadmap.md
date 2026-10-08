@@ -1,5 +1,9 @@
 # Tarefas
 
+- [x] Ajustar inicialização e preparação do pacote para cPanel sem mudar a conexão atual
+- [x] Verificar salvaguardas de inicialização com quatro testes locais e documentar requisitos e limites; conjunto de 28 testes passou, build Lovable OK, versão Node real ainda não gerada/testada
+- [ ] Confirmar instalação real no cPanel — depende de acesso à hospedagem e suporte a Node.js/Passenger
+
 - [x] Preservar imagens intercaladas na importação, prévia e leitor de novels, sem narrar URLs; cinco testes passaram e as quatro imagens do HTML enviado foram preservadas
 - [x] Criar seção exclusiva de novels na home; seção, filtro e leitor ilustrado com dados simulados conferidos no navegador sem erros, build OK, sem publicar ou alterar dados existentes
 - [ ] Confirmar salvamento e prévia ilustrada com conta administrativa; imagens removidas em importações antigas exigem reimportação do HTML original

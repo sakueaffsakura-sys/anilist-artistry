@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "build:cpanel": "CPANEL_BUILD=1 vite build",
+    "build:cpanel": "node scripts/build-cpanel.cjs",
+    "check:cpanel": "node scripts/check-cpanel.cjs",
     "start:cpanel": "node app.cjs"
   },
   "overrides": {
