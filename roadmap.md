@@ -1,5 +1,7 @@
 # Tarefas
 
+- [ ] Ampliar categorias de obras no catálogo, painel e pedidos, incluindo Manhwa; validar sem alterar obras existentes
+
 - [ ] Mostrar no slide somente obras ativadas no painel, sem alternativa automática
 - [ ] Reduzir consultas repetidas e trabalho do carregamento da home
 - [ ] Criar pedidos de obras, atendimento administrativo e notificações de publicação
