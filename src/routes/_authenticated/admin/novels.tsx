@@ -363,6 +363,13 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
     }
   }, [draftKey, editingId, nextNumber]);
 
+  // Mantém o número do próximo capítulo atualizado conforme capítulos são adicionados.
+  useEffect(() => {
+    if (editingId || title.trim() || content.trim()) return;
+    setNumber(String(nextNumber));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextNumber, editingId]);
+
   useEffect(() => {
     if (editingId) return;
     const timer = window.setTimeout(() => {
