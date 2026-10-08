@@ -1,5 +1,7 @@
 # Tarefas
 
+- [ ] Ampliar gêneros, substituir digitação por seleção múltipla e padronizar opções de cadastro, edição e catálogo sem alterar postagens existentes
+
 - [x] Adicionar publicação de capítulos de obras por TXT numerados, sem limite artificial de seleção ou armazenamento dos TXT; cinco testes passaram, incluindo 1.001 arquivos, e painel validado com os quatro TXT enviados e gravação simulada; publicação real não executada
 
 - [x] Ajustar inicialização e preparação do pacote para cPanel sem mudar a conexão atual
