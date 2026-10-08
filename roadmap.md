@@ -1,5 +1,7 @@
 # Tarefas
 
+- [x] Adicionar publicação de capítulos de obras por TXT numerados, sem limite artificial de seleção ou armazenamento dos TXT; cinco testes passaram, incluindo 1.001 arquivos, e painel validado com os quatro TXT enviados e gravação simulada; publicação real não executada
+
 - [x] Ajustar inicialização e preparação do pacote para cPanel sem mudar a conexão atual
 - [x] Verificar salvaguardas de inicialização com quatro testes locais e documentar requisitos e limites; conjunto de 28 testes passou, build Lovable OK, versão Node real ainda não gerada/testada
 - [ ] Confirmar instalação real no cPanel — depende de acesso à hospedagem e suporte a Node.js/Passenger

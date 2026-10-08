@@ -17,6 +17,7 @@ import { coverUrl, formatChapter, slugify, timeAgo } from "@/lib/media";
 import { KINDS } from "@/lib/queries";
 import { useRoles, useSession } from "@/hooks/useAuth";
 import { signCloudinaryUpload } from "@/lib/media.functions";
+import { TxtChapterImport } from "@/components/TxtChapterImport";
 
 const TEN_YEARS = 60 * 60 * 24 * 365 * 10;
 const STATUSES = ["Em andamento", "Completo", "Hiato", "Cancelado"];
@@ -222,7 +223,7 @@ function SeriesEditor() {
             ))}
           </div>
 
-          {tab === "info" ? <InfoForm obra={obra} onSaved={refresh} /> : <ChaptersPanel seriesId={id} chapters={chapters} onChange={refresh} isAdmin={isAdmin} />}
+          {tab === "info" ? <InfoForm obra={obra} onSaved={refresh} /> : <><TxtChapterImport key={id} seriesId={id} onChange={refresh} /><ChaptersPanel seriesId={id} chapters={chapters} onChange={refresh} isAdmin={isAdmin} /></>}
         </>
       ) : null}
     </AdminShell>
