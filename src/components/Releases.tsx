@@ -97,7 +97,7 @@ export function Releases({ rows }: { rows: SeriesRow[] }) {
                   <div className="relative aspect-[2/3] overflow-hidden rounded-[1.35rem] border border-foreground/10 bg-card/55 transition-[transform,box-shadow,border-color] duration-300 ease-out group-hover:-translate-y-0.5 group-hover:border-foreground/20 group-hover:shadow-[0_18px_42px_rgba(0,0,0,0.45)] group-hover:will-change-transform">
                     <img
                       alt={item.title}
-                      loading="eager"
+                      loading="lazy"
                       decoding="async"
                       draggable={false}
                       className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"

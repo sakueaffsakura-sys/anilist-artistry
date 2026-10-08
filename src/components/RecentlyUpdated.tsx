@@ -71,7 +71,7 @@ export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
               >
                 <img
                   alt={item.title}
-                  loading="eager"
+                  loading="lazy"
                   decoding="async"
                   className="h-full w-full object-cover transition-transform duration-200 ease-out group-hover/cover:scale-105 motion-reduce:transition-none"
                   src={coverUrl(item.cover_url)}
