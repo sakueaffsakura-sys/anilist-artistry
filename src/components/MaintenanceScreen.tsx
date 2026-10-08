@@ -21,8 +21,8 @@ export function MaintenanceScreen({ settings, preview = false }: { settings: Mai
   return <section className={`maintenance-screen ${preview ? "maintenance-preview" : ""}`} aria-label="Aviso de manutenção">
     <img src={night} alt="" className="maintenance-backdrop" width={1920} height={1088} />
     {settings.media_kind === "video" && settings.media_url ?
-      <video ref={video} src={settings.media_url} className="maintenance-backdrop" autoPlay loop playsInline muted={preview} controls={false} disablePictureInPicture disableRemotePlayback preload="auto" aria-hidden="true" /> :
-      settings.media_url ? <img src={settings.media_url} alt="" className="maintenance-backdrop" /> : null}
+      <video ref={video} src={settings.media_url} className="maintenance-backdrop" autoPlay loop playsInline muted={preview} controls={false} disablePictureInPicture disableRemotePlayback preload="metadata" aria-hidden="true" /> :
+      settings.media_url ? <img src={settings.media_url} alt="" className="maintenance-backdrop" decoding="async" /> : null}
     <div className="maintenance-shade" />
     <div className="maintenance-copy">
       <div className="maintenance-status"><span /> BETTER MANGÁ · EM MANUTENÇÃO</div>

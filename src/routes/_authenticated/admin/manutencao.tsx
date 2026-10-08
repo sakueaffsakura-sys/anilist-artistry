@@ -34,7 +34,7 @@ function MaintenanceAdmin() {
     const isVideo = file.type === "video/mp4" && /\.mp4$/i.test(file.name);
     const isImage = ["image/jpeg", "image/png", "image/webp"].includes(file.type);
     if (!isVideo && !isImage) { toast.error("Escolha MP4, JPG, PNG ou WebP."); return; }
-    if (file.size > (isVideo ? 50_000_000 : 5_000_000)) { toast.error(isVideo ? "O vídeo deve ter até 50 MB." : "A imagem deve ter até 5 MB."); return; }
+    if (file.size > 1024 ** 3) { toast.error(isVideo ? "O vídeo deve ter até 1 GB." : "A imagem deve ter até 1 GB."); return; }
     setBusy(true); setProgress(15);
     try {
       const ext = isVideo ? "mp4" : file.type === "image/jpeg" ? "jpg" : file.type.split("/")[1];
@@ -74,7 +74,7 @@ function MaintenanceAdmin() {
         <Button variant="outline" className="w-full" disabled={busy} onClick={() => fileInput.current?.click()}><Upload className="mr-2 h-4 w-4" />Enviar fundo</Button>
         <input ref={fileInput} hidden type="file" accept="video/mp4,image/jpeg,image/png,image/webp" onChange={(e) => { const file = e.target.files?.[0]; if (file) void upload(file); e.target.value = ""; }} />
         {busy && progress > 0 ? <progress className="h-1 w-full accent-primary" value={progress} max={100} /> : null}
-        <p className="text-xs text-muted-foreground">MP4 até 50 MB · Imagens até 5 MB. O navegador pode exigir um toque para liberar o áudio.</p>
+        <p className="text-xs text-muted-foreground">MP4 até 1 GB · Imagens até 1 GB. O navegador pode exigir um toque para liberar o áudio.</p>
         </div>
         <Button asChild variant="ghost"><a href="/manutencao" target="_blank" rel="noreferrer"><ExternalLink className="mr-2 h-4 w-4" />Abrir tela de manutenção</a></Button>
       </div>
