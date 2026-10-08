@@ -19,6 +19,7 @@ import { Route as RankingLeitoresRouteImport } from './routes/ranking-leitores'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthenticatedBibliotecaRouteImport } from './routes/_authenticated/biblioteca'
 import { Route as AuthenticatedHistoricoRouteImport } from './routes/_authenticated/historico'
+import { Route as AuthenticatedPedidosRouteImport } from './routes/_authenticated/pedidos'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ListasIndexRouteImport } from './routes/listas/index'
 import { Route as ListasIdRouteImport } from './routes/listas/$id'
@@ -32,6 +33,7 @@ import { Route as AuthenticatedAdminMoldurasRouteImport } from './routes/_authen
 import { Route as AuthenticatedAdminNovaRouteImport } from './routes/_authenticated/admin/nova'
 import { Route as AuthenticatedAdminNovelsRouteImport } from './routes/_authenticated/admin/novels'
 import { Route as AuthenticatedAdminObrasRouteImport } from './routes/_authenticated/admin/obras'
+import { Route as AuthenticatedAdminPedidosRouteImport } from './routes/_authenticated/admin/pedidos'
 import { Route as AuthenticatedAdminSelosRouteImport } from './routes/_authenticated/admin/selos'
 import { Route as AuthenticatedAdminSuporteRouteImport } from './routes/_authenticated/admin/suporte'
 import { Route as ObraSlugIndexRouteImport } from './routes/obra/$slug/index'
@@ -84,6 +86,11 @@ const AuthenticatedBibliotecaRoute = AuthenticatedBibliotecaRouteImport.update({
 const AuthenticatedHistoricoRoute = AuthenticatedHistoricoRouteImport.update({
   id: '/historico',
   path: '/historico',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPedidosRoute = AuthenticatedPedidosRouteImport.update({
+  id: '/pedidos',
+  path: '/pedidos',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const ApiTtsRoute = ApiTtsRouteImport.update({
@@ -156,6 +163,12 @@ const AuthenticatedAdminObrasRoute = AuthenticatedAdminObrasRouteImport.update({
   path: '/admin/obras',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAdminPedidosRoute =
+  AuthenticatedAdminPedidosRouteImport.update({
+    id: '/admin/pedidos',
+    path: '/admin/pedidos',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminSelosRoute = AuthenticatedAdminSelosRouteImport.update({
   id: '/admin/selos',
   path: '/admin/selos',
@@ -188,6 +201,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/biblioteca': typeof AuthenticatedBibliotecaRoute
   '/historico': typeof AuthenticatedHistoricoRoute
+  '/pedidos': typeof AuthenticatedPedidosRoute
   '/api/tts': typeof ApiTtsRoute
   '/listas/$id': typeof ListasIdRoute
   '/u/$username': typeof UUsernameRoute
@@ -200,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/admin/nova': typeof AuthenticatedAdminNovaRoute
   '/admin/novels': typeof AuthenticatedAdminNovelsRoute
   '/admin/obras': typeof AuthenticatedAdminObrasRoute
+  '/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
   '/admin/selos': typeof AuthenticatedAdminSelosRoute
   '/admin/suporte': typeof AuthenticatedAdminSuporteRoute
   '/obra/$slug/$chapter': typeof ObraSlugChapterRoute
@@ -216,6 +231,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/biblioteca': typeof AuthenticatedBibliotecaRoute
   '/historico': typeof AuthenticatedHistoricoRoute
+  '/pedidos': typeof AuthenticatedPedidosRoute
   '/api/tts': typeof ApiTtsRoute
   '/listas/$id': typeof ListasIdRoute
   '/u/$username': typeof UUsernameRoute
@@ -228,6 +244,7 @@ export interface FileRoutesByTo {
   '/admin/nova': typeof AuthenticatedAdminNovaRoute
   '/admin/novels': typeof AuthenticatedAdminNovelsRoute
   '/admin/obras': typeof AuthenticatedAdminObrasRoute
+  '/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
   '/admin/selos': typeof AuthenticatedAdminSelosRoute
   '/admin/suporte': typeof AuthenticatedAdminSuporteRoute
   '/obra/$slug/$chapter': typeof ObraSlugChapterRoute
@@ -246,6 +263,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/biblioteca': typeof AuthenticatedBibliotecaRoute
   '/_authenticated/historico': typeof AuthenticatedHistoricoRoute
+  '/_authenticated/pedidos': typeof AuthenticatedPedidosRoute
   '/api/tts': typeof ApiTtsRoute
   '/listas/$id': typeof ListasIdRoute
   '/u/$username': typeof UUsernameRoute
@@ -258,6 +276,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/nova': typeof AuthenticatedAdminNovaRoute
   '/_authenticated/admin/novels': typeof AuthenticatedAdminNovelsRoute
   '/_authenticated/admin/obras': typeof AuthenticatedAdminObrasRoute
+  '/_authenticated/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
   '/_authenticated/admin/selos': typeof AuthenticatedAdminSelosRoute
   '/_authenticated/admin/suporte': typeof AuthenticatedAdminSuporteRoute
   '/obra/$slug/$chapter': typeof ObraSlugChapterRoute
@@ -276,6 +295,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/biblioteca'
     | '/historico'
+    | '/pedidos'
     | '/api/tts'
     | '/listas/$id'
     | '/u/$username'
@@ -288,6 +308,7 @@ export interface FileRouteTypes {
     | '/admin/nova'
     | '/admin/novels'
     | '/admin/obras'
+    | '/admin/pedidos'
     | '/admin/selos'
     | '/admin/suporte'
     | '/obra/$slug/$chapter'
@@ -304,6 +325,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/biblioteca'
     | '/historico'
+    | '/pedidos'
     | '/api/tts'
     | '/listas/$id'
     | '/u/$username'
@@ -316,6 +338,7 @@ export interface FileRouteTypes {
     | '/admin/nova'
     | '/admin/novels'
     | '/admin/obras'
+    | '/admin/pedidos'
     | '/admin/selos'
     | '/admin/suporte'
     | '/obra/$slug/$chapter'
@@ -333,6 +356,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/_authenticated/biblioteca'
     | '/_authenticated/historico'
+    | '/_authenticated/pedidos'
     | '/api/tts'
     | '/listas/$id'
     | '/u/$username'
@@ -345,6 +369,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/nova'
     | '/_authenticated/admin/novels'
     | '/_authenticated/admin/obras'
+    | '/_authenticated/admin/pedidos'
     | '/_authenticated/admin/selos'
     | '/_authenticated/admin/suporte'
     | '/obra/$slug/$chapter'
@@ -441,6 +466,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHistoricoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/pedidos': {
+      id: '/_authenticated/pedidos'
+      path: '/pedidos'
+      fullPath: '/pedidos'
+      preLoaderRoute: typeof AuthenticatedPedidosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/api/tts': {
       id: '/api/tts'
       path: '/api/tts'
@@ -532,6 +564,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminObrasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/pedidos': {
+      id: '/_authenticated/admin/pedidos'
+      path: '/admin/pedidos'
+      fullPath: '/admin/pedidos'
+      preLoaderRoute: typeof AuthenticatedAdminPedidosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/selos': {
       id: '/_authenticated/admin/selos'
       path: '/admin/selos'
@@ -566,6 +605,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedBibliotecaRoute: typeof AuthenticatedBibliotecaRoute
   AuthenticatedHistoricoRoute: typeof AuthenticatedHistoricoRoute
+  AuthenticatedPedidosRoute: typeof AuthenticatedPedidosRoute
   AuthenticatedAdminIdRoute: typeof AuthenticatedAdminIdRoute
   AuthenticatedAdminContasRoute: typeof AuthenticatedAdminContasRoute
   AuthenticatedAdminImagensRoute: typeof AuthenticatedAdminImagensRoute
@@ -574,6 +614,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminNovaRoute: typeof AuthenticatedAdminNovaRoute
   AuthenticatedAdminNovelsRoute: typeof AuthenticatedAdminNovelsRoute
   AuthenticatedAdminObrasRoute: typeof AuthenticatedAdminObrasRoute
+  AuthenticatedAdminPedidosRoute: typeof AuthenticatedAdminPedidosRoute
   AuthenticatedAdminSelosRoute: typeof AuthenticatedAdminSelosRoute
   AuthenticatedAdminSuporteRoute: typeof AuthenticatedAdminSuporteRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
@@ -582,6 +623,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBibliotecaRoute: AuthenticatedBibliotecaRoute,
   AuthenticatedHistoricoRoute: AuthenticatedHistoricoRoute,
+  AuthenticatedPedidosRoute: AuthenticatedPedidosRoute,
   AuthenticatedAdminIdRoute: AuthenticatedAdminIdRoute,
   AuthenticatedAdminContasRoute: AuthenticatedAdminContasRoute,
   AuthenticatedAdminImagensRoute: AuthenticatedAdminImagensRoute,
@@ -590,6 +632,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminNovaRoute: AuthenticatedAdminNovaRoute,
   AuthenticatedAdminNovelsRoute: AuthenticatedAdminNovelsRoute,
   AuthenticatedAdminObrasRoute: AuthenticatedAdminObrasRoute,
+  AuthenticatedAdminPedidosRoute: AuthenticatedAdminPedidosRoute,
   AuthenticatedAdminSelosRoute: AuthenticatedAdminSelosRoute,
   AuthenticatedAdminSuporteRoute: AuthenticatedAdminSuporteRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
