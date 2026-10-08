@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { fetchSpeech, getAudioContext, SpeechError } from "@/lib/realistic-speech";
 
 const AI_VOICES = [
-  { id: "240c6c29d4a54e35983a8982eeae3d66", label: "Fish Audio (narrador)" },
+  { id: "240c6c29d4a54e35983a8982eeae3d66", label: "Rudeus (Mushoku Tensei)" },
   { id: "Kore", label: "Kore (feminina)" },
   { id: "Aoede", label: "Aoede (feminina suave)" },
   { id: "Leda", label: "Leda (feminina jovem)" },
