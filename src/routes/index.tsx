@@ -146,7 +146,7 @@ function Home() {
         {(updated.data?.length ?? 0) > 0 ? <RecentlyUpdated rows={updated.data ?? []} /> : null}
 
         {novels.isPending ? <LoadingShelf label="Carregando novels" /> : null}
-        {novels.isSuccess ? (
+        {novels.isSuccess ? <div className="cv-auto">{(
           <SectionRow icon={<BookOpenText className="h-5 w-5" />} title="Novels"
             subtitle="Últimos capítulos em texto"
             action={<Button asChild variant="ghost" size="sm" className="text-primary"><Link to="/catalogo" search={{ kind: "Novel" }}>Ver todas</Link></Button>}>
@@ -157,7 +157,7 @@ function Home() {
               </div>)}
             </HScroll> : <p className="py-6 text-sm text-muted-foreground">Nenhuma novel publicada ainda.</p>}
           </SectionRow>
-        ) : null}
+        )}</div> : null}
 
         {ranking.isPending ? <LoadingShelf label="Carregando ranking" /> : null}
         {(ranking.data?.length ?? 0) > 0 ? (
