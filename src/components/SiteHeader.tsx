@@ -163,7 +163,7 @@ export const SITE_LOGO =
 export function SiteFooter() {
   const year = new Date().getFullYear();
   return (
-    <footer className="border-t border-border/70 bg-background pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
+    <footer className="hidden border-t border-border/70 bg-background lg:block">
       <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 md:px-8">
         <div className="mb-8 grid grid-cols-1 gap-8 md:grid-cols-4">
           <div className="space-y-4">
