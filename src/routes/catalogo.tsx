@@ -70,13 +70,7 @@ function Pesquisar() {
 
   const isUser = s.q.startsWith("@");
 
-  const tags = useQuery({
-    queryKey: ["all-genres"],
-    queryFn: async () => {
-      const { data } = await supabase.from("series").select("genres").eq("published", true);
-      return normalizeGenres([...GENRES, ...(data ?? []).flatMap((r) => r.genres ?? [])]).sort((a, b) => a.localeCompare(b, "pt-BR"));
-    },
-  });
+  const tags = useGenres();
 
   const results = useQuery({
     queryKey: ["search", s],
