@@ -3,8 +3,7 @@ import { GENRES, genreAliases, normalizeGenres } from "../src/lib/work-genres";
 
 describe("shared work genres", () => {
   it("offers the full AniList genre set and common manga and novel genres", () => {
-    for (const genre of ["Ação", "Aventura", "Comédia", "Drama", "Ecchi", "Fantasia", "Terror", "Garota Mágica", "Mecha", "Música", "Mistério", "Psicológico", "Romance", "Ficção Científica", "Cotidiano", "Esportes", "Sobrenatural", "Suspense", "Yaoi", "Yuri", "Hentai", "Manhwa", "Isekai", "Murim", "Cultivo"]) {
-      if (genre === "Manhwa") continue; // A format, not a genre.
+    for (const genre of ["Ação", "Aventura", "Comédia", "Drama", "Ecchi", "Fantasia", "Terror", "Garota Mágica", "Mecha", "Música", "Mistério", "Psicológico", "Romance", "Ficção Científica", "Cotidiano", "Esportes", "Sobrenatural", "Suspense", "Yaoi", "Yuri", "Hentai", "Isekai", "Murim", "Cultivo"]) {
       expect(GENRES).toContain(genre);
     }
   });
