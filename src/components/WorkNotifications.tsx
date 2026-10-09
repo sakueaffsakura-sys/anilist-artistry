@@ -10,7 +10,7 @@ import { fetchWorkNotifications } from "@/lib/work-requests";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
-type Item = { id: string; kind: "chapter" | "request"; read_at: string | null; created_at: string; slug: string; title: string; cover: string | null; text: string; chapter?: string };
+type Item = { id: string; kind: "chapter" | "request"; read_at: string | null; created_at: string; slug: string; title: string; cover: string | null; text: string; chapter?: string | undefined };
 
 function when(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
