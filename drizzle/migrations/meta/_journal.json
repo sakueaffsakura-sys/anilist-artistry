@@ -260,6 +260,13 @@
       "when": 1791508916006,
       "tag": "0036_homepage_curated_sections",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1791509343169,
+      "tag": "0037_maintenance_media_one_gib",
+      "breakpoints": true
     }
   ]
 }

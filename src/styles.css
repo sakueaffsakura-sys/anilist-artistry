@@ -4,24 +4,28 @@
 
 @custom-variant light (&:is(.light *));
 
-.maintenance-screen { position: fixed; inset: 0; min-height: 100dvh; overflow: hidden; background: var(--background); color: var(--foreground); z-index: 40; }
+.maintenance-screen { position: fixed; inset: 0; min-height: 100dvh; overflow-y: auto; background: var(--background); color: var(--foreground); z-index: 40; }
 .maintenance-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .maintenance-shade { position: absolute; inset: 0; background: linear-gradient(90deg, color-mix(in oklab, var(--background) 86%, transparent), color-mix(in oklab, var(--background) 24%, transparent)), linear-gradient(0deg, color-mix(in oklab, var(--background) 65%, transparent), transparent); }
-.maintenance-copy { position: relative; display: flex; flex-direction: column; justify-content: center; min-height: 100dvh; max-width: 760px; padding: 64px 8%; }
+.maintenance-brand { position: absolute; z-index: 1; top: 40px; left: 8%; display: flex; align-items: center; gap: 12px; font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: 0; }
+.maintenance-brand svg { width: 30px; height: 30px; color: var(--primary); }
+.maintenance-brand strong { color: var(--primary); }
+.maintenance-copy { position: relative; display: flex; flex-direction: column; justify-content: center; min-height: 100dvh; max-width: 850px; padding: 130px 8% 70px; }
 .maintenance-copy > * { animation: maint-in .7s cubic-bezier(.2,.7,.2,1) both; }
 .maintenance-copy > *:nth-child(2) { animation-delay: .08s; } .maintenance-copy > *:nth-child(3) { animation-delay: .16s; } .maintenance-copy > *:nth-child(4) { animation-delay: .24s; }
 @keyframes maint-in { from { opacity: 0; transform: translateY(14px); } }
-.maintenance-status { display: inline-flex; align-self: flex-start; align-items: center; gap: 10px; color: var(--primary); font-size: 11px; letter-spacing: .14em; font-weight: 800; margin-bottom: 28px; padding: 8px 14px; border: 1px solid color-mix(in oklab, var(--primary) 40%, transparent); border-radius: 999px; background: color-mix(in oklab, var(--background) 55%, transparent); backdrop-filter: blur(8px); }
+.maintenance-status { display: inline-flex; align-self: flex-start; align-items: center; gap: 10px; color: var(--primary); font-size: 11px; letter-spacing: 0; font-weight: 800; margin-bottom: 24px; padding: 8px 12px; border: 1px solid color-mix(in oklab, var(--primary) 40%, transparent); border-radius: 4px; background: color-mix(in oklab, var(--background) 70%, transparent); }
 .maintenance-status span { width: 7px; height: 7px; background: var(--primary); border-radius: 100%; box-shadow: 0 0 0 0 var(--primary); animation: maint-pulse 1.8s infinite; }
 @keyframes maint-pulse { 70% { box-shadow: 0 0 0 8px transparent; } }
-.maintenance-copy h1 { font-family: var(--font-display); font-size: clamp(36px, 6vw, 68px); line-height: 1.08; font-weight: 800; letter-spacing: -.02em; overflow-wrap: anywhere; text-shadow: 0 4px 30px color-mix(in oklab, var(--background) 70%, transparent); }
+.maintenance-copy h1 { font-family: var(--font-display); font-size: 60px; line-height: 1.12; font-weight: 800; letter-spacing: 0; overflow-wrap: anywhere; text-shadow: 0 4px 30px color-mix(in oklab, var(--background) 70%, transparent); }
 .maintenance-copy p { font-size: 17px; line-height: 1.8; margin-top: 22px; max-width: 560px; white-space: pre-wrap; overflow-wrap: anywhere; opacity: .85; padding-left: 16px; border-left: 3px solid var(--primary); }
-.maintenance-rule { height: 3px; width: 120px; margin-top: 40px; border-radius: 3px; background: linear-gradient(90deg, var(--primary), transparent); }
+.maintenance-rule { height: 3px; width: 72px; margin-top: 32px; background: var(--primary); }
 @media (prefers-reduced-motion: reduce) { .maintenance-copy > *, .maintenance-status span { animation: none; } }
-.maintenance-preview { position: relative; min-height: 420px; z-index: 0; }
-.maintenance-preview .maintenance-copy { min-height: 420px; padding: 40px; }
+.maintenance-preview { position: relative; min-height: 480px; z-index: 0; border: 1px solid var(--border); border-radius: 8px; }
+.maintenance-preview .maintenance-brand { top: 28px; left: 32px; font-size: 18px; }
+.maintenance-preview .maintenance-copy { min-height: 480px; padding: 100px 32px 36px; }
 .maintenance-preview .maintenance-copy h1 { font-size: 36px; }
-@media (max-width: 640px) { .maintenance-copy { padding: 40px 24px; } .maintenance-copy h1 { font-size: 40px; } .maintenance-copy p { font-size: 15px; } }
+@media (max-width: 640px) { .maintenance-brand { top: 28px; left: 24px; font-size: 18px; } .maintenance-copy { padding: 110px 24px 44px; } .maintenance-copy h1 { font-size: 36px; } .maintenance-copy p { font-size: 15px; } .maintenance-preview .maintenance-brand { left: 24px; } .maintenance-preview .maintenance-copy { padding-left: 24px; padding-right: 24px; } }
 
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
