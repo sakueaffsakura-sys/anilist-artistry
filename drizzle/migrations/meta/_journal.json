@@ -267,6 +267,13 @@
       "when": 1791509343169,
       "tag": "0037_maintenance_media_one_gib",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1791510382913,
+      "tag": "0038_maintenance_tus_authorization",
+      "breakpoints": true
     }
   ]
 }

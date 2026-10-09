@@ -961,6 +961,10 @@ export type Database = {
         Returns: undefined
       }
       maintenance_access_allowed: { Args: never; Returns: boolean }
+      maintenance_media_upload_valid: {
+        Args: { object_metadata: Json; object_name: string }
+        Returns: boolean
+      }
       obra_ranking: {
         Args: { _metric: string }
         Returns: {

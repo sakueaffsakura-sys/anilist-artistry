@@ -40,7 +40,8 @@ export async function uploadMaintenanceMedia(file: File, onProgress: (value: num
 
 export function maintenanceUploadError(error: unknown) {
   const text = error instanceof Error ? error.message : "";
-  if (/403|401|row.level|unauthorized/i.test(text)) return "Sua conta precisa de acesso administrativo. Entre novamente e tente enviar.";
+  if (/401|unauthorized|jwt|token.*expir/i.test(text)) return "Sua sessão expirou. Entre novamente e tente enviar.";
+  if (/403|row.level/i.test(text)) return "O armazenamento recusou o envio. Verifique o acesso administrativo e o formato do arquivo; essa recusa também pode ser uma regra de validação.";
   if (/413|size|too large/i.test(text)) return "O envio excedeu o limite permitido. Escolha um arquivo de até 1 GB.";
   if (/network|fetch|failed to|offline/i.test(text)) return "A conexão foi interrompida. Confira sua internet e tente novamente.";
   return text || "Não foi possível enviar o arquivo. Tente novamente.";

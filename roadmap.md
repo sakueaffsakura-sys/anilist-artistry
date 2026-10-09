@@ -1,6 +1,7 @@
 # Tarefas
 
-- [ ] Corrigir recusa indevida no envio de manutenção para administradores, conferir autorização TUS e distinguir erro de sessão de validação do arquivo
+- [x] Corrigir recusa indevida no início do envio de manutenção: aceitar contentLength na autorização TUS e size após conclusão; nove casos reais da regra e seis testes passaram, conta sem administração segue bloqueada com 403; mensagem diferencia sessão expirada de recusa do armazenamento
+- [ ] Validar envio completo com administrador — sessão solicitante disponível tem somente papel uploader; permissões não foram alteradas, nenhuma manutenção ativada ou mídia apagada
 
 - [x] Corrigir regra de envio de mídia de manutenção de 50 MB/5 MB para 1 GB, adicionar envio em partes com progresso e cancelamento, harmonizar tela e alinhar Atualizados Recentes; seis testes passaram e telas públicas conferidas sem ativar manutenção ou apagar dados
 - [ ] Confirmar envio real de vídeo grande — precisa de sessão administrativa e arquivo real; limites e políticas conferidos, teste real não executado
