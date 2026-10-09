@@ -1,5 +1,7 @@
 # Tarefas
 
+- [ ] Adicionar importação TXT de novels com conferência, numeração, rascunho/publicação e simplificar a tela; validar sem gravar capítulos reais
+
 - [x] Corrigir recusa indevida no início do envio de manutenção: aceitar contentLength na autorização TUS e size após conclusão; nove casos reais da regra e seis testes passaram, conta sem administração segue bloqueada com 403; mensagem diferencia sessão expirada de recusa do armazenamento
 - [ ] Validar envio completo com administrador — sessão solicitante disponível tem somente papel uploader; permissões não foram alteradas, nenhuma manutenção ativada ou mídia apagada
 
