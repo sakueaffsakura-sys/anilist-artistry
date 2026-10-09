@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useGenres } from "@/hooks/use-genres";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { BookOpen, Search, Star, User2 } from "lucide-react";
@@ -70,13 +71,7 @@ function Pesquisar() {
 
   const isUser = s.q.startsWith("@");
 
-  const tags = useQuery({
-    queryKey: ["all-genres"],
-    queryFn: async () => {
-      const { data } = await supabase.from("series").select("genres").eq("published", true);
-      return normalizeGenres([...GENRES, ...(data ?? []).flatMap((r) => r.genres ?? [])]).sort((a, b) => a.localeCompare(b, "pt-BR"));
-    },
-  });
+  const tags = useGenres();
 
   const results = useQuery({
     queryKey: ["search", s],

@@ -3,13 +3,15 @@ import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { useGenres } from "@/hooks/use-genres";
 import { GENRES, normalizeGenres } from "@/lib/work-genres";
 
 export function GenreSelect({ value, onChange }: { value: string[]; onChange: (value: string[]) => void }) {
   const id = useId();
   const [query, setQuery] = useState("");
   const selected = normalizeGenres(value);
-  const options = normalizeGenres([...GENRES, ...selected]).filter((genre) =>
+  const genres = useGenres();
+  const options = normalizeGenres([...(genres.data ?? GENRES), ...selected]).filter((genre) =>
     genre.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().includes(query.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase()),
   );
   return (

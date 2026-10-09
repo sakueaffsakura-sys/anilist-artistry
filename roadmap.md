@@ -1,5 +1,10 @@
 # Tarefas
 
+- [ ] Criar painel de versões Android com envio APK e consulta pública de atualização obrigatória; integração no APK depende do código Android
+- [ ] Alinhar listagem de novels ao painel de obras, preservando editor e importação
+- [ ] Criar área de gêneros adicionais e integrá-los aos seletores e catálogo
+- [ ] Validar regras, permissões e telas sem publicar nem alterar conteúdos existentes
+
 - [x] Ativar som do vídeo de manutenção com ação explícita quando o navegador bloquear áudio; sem controles de vídeo ou alterações de dados
 
 - [ ] Adicionar importação TXT de novels com conferência, numeração, rascunho/publicação e simplificar a tela; validar sem gravar capítulos reais

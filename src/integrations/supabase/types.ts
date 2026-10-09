@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_releases: {
+        Row: {
+          apk_path: string
+          created_at: string
+          id: string
+          minimum_version_code: number
+          notes: string
+          published: boolean
+          version_code: number
+          version_name: string
+        }
+        Insert: {
+          apk_path: string
+          created_at?: string
+          id?: string
+          minimum_version_code: number
+          notes?: string
+          published?: boolean
+          version_code: number
+          version_name: string
+        }
+        Update: {
+          apk_path?: string
+          created_at?: string
+          id?: string
+          minimum_version_code?: number
+          notes?: string
+          published?: boolean
+          version_code?: number
+          version_name?: string
+        }
+        Relationships: []
+      }
       avatar_frames: {
         Row: {
           active: boolean
@@ -266,6 +299,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      custom_genres: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
       }
       favorites: {
         Row: {
