@@ -31,3 +31,4 @@
 
 - Genre selectors, import writes and public genre labels use the browser-safe work-genres module; alias-aware catalog filtering preserves old records without bulk rewrites.
 - Homepage discovery shelves use admin-only persisted selection settings and lightweight published-work queries; automatic ordering uses saved AniList metrics so home visits never call AniList, while manual selection preserves its order without fallback.
+- Recent updates uses the shared horizontal shelf and browser-safe selection helper for both query and display limits, keeping layout and result counts consistent.

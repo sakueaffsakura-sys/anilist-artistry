@@ -6,7 +6,8 @@ import type { SeriesRow } from "@/lib/queries";
 import { supabase } from "@/integrations/supabase/client";
 import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
 import { useSession } from "@/hooks/useAuth";
-import { SectionRow } from "@/components/SectionRow";
+import { HScroll, SectionRow } from "@/components/SectionRow";
+import { selectRecentUpdates } from "@/lib/recent-updates";
 
 export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
   const { user } = useSession();
@@ -51,13 +52,13 @@ export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
   return (
     <SectionRow icon={<Clock className="h-5 w-5" />} title="Atualizados Recentes">
 
-      <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-4 lg:grid-cols-5">
-        {rows.map((item) => {
+      <HScroll>
+        {selectRecentUpdates(rows).map((item) => {
           const [latest, previous] = item.chapters ?? [];
           return (
             <div
               key={item.id}
-              className="group flex h-full w-full min-w-0 flex-col gap-2 rounded-[1.35rem] bg-card/40 transition-colors duration-200"
+              className="group flex w-[160px] min-w-0 shrink-0 flex-col gap-2 rounded-[1.35rem] bg-card/40 transition-colors duration-200"
             >
               <Link
                 to="/obra/$slug"
@@ -162,7 +163,7 @@ export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
             </div>
           );
         })}
-      </div>
+      </HScroll>
     </SectionRow>
   );
 }

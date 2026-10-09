@@ -16,6 +16,7 @@ import { useSession } from "@/hooks/useAuth";
 import { EventBadges } from "@/components/EventBadges";
 import { HomeDiscovery } from "@/components/HomeDiscovery";
 import { fetchHomeSections } from "@/lib/home-section-queries";
+import { RECENT_UPDATES_LIMIT } from "@/lib/recent-updates";
 
 export const Route = createFileRoute("/")({
   staticData: { sitemap: true },
@@ -50,7 +51,7 @@ function Home() {
   });
   const updated = useQuery({
     queryKey: ["series", "updated"],
-    queryFn: () => fetchSeries({ order: "updated_at", limit: 10, pinnedFirst: true }),
+    queryFn: () => fetchSeries({ order: "updated_at", limit: RECENT_UPDATES_LIMIT, pinnedFirst: true }),
   });
   const releases = recent;
   const slider = useQuery({
