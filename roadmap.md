@@ -1,6 +1,7 @@
 # Tarefas
 
-- [ ] Adicionar Obras populares, Em alta agora e Manhwa popular com seleção administrativa e dados automáticos do AniList; testar sem publicar ou apagar dados
+- [x] Adicionar Obras populares, Em alta agora e Manhwa popular com seleção administrativa e dados automáticos do AniList; 16 testes passaram, home e escolha/ordenação/salvamento simulado conferidos, sem publicar ou apagar dados
+- [ ] Confirmar gravação real das colunas e atualização completa do AniList — sessão disponível não tem papel administrativo; controle visual testado com acesso simulado sem alterar permissões
 
 - [x] Ampliar gêneros e substituir digitação por seleção múltipla em cadastro, edição e novels; padronizar nomes nas postagens e filtros com aliases para registros antigos, sem alterar dados existentes; quatro testes e seleção/remoção no navegador passaram, gravação real não executada
 
