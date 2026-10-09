@@ -251,6 +251,30 @@ export type Database = {
           },
         ]
       }
+      home_sections: {
+        Row: {
+          created_at: string
+          mode: string
+          section: string
+          series_ids: string[]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          mode?: string
+          section: string
+          series_ids?: string[]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          mode?: string
+          section?: string
+          series_ids?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       list_follows: {
         Row: {
           created_at: string
@@ -629,6 +653,8 @@ export type Database = {
         Row: {
           alt_titles: string | null
           anilist_id: number | null
+          anilist_popularity: number
+          anilist_trending: number
           artist: string | null
           author: string | null
           banner_url: string | null
@@ -652,6 +678,8 @@ export type Database = {
         Insert: {
           alt_titles?: string | null
           anilist_id?: number | null
+          anilist_popularity?: number
+          anilist_trending?: number
           artist?: string | null
           author?: string | null
           banner_url?: string | null
@@ -675,6 +703,8 @@ export type Database = {
         Update: {
           alt_titles?: string | null
           anilist_id?: number | null
+          anilist_popularity?: number
+          anilist_trending?: number
           artist?: string | null
           author?: string | null
           banner_url?: string | null
