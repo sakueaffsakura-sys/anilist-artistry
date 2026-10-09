@@ -27,6 +27,7 @@ import { Route as UUsernameRouteImport } from './routes/u/$username'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminIdRouteImport } from './routes/_authenticated/admin/$id'
 import { Route as AuthenticatedAdminContasRouteImport } from './routes/_authenticated/admin/contas'
+import { Route as AuthenticatedAdminHomeRouteImport } from './routes/_authenticated/admin/home'
 import { Route as AuthenticatedAdminImagensRouteImport } from './routes/_authenticated/admin/imagens'
 import { Route as AuthenticatedAdminManutencaoRouteImport } from './routes/_authenticated/admin/manutencao'
 import { Route as AuthenticatedAdminMoldurasRouteImport } from './routes/_authenticated/admin/molduras'
@@ -129,6 +130,11 @@ const AuthenticatedAdminContasRoute =
     path: '/admin/contas',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminHomeRoute = AuthenticatedAdminHomeRouteImport.update({
+  id: '/admin/home',
+  path: '/admin/home',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAdminImagensRoute =
   AuthenticatedAdminImagensRouteImport.update({
     id: '/admin/imagens',
@@ -208,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/listas/': typeof ListasIndexRoute
   '/admin/$id': typeof AuthenticatedAdminIdRoute
   '/admin/contas': typeof AuthenticatedAdminContasRoute
+  '/admin/home': typeof AuthenticatedAdminHomeRoute
   '/admin/imagens': typeof AuthenticatedAdminImagensRoute
   '/admin/manutencao': typeof AuthenticatedAdminManutencaoRoute
   '/admin/molduras': typeof AuthenticatedAdminMoldurasRoute
@@ -238,6 +245,7 @@ export interface FileRoutesByTo {
   '/listas': typeof ListasIndexRoute
   '/admin/$id': typeof AuthenticatedAdminIdRoute
   '/admin/contas': typeof AuthenticatedAdminContasRoute
+  '/admin/home': typeof AuthenticatedAdminHomeRoute
   '/admin/imagens': typeof AuthenticatedAdminImagensRoute
   '/admin/manutencao': typeof AuthenticatedAdminManutencaoRoute
   '/admin/molduras': typeof AuthenticatedAdminMoldurasRoute
@@ -270,6 +278,7 @@ export interface FileRoutesById {
   '/listas/': typeof ListasIndexRoute
   '/_authenticated/admin/$id': typeof AuthenticatedAdminIdRoute
   '/_authenticated/admin/contas': typeof AuthenticatedAdminContasRoute
+  '/_authenticated/admin/home': typeof AuthenticatedAdminHomeRoute
   '/_authenticated/admin/imagens': typeof AuthenticatedAdminImagensRoute
   '/_authenticated/admin/manutencao': typeof AuthenticatedAdminManutencaoRoute
   '/_authenticated/admin/molduras': typeof AuthenticatedAdminMoldurasRoute
@@ -302,6 +311,7 @@ export interface FileRouteTypes {
     | '/listas/'
     | '/admin/$id'
     | '/admin/contas'
+    | '/admin/home'
     | '/admin/imagens'
     | '/admin/manutencao'
     | '/admin/molduras'
@@ -332,6 +342,7 @@ export interface FileRouteTypes {
     | '/listas'
     | '/admin/$id'
     | '/admin/contas'
+    | '/admin/home'
     | '/admin/imagens'
     | '/admin/manutencao'
     | '/admin/molduras'
@@ -363,6 +374,7 @@ export interface FileRouteTypes {
     | '/listas/'
     | '/_authenticated/admin/$id'
     | '/_authenticated/admin/contas'
+    | '/_authenticated/admin/home'
     | '/_authenticated/admin/imagens'
     | '/_authenticated/admin/manutencao'
     | '/_authenticated/admin/molduras'
@@ -522,6 +534,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminContasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/home': {
+      id: '/_authenticated/admin/home'
+      path: '/admin/home'
+      fullPath: '/admin/home'
+      preLoaderRoute: typeof AuthenticatedAdminHomeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/imagens': {
       id: '/_authenticated/admin/imagens'
       path: '/admin/imagens'
@@ -608,6 +627,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPedidosRoute: typeof AuthenticatedPedidosRoute
   AuthenticatedAdminIdRoute: typeof AuthenticatedAdminIdRoute
   AuthenticatedAdminContasRoute: typeof AuthenticatedAdminContasRoute
+  AuthenticatedAdminHomeRoute: typeof AuthenticatedAdminHomeRoute
   AuthenticatedAdminImagensRoute: typeof AuthenticatedAdminImagensRoute
   AuthenticatedAdminManutencaoRoute: typeof AuthenticatedAdminManutencaoRoute
   AuthenticatedAdminMoldurasRoute: typeof AuthenticatedAdminMoldurasRoute
@@ -626,6 +646,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPedidosRoute: AuthenticatedPedidosRoute,
   AuthenticatedAdminIdRoute: AuthenticatedAdminIdRoute,
   AuthenticatedAdminContasRoute: AuthenticatedAdminContasRoute,
+  AuthenticatedAdminHomeRoute: AuthenticatedAdminHomeRoute,
   AuthenticatedAdminImagensRoute: AuthenticatedAdminImagensRoute,
   AuthenticatedAdminManutencaoRoute: AuthenticatedAdminManutencaoRoute,
   AuthenticatedAdminMoldurasRoute: AuthenticatedAdminMoldurasRoute,
