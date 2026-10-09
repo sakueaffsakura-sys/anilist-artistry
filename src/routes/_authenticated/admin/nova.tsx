@@ -16,6 +16,7 @@ import { GenreSelect } from "@/components/GenreSelect";
 import { normalizeGenres } from "@/lib/work-genres";
 import { useSession } from "@/hooks/useAuth";
 import { searchAnilist, searchAnilistSmart } from "@/lib/anilist.functions";
+import { anilistMetrics } from "@/lib/home-sections";
 
 export const Route = createFileRoute("/_authenticated/admin/nova")({
   staticData: { sitemap: false },
@@ -49,7 +50,7 @@ function NovaObra() {
     artist: "",
     genres: [] as string[],
   });
-  const [meta, setMeta] = useState<{ anilistId: number | null; rating: number }>({ anilistId: null, rating: 0 });
+  const [meta, setMeta] = useState({ anilistId: null as number | null, rating: 0, popularity: 0, trending: 0 });
 
   function set(key: Exclude<keyof typeof form, "genres">, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -63,7 +64,7 @@ function NovaObra() {
       return item;
     },
     onSuccess: (item) => {
-      setMeta({ anilistId: item.anilistId, rating: item.averageScore });
+      setMeta({ anilistId: item.anilistId, rating: item.averageScore, popularity: item.popularity, trending: item.trending });
       setForm((prev) => ({
         ...prev,
         kind: item.suggestedKind,
@@ -94,6 +95,7 @@ function NovaObra() {
           title,
           anilist_id: meta.anilistId,
           rating: meta.rating,
+          ...anilistMetrics(meta),
           alt_titles: form.altTitles,
           synopsis: form.synopsis,
           cover_url: form.coverUrl,

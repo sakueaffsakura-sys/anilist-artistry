@@ -253,6 +253,13 @@
       "when": 1791424035474,
       "tag": "0035_expand_work_request_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1791508916006,
+      "tag": "0036_homepage_curated_sections",
+      "breakpoints": true
     }
   ]
 }

@@ -15,6 +15,8 @@ export type AnilistResult = {
   artist: string;
   averageScore: number;
   suggestedKind: string;
+  popularity: number;
+  trending: number;
 };
 
 const QUERY = `
@@ -29,6 +31,8 @@ query ($search: String, $ids: [Int], $sort: [MediaSort]) {
       genres
       status
       averageScore
+      popularity
+      trending
       countryOfOrigin
       format
       staff(perPage: 6) { edges { role node { name { full } } } }
@@ -86,19 +90,14 @@ async function runAnilistSearch(data: { search: string }): Promise<AnilistResult
         );
         if (!r.ok) throw new Error(`Não foi possível ler o anime no AniList (${r.status}).`);
         const j = (await r.json()) as { data?: { Media?: { relations?: { edges?: Array<{ node?: { id: number; type: string } }> } } } };
-        const ids = (j.data?.Media?.relations?.edges ?? []).filter((e) => e.node?.type === "MANGA").map((e) => e.node!.id);
+        const ids = (j.data?.Media?.relations?.edges ?? []).flatMap((edge) => edge.node?.type === "MANGA" ? [edge.node.id] : []);
         if (!ids.length) throw new Error("Esse anime não tem mangá de origem no AniList.");
         variables = { ids };
       } else {
         // Link de busca do AniList (ex.: /search/manga?search=Naruto)
         const params = new URL(raw.startsWith("http") ? raw : `https://${raw}`).searchParams;
         const q = params.get("search") ?? params.get("query");
-        if (!q) {
-          throw new Error(
-            "Esse link é só a página de busca do AniList. Abra a obra lá e cole o link dela (ex.: https://anilist.co/manga/30656/Vagabond).",
-          );
-        }
-        variables = { search: q, sort: ["SEARCH_MATCH"] };
+        variables = q ? { search: q, sort: ["SEARCH_MATCH"] } : { sort: [params.get("sort") === "TRENDING_DESC" ? "TRENDING_DESC" : "POPULARITY_DESC"] };
       }
     }
     let response = await gql(QUERY, variables);
@@ -116,7 +115,8 @@ async function runAnilistSearch(data: { search: string }): Promise<AnilistResult
       data?: { Page?: { media?: unknown[] } };
       errors?: { message: string }[];
     };
-    if (json.errors?.length) throw new Error(json.errors[0]!.message);
+    const apiError = json.errors?.[0];
+    if (apiError) throw new Error(apiError.message);
 
     const media = (json.data?.Page?.media ?? []) as Array<{
       id: number;
@@ -127,6 +127,8 @@ async function runAnilistSearch(data: { search: string }): Promise<AnilistResult
       genres?: string[];
       status?: string;
       averageScore?: number;
+      popularity?: number;
+      trending?: number;
       countryOfOrigin?: string;
       format?: string;
       staff?: { edges?: Array<{ role?: string; node?: { name?: { full?: string } } }> };
@@ -149,6 +151,8 @@ async function runAnilistSearch(data: { search: string }): Promise<AnilistResult
         author: findRole("story") || findRole("original") || "",
         artist: findRole("art") || "",
         suggestedKind: suggestWorkKind(item),
+        popularity: item.popularity ?? 0,
+        trending: item.trending ?? 0,
         averageScore: item.averageScore ? Math.round((item.averageScore / 10) * 10) / 10 : 0,
       };
     });
