@@ -1,5 +1,7 @@
 # Tarefas
 
+- [ ] Corrigir envio de vídeos grandes na manutenção, harmonizar tela com o site e alinhar Atualizados Recentes às outras seções; sem ativar manutenção ou apagar dados
+
 - [x] Adicionar Obras populares, Em alta agora e Manhwa popular com seleção administrativa e dados automáticos do AniList; 16 testes passaram, home e escolha/ordenação/salvamento simulado conferidos, sem publicar ou apagar dados
 - [ ] Confirmar gravação real das colunas e atualização completa do AniList — sessão disponível não tem papel administrativo; controle visual testado com acesso simulado sem alterar permissões
 
