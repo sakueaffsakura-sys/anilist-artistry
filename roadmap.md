@@ -1,5 +1,7 @@
 # Tarefas
 
+- [ ] Corrigir recusa indevida no envio de manutenção para administradores, conferir autorização TUS e distinguir erro de sessão de validação do arquivo
+
 - [x] Corrigir regra de envio de mídia de manutenção de 50 MB/5 MB para 1 GB, adicionar envio em partes com progresso e cancelamento, harmonizar tela e alinhar Atualizados Recentes; seis testes passaram e telas públicas conferidas sem ativar manutenção ou apagar dados
 - [ ] Confirmar envio real de vídeo grande — precisa de sessão administrativa e arquivo real; limites e políticas conferidos, teste real não executado
 
