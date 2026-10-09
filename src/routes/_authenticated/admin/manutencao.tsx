@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Image, Film, Save, Upload, ExternalLink } from "lucide-react";
+import { Image, Film, Save, Upload, ExternalLink, X } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/AdminShell";
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";
@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { getMaintenanceStatus, saveMaintenanceSettings } from "@/lib/maintenance.functions";
-import { supabase } from "@/integrations/supabase/client";
+import { uploadMaintenanceMedia, maintenanceUploadError } from "@/lib/maintenance-upload";
+import { validateMaintenanceMedia } from "@/lib/maintenance-media";
 
 export const Route = createFileRoute("/_authenticated/admin/manutencao")({
   staticData: { sitemap: false },
@@ -28,26 +29,26 @@ function MaintenanceAdmin() {
   const [form, setForm] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [uploading, setUploading] = useState(false);
+  const [fileName, setFileName] = useState("");
+  const [uploadError, setUploadError] = useState("");
+  const controller = useRef<AbortController | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const save = useServerFn(saveMaintenanceSettings);
   const upload = async (file: File) => {
-    const isVideo = file.type === "video/mp4" && /\.mp4$/i.test(file.name);
-    const isImage = ["image/jpeg", "image/png", "image/webp"].includes(file.type);
-    if (!isVideo && !isImage) { toast.error("Escolha MP4, JPG, PNG ou WebP."); return; }
-    if (file.size > 1024 ** 3) { toast.error(isVideo ? "O vídeo deve ter até 1 GB." : "A imagem deve ter até 1 GB."); return; }
-    setBusy(true); setProgress(15);
+    try { validateMaintenanceMedia(file); } catch (error) { toast.error(maintenanceUploadError(error)); return; }
+    const abort = new AbortController();
+    controller.current = abort;
+    setBusy(true); setUploading(true); setProgress(0); setFileName(file.name); setUploadError("");
     try {
-      const ext = isVideo ? "mp4" : file.type === "image/jpeg" ? "jpg" : file.type.split("/")[1];
-      const path = `backgrounds/${crypto.randomUUID()}.${ext}`;
-      const { error } = await supabase.storage.from("maintenance-media").upload(path, file, { contentType: file.type, upsert: false });
-      if (error) throw error;
-      setProgress(85);
-      const { data, error: signError } = await supabase.storage.from("maintenance-media").createSignedUrl(path, 3600);
-      if (signError || !data) throw new Error("Não foi possível carregar o fundo.");
-      setForm((f) => ({ ...f, media_kind: isVideo ? "video" : "image", media_path: path, media_url: data.signedUrl }));
+      const media = await uploadMaintenanceMedia(file, setProgress, abort.signal);
+      setForm((f) => ({ ...f, ...media }));
       setProgress(100); toast.success("Fundo enviado. Salve para aplicar.");
-    } catch { toast.error("Não foi possível enviar o arquivo."); }
-    finally { setBusy(false); }
+    } catch (error) {
+      if (abort.signal.aborted) toast.info("Envio cancelado. O fundo anterior foi mantido.");
+      else { const message = maintenanceUploadError(error); setUploadError(message); toast.error(message); }
+    }
+    finally { setBusy(false); setUploading(false); controller.current = null; }
   };
   const submit = async () => {
     setBusy(true);
@@ -68,12 +69,13 @@ function MaintenanceAdmin() {
         <div className="space-y-2"><Label htmlFor="maintenance-title">Título do aviso</Label><Input id="maintenance-title" maxLength={160} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
         <div className="space-y-2"><Label htmlFor="maintenance-message">Sua mensagem</Label><Textarea id="maintenance-message" rows={5} maxLength={2000} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} /></div>
         <div className="space-y-3"><Label>Fundo da tela</Label><div className="flex gap-2">
-          <Button variant={form.media_kind === "image" ? "default" : "outline"} onClick={() => setForm({ ...form, media_kind: "image", media_path: "", media_url: "" })}><Image className="mr-2 h-4 w-4" />Imagem</Button>
-          <Button variant={form.media_kind === "video" ? "default" : "outline"} onClick={() => { setForm({ ...form, media_kind: "video", media_path: "", media_url: "" }); fileInput.current?.click(); }}><Film className="mr-2 h-4 w-4" />Vídeo MP4</Button>
+          <Button disabled={busy} variant={form.media_kind === "image" ? "default" : "outline"} onClick={() => fileInput.current?.click()}><Image className="mr-2 h-4 w-4" />Imagem</Button>
+          <Button disabled={busy} variant={form.media_kind === "video" ? "default" : "outline"} onClick={() => fileInput.current?.click()}><Film className="mr-2 h-4 w-4" />Vídeo MP4</Button>
         </div>
         <Button variant="outline" className="w-full" disabled={busy} onClick={() => fileInput.current?.click()}><Upload className="mr-2 h-4 w-4" />Enviar fundo</Button>
-        <input ref={fileInput} hidden type="file" accept="video/mp4,image/jpeg,image/png,image/webp" onChange={(e) => { const file = e.target.files?.[0]; if (file) void upload(file); e.target.value = ""; }} />
-        {busy && progress > 0 ? <progress className="h-1 w-full accent-primary" value={progress} max={100} /> : null}
+        <input ref={fileInput} hidden type="file" accept=".mp4,.jpg,.jpeg,.png,.webp,video/mp4,image/jpeg,image/png,image/webp" onChange={(e) => { const file = e.target.files?.[0]; if (file) void upload(file); e.target.value = ""; }} />
+        {uploading ? <div className="space-y-2" role="status"><div className="flex min-w-0 items-center gap-3"><span className="min-w-0 flex-1 truncate text-sm">{fileName}</span><span className="text-sm tabular-nums text-primary">{progress}%</span><Button variant="ghost" size="icon" aria-label="Cancelar envio" onClick={() => controller.current?.abort()}><X className="h-4 w-4" /></Button></div><progress aria-label="Progresso do envio" className="h-1 w-full accent-primary" value={progress} max={100} /></div> : null}
+        {uploadError ? <p role="alert" className="text-sm text-destructive">{uploadError}</p> : null}
         <p className="text-xs text-muted-foreground">MP4 até 1 GB · Imagens até 1 GB. O navegador pode exigir um toque para liberar o áudio.</p>
         </div>
         <Button asChild variant="ghost"><a href="/manutencao" target="_blank" rel="noreferrer"><ExternalLink className="mr-2 h-4 w-4" />Abrir tela de manutenção</a></Button>

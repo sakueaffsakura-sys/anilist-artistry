@@ -6,6 +6,7 @@ import type { SeriesRow } from "@/lib/queries";
 import { supabase } from "@/integrations/supabase/client";
 import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
 import { useSession } from "@/hooks/useAuth";
+import { SectionRow } from "@/components/SectionRow";
 
 export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
   const { user } = useSession();
@@ -48,13 +49,7 @@ export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
   if (rows.length === 0) return null;
 
   return (
-    <section aria-label="Atualizados Recentes" className="relative py-4 md:py-8">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-          <Clock className="h-[18px] w-[18px]" />
-        </div>
-        <h2 className="text-lg font-bold">Atualizados Recentes</h2>
-      </div>
+    <SectionRow icon={<Clock className="h-5 w-5" />} title="Atualizados Recentes">
 
       <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-4 lg:grid-cols-5">
         {rows.map((item) => {
@@ -168,6 +163,6 @@ export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
           );
         })}
       </div>
-    </section>
+    </SectionRow>
   );
 }
