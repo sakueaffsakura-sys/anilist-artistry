@@ -21,7 +21,7 @@ export const saveMaintenanceSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ enabled: z.boolean(), title: z.string().trim().min(1).max(160),
     message: z.string().max(2000), media_kind: z.enum(["image", "video"]),
-    media_path: z.string().max(500).refine((p) => p === "" || /^backgrounds\/[a-zA-Z0-9_.-]+$/.test(p)),
+    media_path: z.string().max(500).refine((p) => p === "" || /^backgrounds\/[a-zA-Z0-9_.-]+$/.test(p) || /^https:\/\/[^\s"'<>]+$/i.test(p)),
   }).parse(input))
   .handler(async ({ context, data }) => {
     const role = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });

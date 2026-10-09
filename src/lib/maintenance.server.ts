@@ -34,7 +34,9 @@ async function loadMaintenance(resolveMedia: boolean) {
   const { data, error } = await client.from("maintenance_settings").select("*").eq("id", 1).maybeSingle();
   if (error) throw new Error("Não foi possível verificar a manutenção.");
   let media_url = "";
-  if (resolveMedia && data?.media_path) {
+  if (resolveMedia && data?.media_path && /^https:\/\//i.test(data.media_path)) {
+    media_url = data.media_path;
+  } else if (resolveMedia && data?.media_path) {
     // Assinatura com o cliente privilegiado: o bucket não tem leitura pública,
     // então visitantes só recebem um link temporário gerado no servidor.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
