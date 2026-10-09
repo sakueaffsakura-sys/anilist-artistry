@@ -274,6 +274,13 @@
       "when": 1791510382913,
       "tag": "0038_maintenance_tus_authorization",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1791566994415,
+      "tag": "0039_chapter_notifications",
+      "breakpoints": true
     }
   ]
 }

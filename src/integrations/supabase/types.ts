@@ -71,6 +71,48 @@ export type Database = {
         }
         Relationships: []
       }
+      chapter_notifications: {
+        Row: {
+          chapter_id: string
+          created_at: string
+          id: string
+          read_at: string | null
+          series_id: string
+          user_id: string
+        }
+        Insert: {
+          chapter_id: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          series_id: string
+          user_id: string
+        }
+        Update: {
+          chapter_id?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          series_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chapter_notifications_chapter_id_fkey"
+            columns: ["chapter_id"]
+            isOneToOne: false
+            referencedRelation: "chapters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chapter_notifications_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "series"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chapter_reads: {
         Row: {
           chapter_id: string
