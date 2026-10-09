@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { uniqueSlug } from "@/lib/series-import";
+import { NovelFileImport } from "@/components/NovelFileImport";
 import { GenreSelect } from "@/components/GenreSelect";
 import { normalizeGenres } from "@/lib/work-genres";
 import { coverUrl, formatChapter } from "@/lib/media";
@@ -525,6 +526,10 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
           </div>
         </div>
         <div className="mt-3 flex flex-1 flex-col space-y-1.5 px-4 sm:px-5">
+          <NovelFileImport novelId={novel.id} onChange={refresh} />
+          <details className="rounded-md border border-border bg-surface/40 p-2 [&_summary]:cursor-pointer">
+            <summary className="text-xs font-semibold text-muted-foreground">Outras formas de importar (link ou HTML)</summary>
+            <div className="mt-2 space-y-2">
           <div className="flex flex-col gap-2 rounded-md border border-border bg-surface/60 p-2 sm:flex-row">
             <Input
               value={importUrl}
@@ -567,7 +572,8 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
             </label>
           </div>
           <label className="flex items-center gap-2 text-[11px] text-muted-foreground"><input type="checkbox" checked={bulkPublish} onChange={(e) => setBulkPublish(e.target.checked)} /> Publicar direto os capítulos enviados em lote</label>
-          <p className="text-[11px] text-muted-foreground">Também pode colar o HTML da página salva no campo de texto: o capítulo é extraído e publicado automaticamente.</p>
+            </div>
+          </details>
           <Label className="sr-only">Texto do capítulo</Label>
           {showPreview ? (
             <article className="min-h-[420px] flex-1 rounded-md border border-border bg-surface px-5 py-8 text-[17px] leading-8 text-foreground/90 sm:px-10 lg:min-h-[520px]">
