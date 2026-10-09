@@ -15,6 +15,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { supabase } from "@/integrations/supabase/client";
 import { coverUrl, formatChapter, slugify, timeAgo } from "@/lib/media";
 import { KINDS } from "@/lib/queries";
+import { GenreSelect } from "@/components/GenreSelect";
+import { normalizeGenres } from "@/lib/work-genres";
 import { useRoles, useSession } from "@/hooks/useAuth";
 import { signCloudinaryUpload } from "@/lib/media.functions";
 import { TxtChapterImport } from "@/components/TxtChapterImport";
@@ -237,8 +239,8 @@ type Obra = {
 };
 
 function InfoForm({ obra, onSaved }: { obra: Obra; onSaved: () => void }) {
-  const [f, setF] = useState({ ...obra, genresText: obra.genres.join(", ") });
-  useEffect(() => setF({ ...obra, genresText: obra.genres.join(", ") }), [obra]);
+  const [f, setF] = useState({ ...obra, genres: normalizeGenres(obra.genres) });
+  useEffect(() => setF({ ...obra, genres: normalizeGenres(obra.genres) }), [obra]);
   const set = (k: keyof typeof f, v: unknown) => setF((p) => ({ ...p, [k]: v }));
 
   const save = useMutation({
@@ -257,7 +259,7 @@ function InfoForm({ obra, onSaved }: { obra: Obra; onSaved: () => void }) {
           status: f.status,
           author: f.author || null,
           artist: f.artist || null,
-          genres: f.genresText.split(",").map((g) => g.trim()).filter(Boolean),
+          genres: normalizeGenres(f.genres),
           published: f.published,
           pinned: f.pinned,
         })
@@ -312,7 +314,7 @@ function InfoForm({ obra, onSaved }: { obra: Obra; onSaved: () => void }) {
           {field("Autor", "author")}
           {field("Artista", "artist")}
         </div>
-        {field("Gêneros (separados por vírgula)", "genresText", "Ação, Fantasia")}
+        <GenreSelect value={f.genres} onChange={(genres) => set("genres", genres)} />
         <div className="grid gap-4 sm:grid-cols-2">
           {field("URL da capa", "cover_url", "https://…")}
           {field("URL do banner", "banner_url", "https://…")}

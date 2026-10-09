@@ -13,6 +13,7 @@ import { coverUrl, timeAgo } from "@/lib/media";
 import { findByAnilistId, uniqueSlug } from "@/lib/series-import";
 import { useRoles, useSession } from "@/hooks/useAuth";
 import { KINDS } from "@/lib/queries";
+import { normalizeGenres } from "@/lib/work-genres";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   staticData: { sitemap: false },
@@ -79,7 +80,7 @@ function AdminPage() {
         synopsis: item.synopsis,
         cover_url: item.coverUrl,
         banner_url: item.bannerUrl,
-        genres: item.genres,
+        genres: normalizeGenres(item.genres),
         status: item.status,
         author: item.author,
         artist: item.artist,

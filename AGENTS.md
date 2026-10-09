@@ -27,3 +27,5 @@
 
 - Novel illustrations use validated standalone image markers in chapters.content and a browser-safe shared HTML parser; reader and preview consume ordered blocks, and narration receives empty image entries to preserve paragraph indexes without speaking URLs.
 - Work TXT imports use a browser-safe page-link parser and sequential chapter writes through the existing authenticated client, never Storage uploads; this avoids retaining source files or loading an unbounded batch into memory.
+
+- Genre selectors, import writes and public genre labels use the browser-safe work-genres module; alias-aware catalog filtering preserves old records without bulk rewrites.
