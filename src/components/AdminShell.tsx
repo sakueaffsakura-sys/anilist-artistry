@@ -11,6 +11,7 @@ import { claimFirstAdmin } from "@/lib/staff.functions";
 
 const NAV = [
   { to: "/admin", label: "Visão geral", icon: LayoutDashboard, exact: true },
+  { to: "/admin/home", label: "Colunas da home", icon: BookOpen, exact: true, adminOnly: true },
   { to: "/admin/obras", label: "Obras", icon: BookOpen, exact: false },
   { to: "/admin/nova", label: "Nova obra", icon: PlusCircle, exact: true },
   { to: "/admin/novels", label: "Novels", icon: BookText, exact: false },
