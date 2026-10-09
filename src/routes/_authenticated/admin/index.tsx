@@ -14,6 +14,7 @@ import { findByAnilistId, uniqueSlug } from "@/lib/series-import";
 import { useRoles, useSession } from "@/hooks/useAuth";
 import { KINDS } from "@/lib/queries";
 import { normalizeGenres } from "@/lib/work-genres";
+import { anilistMetrics } from "@/lib/home-sections";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   staticData: { sitemap: false },
@@ -37,7 +38,7 @@ function AdminPage() {
   const anilist = useServerFn(searchAnilist);
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<AnilistResult[]>([]);
-  const [kind, setKind] = useState<string>("Manga");
+  const [kind, setKind] = useState<string>("automatic");
 
   const stats = useQuery({
     queryKey: ["admin-stats"],
@@ -85,7 +86,8 @@ function AdminPage() {
         author: item.author,
         artist: item.artist,
         rating: item.averageScore,
-        kind,
+        ...anilistMetrics(item),
+        kind: kind === "automatic" ? item.suggestedKind : kind,
         published: true,
         created_by: user?.id ?? null,
       });
@@ -95,6 +97,8 @@ function AdminPage() {
       toast.success("Obra importada do AniList!");
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
       queryClient.invalidateQueries({ queryKey: ["admin-series"] });
+      queryClient.invalidateQueries({ queryKey: ["home-sections"] });
+      queryClient.invalidateQueries({ queryKey: ["section-admin-works"] });
     },
     onError: (e) =>
       toast.error(e instanceof Error ? (e.message.includes("duplicate") ? "Essa obra já está no catálogo." : e.message) : "Não foi possível importar."),
@@ -128,6 +132,7 @@ function AdminPage() {
             <Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Nome da obra ou link do AniList (anilist.co/manga/...)" className="h-11 bg-background pl-9" />
           </div>
           <select value={kind} onChange={(e) => setKind(e.target.value)} className="h-11 rounded-md border border-border bg-background px-3 text-sm font-semibold">
+            <option value="automatic">Tipo automático (AniList)</option>
             {KINDS.map((k) => (
               <option key={k} value={k}>{k}</option>
             ))}
@@ -146,7 +151,7 @@ function AdminPage() {
                   <p className="mt-1 text-xs text-muted-foreground">{item.status} · nota {item.averageScore || "—"}</p>
                   <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.synopsis}</p>
                   <Button size="sm" className="mt-2 font-semibold" disabled={importSeries.isPending} onClick={() => importSeries.mutate({ ...item })}>
-                    Publicar como {kind}
+                    Publicar como {kind === "automatic" ? item.suggestedKind : kind}
                   </Button>
                 </div>
               </div>

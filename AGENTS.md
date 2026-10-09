@@ -29,3 +29,4 @@
 - Work TXT imports use a browser-safe page-link parser and sequential chapter writes through the existing authenticated client, never Storage uploads; this avoids retaining source files or loading an unbounded batch into memory.
 
 - Genre selectors, import writes and public genre labels use the browser-safe work-genres module; alias-aware catalog filtering preserves old records without bulk rewrites.
+- Homepage discovery shelves use admin-only persisted selection settings and lightweight published-work queries; automatic ordering uses saved AniList metrics so home visits never call AniList, while manual selection preserves its order without fallback.

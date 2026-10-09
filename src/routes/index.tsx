@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { fetchFavorites, fetchHistory, fetchSeries } from "@/lib/queries";
 import { useSession } from "@/hooks/useAuth";
 import { EventBadges } from "@/components/EventBadges";
+import { HomeDiscovery } from "@/components/HomeDiscovery";
+import { fetchHomeSections } from "@/lib/home-section-queries";
 
 export const Route = createFileRoute("/")({
   staticData: { sitemap: true },
@@ -41,6 +43,7 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const { user } = useSession();
+  const discovery = useQuery({ queryKey: ["home-sections"], queryFn: fetchHomeSections, staleTime: 60_000 });
   const recent = useQuery({
     queryKey: ["series", "created"],
     queryFn: () => fetchSeries({ order: "created_at", limit: 14 }),
@@ -83,7 +86,7 @@ function Home() {
 
   const heroItems = slider.data ?? [];
   const heroLoading = slider.isPending;
-  const catalogFailed = recent.isError || updated.isError || ranking.isError || slider.isError || novels.isError;
+  const catalogFailed = recent.isError || updated.isError || ranking.isError || slider.isError || novels.isError || discovery.isError;
 
   function retryCatalog() {
     void recent.refetch();
@@ -91,6 +94,7 @@ function Home() {
     void slider.refetch();
     void ranking.refetch();
     void novels.refetch();
+    void discovery.refetch();
   }
 
   return (
@@ -144,6 +148,9 @@ function Home() {
 
         {updated.isPending ? <LoadingShelf label="Carregando atualizações" /> : null}
         {(updated.data?.length ?? 0) > 0 ? <RecentlyUpdated rows={updated.data ?? []} /> : null}
+
+        {discovery.isPending ? <LoadingShelf label="Carregando obras populares" /> : null}
+        {discovery.data ? <HomeDiscovery sections={discovery.data} favoriteIds={favoriteIds} /> : null}
 
         {novels.isPending ? <LoadingShelf label="Carregando novels" /> : null}
         {novels.isSuccess ? <div className="cv-auto">{(
