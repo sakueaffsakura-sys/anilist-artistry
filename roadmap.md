@@ -1,5 +1,7 @@
 # Tarefas
 
+- [x] Ativar som do vídeo de manutenção com ação explícita quando o navegador bloquear áudio; sem controles de vídeo ou alterações de dados
+
 - [ ] Adicionar importação TXT de novels com conferência, numeração, rascunho/publicação e simplificar a tela; validar sem gravar capítulos reais
 
 - [x] Corrigir recusa indevida no início do envio de manutenção: aceitar contentLength na autorização TUS e size após conclusão; nove casos reais da regra e seis testes passaram, conta sem administração segue bloqueada com 403; mensagem diferencia sessão expirada de recusa do armazenamento
