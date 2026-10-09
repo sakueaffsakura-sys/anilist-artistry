@@ -5,15 +5,16 @@ export async function uploadMaintenanceMedia(file: File, onProgress: (value: num
   const format = validateMaintenanceMedia(file);
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session) throw new Error("Entre novamente na sua conta para enviar o fundo.");
+  const session = data.session;
   const path = `backgrounds/${crypto.randomUUID()}.${format.extension}`;
   const { Upload } = await import("tus-js-client");
   if (signal.aborted) throw new DOMException("Envio cancelado", "AbortError");
   await new Promise<void>((resolve, reject) => {
     const upload = new Upload(file, {
-      endpoint: `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/upload/resumable`,
+      endpoint: `${import.meta.env['VITE_SUPABASE_URL']}/storage/v1/upload/resumable`,
       chunkSize: 6 * 1024 * 1024,
       retryDelays: [0, 1000, 3000, 5000, 10000],
-      headers: { authorization: `Bearer ${data.session?.access_token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+      headers: { authorization: `Bearer ${session.access_token}`, apikey: import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'] },
       metadata: { bucketName: "maintenance-media", objectName: path, contentType: format.mime, cacheControl: "3600" },
       uploadDataDuringCreation: true,
       removeFingerprintOnSuccess: true,

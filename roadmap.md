@@ -1,6 +1,7 @@
 # Tarefas
 
-- [ ] Corrigir envio de vídeos grandes na manutenção, harmonizar tela com o site e alinhar Atualizados Recentes às outras seções; sem ativar manutenção ou apagar dados
+- [x] Corrigir regra de envio de mídia de manutenção de 50 MB/5 MB para 1 GB, adicionar envio em partes com progresso e cancelamento, harmonizar tela e alinhar Atualizados Recentes; seis testes passaram e telas públicas conferidas sem ativar manutenção ou apagar dados
+- [ ] Confirmar envio real de vídeo grande — precisa de sessão administrativa e arquivo real; limites e políticas conferidos, teste real não executado
 
 - [x] Adicionar Obras populares, Em alta agora e Manhwa popular com seleção administrativa e dados automáticos do AniList; 16 testes passaram, home e escolha/ordenação/salvamento simulado conferidos, sem publicar ou apagar dados
 - [ ] Confirmar gravação real das colunas e atualização completa do AniList — sessão disponível não tem papel administrativo; controle visual testado com acesso simulado sem alterar permissões
