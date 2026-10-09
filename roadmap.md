@@ -1,6 +1,6 @@
 # Tarefas
 
-- [ ] Ampliar gêneros, substituir digitação por seleção múltipla e padronizar opções de cadastro, edição e catálogo sem alterar postagens existentes
+- [x] Ampliar gêneros e substituir digitação por seleção múltipla em cadastro, edição e novels; padronizar nomes nas postagens e filtros com aliases para registros antigos, sem alterar dados existentes; quatro testes e seleção/remoção no navegador passaram, gravação real não executada
 
 - [x] Adicionar publicação de capítulos de obras por TXT numerados, sem limite artificial de seleção ou armazenamento dos TXT; cinco testes passaram, incluindo 1.001 arquivos, e painel validado com os quatro TXT enviados e gravação simulada; publicação real não executada
 

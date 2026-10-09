@@ -9,6 +9,8 @@ import { Chips, FORMATS } from "@/components/LibraryBits";
 import { supabase } from "@/integrations/supabase/client";
 import { coverUrl } from "@/lib/media";
 import { Pager } from "@/components/Pager";
+import { Button } from "@/components/ui/button";
+import { GENRES, genreAliases, normalizeGenres } from "@/lib/work-genres";
 
 const searchSchema = z.object({
   q: fallback(z.string(), "").default(""),
@@ -45,7 +47,7 @@ const SORTS = [
 ];
 const STATUS = ["Em lançamento", "Finalizado", "Hiato", "Cancelado"];
 const STATUS_DB: Record<string, string[]> = {
-  "Em lançamento": ["Em lançamento", "RELEASING", "Lançando"],
+  "Em lançamento": ["Em lançamento", "RELEASING", "Lançando", "Em andamento"],
   Finalizado: ["Finalizado", "Completo", "FINISHED"],
   Hiato: ["Hiato", "HIATUS"],
   Cancelado: ["Cancelado", "CANCELLED"],
@@ -72,7 +74,7 @@ function Pesquisar() {
     queryKey: ["all-genres"],
     queryFn: async () => {
       const { data } = await supabase.from("series").select("genres").eq("published", true);
-      return [...new Set((data ?? []).flatMap((r) => r.genres ?? []))].sort();
+      return normalizeGenres([...GENRES, ...(data ?? []).flatMap((r) => r.genres ?? [])]).sort((a, b) => a.localeCompare(b, "pt-BR"));
     },
   });
 
@@ -87,7 +89,7 @@ function Pesquisar() {
       if (s.q) q = q.ilike("title", `%${s.q}%`);
       if (s.kind !== "Todos") q = q.eq("kind", s.kind);
       if (s.status) q = q.in("status", STATUS_DB[s.status] ?? [s.status]);
-      if (s.tag) q = q.contains("genres", [s.tag]);
+      if (s.tag) q = q.overlaps("genres", genreAliases(s.tag));
       q =
         s.sort === "popular"
           ? q.order("views", { ascending: false })
@@ -171,7 +173,7 @@ function Pesquisar() {
               <p className="mb-2 mt-4 text-sm font-semibold text-muted-foreground">Ordenar</p>
               <div className="space-y-2">
                 {SORTS.map((o) => (
-                  <button
+                  <Button type="button" variant="ghost"
                     key={o.key}
                     onClick={() => set({ sort: o.key })}
                     className={`block w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
@@ -179,13 +181,13 @@ function Pesquisar() {
                     }`}
                   >
                     {o.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
               <p className="mb-2 mt-5 text-sm font-semibold text-muted-foreground">Status</p>
               <div className="flex flex-wrap gap-2">
                 {STATUS.map((st) => (
-                  <button
+                  <Button type="button" variant="ghost"
                     key={st}
                     onClick={() => set({ status: s.status === st ? "" : st })}
                     className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
@@ -193,13 +195,13 @@ function Pesquisar() {
                     }`}
                   >
                     {st}
-                  </button>
+                  </Button>
                 ))}
               </div>
               <p className="mb-2 mt-5 text-sm font-semibold text-muted-foreground">Tags</p>
               <div className="flex max-h-64 flex-wrap gap-2 overflow-y-auto pr-1">
-                {(tags.data ?? []).map((t) => (
-                  <button
+                {(tags.data ?? GENRES).map((t) => (
+                  <Button type="button" variant="ghost"
                     key={t}
                     onClick={() => set({ tag: s.tag === t ? "" : t })}
                     className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
@@ -207,7 +209,7 @@ function Pesquisar() {
                     }`}
                   >
                     {t}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </aside>

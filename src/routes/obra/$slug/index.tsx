@@ -33,6 +33,7 @@ import { AddToListButton, StatusButton } from "@/components/SeriesActions";
 import { CommentThreads } from "@/components/CommentThreads";
 import { CommentComposer, type CommentDraft } from "@/components/CommentComposer";
 import { uploadCommentImage } from "@/lib/comments";
+import { normalizeGenres } from "@/lib/work-genres";
 
 export const Route = createFileRoute("/obra/$slug/")({
   staticData: { sitemap: true },
@@ -417,7 +418,7 @@ function SeriesPage() {
               </div>
 
               <div className="mt-4 flex flex-wrap justify-center gap-1.5 md:justify-start md:gap-2">
-                {obra.genres.map((genre) => (
+                {normalizeGenres(obra.genres).map((genre) => (
                   <span key={genre} className="rounded-lg border border-border bg-surface-2/60 px-2.5 py-1 text-xs text-muted-foreground">{genre}</span>
                 ))}
               </div>
@@ -516,7 +517,7 @@ function SeriesPage() {
                       ["Capítulos", String(obra.chapters.length)],
                       ["Autor", obra.author || "Não informado"],
                       ["Artista", obra.artist || "Não informado"],
-                      ["Gêneros", obra.genres.join(", ") || "Não informado"],
+                      ["Gêneros", normalizeGenres(obra.genres).join(", ") || "Não informado"],
                       ["Última atualização", new Date(obra.updated_at).toLocaleDateString("pt-BR")],
                     ].map(([label, value]) => <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-4"><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 break-words font-medium">{value}</dd></div>)}
                   </dl>

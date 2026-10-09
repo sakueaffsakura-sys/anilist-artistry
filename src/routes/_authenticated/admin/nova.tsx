@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { findByAnilistId, uniqueSlug } from "@/lib/series-import";
 import { KINDS } from "@/lib/queries";
+import { GenreSelect } from "@/components/GenreSelect";
+import { normalizeGenres } from "@/lib/work-genres";
 import { useSession } from "@/hooks/useAuth";
 import { searchAnilist, searchAnilistSmart } from "@/lib/anilist.functions";
 
@@ -45,19 +47,20 @@ function NovaObra() {
     status: "Em andamento",
     author: "",
     artist: "",
-    genres: "",
+    genres: [] as string[],
   });
   const [meta, setMeta] = useState<{ anilistId: number | null; rating: number }>({ anilistId: null, rating: 0 });
 
-  function set(key: keyof typeof form, value: string) {
+  function set(key: Exclude<keyof typeof form, "genres">, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
   const fill = useMutation({
     mutationFn: async () => {
       const results = await searchAnilistSmart(link.trim(), anilist);
-      if (!results.length) throw new Error("Nada encontrado com esse link.");
-      return results[0]!;
+      const item = results[0];
+      if (!item) throw new Error("Nada encontrado com esse link.");
+      return item;
     },
     onSuccess: (item) => {
       setMeta({ anilistId: item.anilistId, rating: item.averageScore });
@@ -72,7 +75,7 @@ function NovaObra() {
         status: item.status || prev.status,
         author: item.author,
         artist: item.artist,
-        genres: item.genres.join(", "),
+        genres: normalizeGenres(item.genres),
       }));
       toast.success("Dados preenchidos do AniList! Revise e crie a obra.");
     },
@@ -99,10 +102,7 @@ function NovaObra() {
           status: form.status,
           author: form.author,
           artist: form.artist,
-          genres: form.genres
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean),
+          genres: normalizeGenres(form.genres),
           published: true,
           created_by: user?.id ?? null,
         })
@@ -218,12 +218,7 @@ function NovaObra() {
             <Field label="Autor" value={form.author} onChange={(v) => set("author", v)} />
             <Field label="Arte" value={form.artist} onChange={(v) => set("artist", v)} />
           </div>
-          <Field
-            label="Gêneros (separados por vírgula)"
-            value={form.genres}
-            onChange={(v) => set("genres", v)}
-            placeholder="Ação, Aventura, Fantasia"
-          />
+          <GenreSelect value={form.genres} onChange={(genres) => setForm((prev) => ({ ...prev, genres }))} />
           <Button
             type="submit"
             disabled={create.isPending || form.title.trim().length === 0}

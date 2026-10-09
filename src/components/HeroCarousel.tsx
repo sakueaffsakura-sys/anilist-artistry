@@ -9,6 +9,7 @@ import { useSession } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { selectHeroItems } from "@/lib/hero-policy";
+import { normalizeGenres } from "@/lib/work-genres";
 
 const INTERVAL = 6000;
 
@@ -91,7 +92,7 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
             <p className="hero-model-status mb-1 text-sm font-bold md:text-base">{active.status}</p>
             <h2 className="break-words font-display text-xl font-extrabold leading-tight md:text-3xl lg:text-4xl"><Link to="/obra/$slug" params={{ slug: active.slug }}>{active.title}</Link></h2>
             <div className="mt-5 flex flex-wrap gap-2 text-xs md:text-sm">
-              {(active.genres ?? []).slice(0, 3).map((genre) => <span key={genre} className="hero-model-tag rounded-lg px-2.5 py-1">{genre}</span>)}
+              {normalizeGenres(active.genres ?? []).slice(0, 3).map((genre) => <span key={genre} className="hero-model-tag rounded-lg px-2.5 py-1">{genre}</span>)}
             </div>
             {active.synopsis ? <p className="hero-model-synopsis mt-5 hidden text-sm font-semibold italic leading-relaxed line-clamp-3 md:[display:-webkit-box] md:text-base"><Quote className="mr-1 inline h-4 w-4" />{active.synopsis.replace(/<[^>]*>/g, "")}</p> : null}
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3 text-xs md:text-sm">

@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { uniqueSlug } from "@/lib/series-import";
+import { GenreSelect } from "@/components/GenreSelect";
+import { normalizeGenres } from "@/lib/work-genres";
 import { coverUrl, formatChapter } from "@/lib/media";
 import { useSession } from "@/hooks/useAuth";
 import { useServerFn } from "@tanstack/react-start";
@@ -65,10 +67,10 @@ function AdminNovels() {
     coverUrl: "",
     bannerUrl: "",
     author: "",
-    genres: "",
+    genres: [] as string[],
     status: "Em andamento",
   });
-  const set = (key: keyof typeof form, value: string) =>
+  const set = (key: Exclude<keyof typeof form, "genres">, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const createNovel = useMutation({
@@ -82,7 +84,7 @@ function AdminNovels() {
         cover_url: form.coverUrl,
         banner_url: form.bannerUrl,
         author: form.author,
-        genres: form.genres.split(",").map((g) => g.trim()).filter(Boolean),
+        genres: normalizeGenres(form.genres),
         status: form.status,
         kind: "Novel",
         published: true,
@@ -92,7 +94,7 @@ function AdminNovels() {
     },
     onSuccess: () => {
       toast.success("Novel criada!");
-      setForm({ title: "", synopsis: "", coverUrl: "", bannerUrl: "", author: "", genres: "", status: "Em andamento" });
+      setForm({ title: "", synopsis: "", coverUrl: "", bannerUrl: "", author: "", genres: [] as string[], status: "Em andamento" });
       queryClient.invalidateQueries({ queryKey: ["admin-novels"] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao criar novel"),
@@ -185,7 +187,7 @@ function AdminNovels() {
               <Field label="Autor" value={form.author} onChange={(v) => set("author", v)} />
               <Field label="URL da capa" value={form.coverUrl} onChange={(v) => set("coverUrl", v)} placeholder="https://…" />
               <Field label="URL do banner" value={form.bannerUrl} onChange={(v) => set("bannerUrl", v)} placeholder="https://…" />
-              <Field label="Gêneros (vírgula)" value={form.genres} onChange={(v) => set("genres", v)} placeholder="Ação, Fantasia" />
+              <GenreSelect value={form.genres} onChange={(genres) => setForm((prev) => ({ ...prev, genres }))} />
               <div className="space-y-1.5">
                 <Label>Status</Label>
                 <select value={form.status} onChange={(e) => set("status", e.target.value)} className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm">
