@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import night from "@/assets/maintenance-night.jpg";
-import { BookOpen, Wrench } from "lucide-react";
+import { BookOpen, Wrench, Library, ScrollText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { playMaintenanceAudio } from "@/lib/maintenance-audio";
 
@@ -40,12 +40,14 @@ export function MaintenanceScreen({ settings, preview = false }: { settings: Mai
       <video ref={video} src={settings.media_url} className="maintenance-backdrop" autoPlay loop playsInline controls={false} disablePictureInPicture disableRemotePlayback preload="metadata" aria-hidden="true" /> :
       settings.media_url ? <img src={settings.media_url} alt="" className="maintenance-backdrop" decoding="async" /> : null}
     <div className="maintenance-shade" />
-    <header className="maintenance-topbar"><div className="maintenance-brand"><BookOpen aria-hidden="true" /><span>BETTER <strong>MANGÁ</strong></span></div><Wrench className="maintenance-tool" aria-hidden="true" /></header>
+    <header className="maintenance-topbar"><div className="maintenance-brand"><BookOpen aria-hidden="true" /><span>BETTER <strong>MANGÁ</strong></span></div><div className="maintenance-header-status"><Wrench className="maintenance-tool" aria-hidden="true" /><span>Em manutenção</span></div></header>
     <div className="maintenance-copy">
+      <div className="maintenance-emblem" aria-hidden="true"><BookOpen /><span /></div>
       <div className="maintenance-status"><span /> EM MANUTENÇÃO</div>
       <h1>{settings.title}</h1>
       <p>{settings.message}</p>
+      <div className="maintenance-divider" aria-hidden="true"><span /><BookOpen /><span /></div>
     </div>
-    <footer className="maintenance-footer"><span>MANGÁS · MANHWAS · NOVELS</span><span>Voltamos em breve<span className="maintenance-footer-dot">.</span></span></footer>
+    <footer className="maintenance-footer"><div className="maintenance-categories"><span><BookOpen aria-hidden="true" />MANGÁS</span><span><Library aria-hidden="true" />MANHWAS</span><span><ScrollText aria-hidden="true" />NOVELS</span></div><span>Voltamos em breve<span className="maintenance-footer-dot">.</span></span></footer>
   </section>;
 }
