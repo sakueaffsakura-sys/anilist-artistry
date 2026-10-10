@@ -40,6 +40,7 @@ import { Route as AuthenticatedAdminObrasRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminPedidosRouteImport } from './routes/_authenticated/admin/pedidos'
 import { Route as AuthenticatedAdminSelosRouteImport } from './routes/_authenticated/admin/selos'
 import { Route as AuthenticatedAdminSuporteRouteImport } from './routes/_authenticated/admin/suporte'
+import { Route as ApiPublicMaintenanceRouteImport } from './routes/api/public/maintenance'
 import { Route as ApiPublicVersionRouteImport } from './routes/api/public/version'
 import { Route as ObraSlugIndexRouteImport } from './routes/obra/$slug/index'
 import { Route as ObraSlugChapterRouteImport } from './routes/obra/$slug/$chapter'
@@ -206,6 +207,11 @@ const AuthenticatedAdminSuporteRoute =
     path: '/admin/suporte',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicMaintenanceRoute = ApiPublicMaintenanceRouteImport.update({
+  id: '/api/public/maintenance',
+  path: '/api/public/maintenance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicVersionRoute = ApiPublicVersionRouteImport.update({
   id: '/api/public/version',
   path: '/api/public/version',
@@ -252,6 +258,7 @@ export interface FileRoutesByFullPath {
   '/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
   '/admin/selos': typeof AuthenticatedAdminSelosRoute
   '/admin/suporte': typeof AuthenticatedAdminSuporteRoute
+  '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/obra/$slug/$chapter': typeof ObraSlugChapterRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -287,6 +294,7 @@ export interface FileRoutesByTo {
   '/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
   '/admin/selos': typeof AuthenticatedAdminSelosRoute
   '/admin/suporte': typeof AuthenticatedAdminSuporteRoute
+  '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/obra/$slug/$chapter': typeof ObraSlugChapterRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -324,6 +332,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
   '/_authenticated/admin/selos': typeof AuthenticatedAdminSelosRoute
   '/_authenticated/admin/suporte': typeof AuthenticatedAdminSuporteRoute
+  '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/obra/$slug/$chapter': typeof ObraSlugChapterRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -361,6 +370,7 @@ export interface FileRouteTypes {
     | '/admin/pedidos'
     | '/admin/selos'
     | '/admin/suporte'
+    | '/api/public/maintenance'
     | '/api/public/version'
     | '/obra/$slug/$chapter'
     | '/admin/'
@@ -396,6 +406,7 @@ export interface FileRouteTypes {
     | '/admin/pedidos'
     | '/admin/selos'
     | '/admin/suporte'
+    | '/api/public/maintenance'
     | '/api/public/version'
     | '/obra/$slug/$chapter'
     | '/admin'
@@ -432,6 +443,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/pedidos'
     | '/_authenticated/admin/selos'
     | '/_authenticated/admin/suporte'
+    | '/api/public/maintenance'
     | '/api/public/version'
     | '/obra/$slug/$chapter'
     | '/_authenticated/admin/'
@@ -452,6 +464,7 @@ export interface RootRouteChildren {
   ListasIdRoute: typeof ListasIdRoute
   UUsernameRoute: typeof UUsernameRoute
   ListasIndexRoute: typeof ListasIndexRoute
+  ApiPublicMaintenanceRoute: typeof ApiPublicMaintenanceRoute
   ApiPublicVersionRoute: typeof ApiPublicVersionRoute
   ObraSlugChapterRoute: typeof ObraSlugChapterRoute
   ObraSlugIndexRoute: typeof ObraSlugIndexRoute
@@ -676,6 +689,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSuporteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/maintenance': {
+      id: '/api/public/maintenance'
+      path: '/api/public/maintenance'
+      fullPath: '/api/public/maintenance'
+      preLoaderRoute: typeof ApiPublicMaintenanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/version': {
       id: '/api/public/version'
       path: '/api/public/version'
@@ -759,6 +779,7 @@ const rootRouteChildren: RootRouteChildren = {
   ListasIdRoute: ListasIdRoute,
   UUsernameRoute: UUsernameRoute,
   ListasIndexRoute: ListasIndexRoute,
+  ApiPublicMaintenanceRoute: ApiPublicMaintenanceRoute,
   ApiPublicVersionRoute: ApiPublicVersionRoute,
   ObraSlugChapterRoute: ObraSlugChapterRoute,
   ObraSlugIndexRoute: ObraSlugIndexRoute,
