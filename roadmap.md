@@ -1,6 +1,6 @@
 # Tarefas
 
-- [ ] Mostrar APKs na navegação administrativa e melhorar manutenção; tentar som automático, ativar na primeira interação e retomar ao voltar à tela, respeitando o navegador
+- [x] Mostrar APKs na navegação administrativa e melhorar manutenção; cinco testes passaram, telas reais verificadas com administrador sem salvar alterações; áudio ativou na primeira interação e retomou com mídia local de teste, sem publicar
 
 - [ ] Corrigir endpoint de versões incompatível e validar abertura do site; concluir os três ajustes de painel pendentes
 
