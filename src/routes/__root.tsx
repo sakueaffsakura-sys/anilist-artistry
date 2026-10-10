@@ -16,7 +16,8 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { SupportChat } from "@/components/SupportChat";
 import { supabase } from "@/integrations/supabase/client";
-import { getMaintenanceStatus, verifyMaintenanceAdmin } from "@/lib/maintenance.functions";
+import { verifyMaintenanceAdmin } from "@/lib/maintenance.functions";
+import { fetchMaintenanceStatus, maintenanceUnavailable } from "@/lib/maintenance-status";
 import { maintenanceExemptPath } from "@/lib/maintenance-policy";
 import { SessionProvider } from "@/hooks/useAuth";
 import { ClickSound } from "@/components/ClickSound";
@@ -85,9 +86,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   staticData: { sitemap: false },
   beforeLoad: async ({ location }) => {
     if (typeof window === "undefined" || maintenanceExemptPath(location.pathname)) return;
-    const status = await getMaintenanceStatus();
+    const status = await fetchMaintenanceStatus().catch(() => maintenanceUnavailable);
     if (!status.enabled) return;
-    const access = await verifyMaintenanceAdmin();
+    const access = await verifyMaintenanceAdmin().catch(() => ({ isAdmin: false }));
     if (!access.isAdmin) throw redirect({ to: "/manutencao" });
   },
   head: () => ({
@@ -144,9 +145,9 @@ function RootComponent() {
     if (maintenancePage) return;
     const timer = setInterval(() => {
       if (document.hidden) return;
-      void getMaintenanceStatus().then(async (status) => {
+      void fetchMaintenanceStatus().then(async (status) => {
         if (!status.enabled || maintenanceExemptPath(window.location.pathname)) return;
-        const access = await verifyMaintenanceAdmin();
+        const access = await verifyMaintenanceAdmin().catch(() => ({ isAdmin: false }));
         if (!access.isAdmin) await router.navigate({ to: "/manutencao", replace: true });
       }).catch(() => undefined);
     }, 30000);

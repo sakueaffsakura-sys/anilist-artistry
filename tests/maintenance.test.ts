@@ -9,6 +9,9 @@ test("normal mode permits visitors", () => {
 });
 test("only recovery and admin pages bypass document redirect", () => {
   expect(maintenanceExemptPath("/api/public/version")).toBe(true);
+  expect(maintenanceExemptPath("/manutencao")).toBe(true);
+  expect(maintenanceExemptPath("/api/public/maintenance")).toBe(true);
+  expect(maintenanceExemptPath("/api/public/maintenance/private")).toBe(false);
   expect(maintenanceExemptPath("/api/version")).toBe(true);
   expect(maintenanceExemptPath("/auth")).toBe(true);
   expect(maintenanceExemptPath("/admin/manutencao")).toBe(true);
