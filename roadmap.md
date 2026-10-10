@@ -1,6 +1,6 @@
 # Tarefas
 
-- [ ] Conferir ZIP enviado e reconhecer numeração TXT com ponto ou hífen, preservando títulos, ordem numérica e proteção contra duplicados; testar sem publicar capítulos reais
+- [x] Reconhecer numeração TXT com ponto ou hífen nos dois painéis, com ordem numérica e proteção contra duplicados; 217 TXT enviados analisados sem erros de leitura/numeração, 13 testes passaram e build OK; nenhum capítulo publicado, imagens remotas não verificadas
 
 - [x] Embelezar manutenção com aviso centralizado, emblema, contraste e rodapé refinado; computador e celular conferidos sem sobreposição, cinco testes passaram, build OK; mídia, áudio e permissões preservados, sem publicar ou alterar dados
 
