@@ -8,6 +8,8 @@ test("normal mode permits visitors", () => {
   expect(canEnterMaintenance(false, false)).toBe(true);
 });
 test("only recovery and admin pages bypass document redirect", () => {
+  expect(maintenanceExemptPath("/api/public/version")).toBe(true);
+  expect(maintenanceExemptPath("/api/version")).toBe(true);
   expect(maintenanceExemptPath("/auth")).toBe(true);
   expect(maintenanceExemptPath("/admin/manutencao")).toBe(true);
   expect(maintenanceExemptPath("/obra/shadow-slave/0")).toBe(false);

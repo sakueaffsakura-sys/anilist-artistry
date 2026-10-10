@@ -1,5 +1,7 @@
 # Tarefas
 
+- [ ] Corrigir endpoint de versões incompatível e validar abertura do site; concluir os três ajustes de painel pendentes
+
 - [ ] Criar painel de versões Android com envio APK e consulta pública de atualização obrigatória; integração no APK depende do código Android
 - [ ] Alinhar listagem de novels ao painel de obras, preservando editor e importação
 - [ ] Criar área de gêneros adicionais e integrá-los aos seletores e catálogo
