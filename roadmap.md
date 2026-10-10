@@ -1,5 +1,7 @@
 # Tarefas
 
+- [ ] Mostrar APKs na navegação administrativa e melhorar manutenção; tentar som automático, ativar na primeira interação e retomar ao voltar à tela, respeitando o navegador
+
 - [ ] Corrigir endpoint de versões incompatível e validar abertura do site; concluir os três ajustes de painel pendentes
 
 - [ ] Criar painel de versões Android com envio APK e consulta pública de atualização obrigatória; integração no APK depende do código Android
