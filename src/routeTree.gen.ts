@@ -27,7 +27,9 @@ import { Route as ListasIdRouteImport } from './routes/listas/$id'
 import { Route as UUsernameRouteImport } from './routes/u/$username'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminIdRouteImport } from './routes/_authenticated/admin/$id'
+import { Route as AuthenticatedAdminAppRouteImport } from './routes/_authenticated/admin/app'
 import { Route as AuthenticatedAdminContasRouteImport } from './routes/_authenticated/admin/contas'
+import { Route as AuthenticatedAdminGenerosRouteImport } from './routes/_authenticated/admin/generos'
 import { Route as AuthenticatedAdminHomeRouteImport } from './routes/_authenticated/admin/home'
 import { Route as AuthenticatedAdminImagensRouteImport } from './routes/_authenticated/admin/imagens'
 import { Route as AuthenticatedAdminManutencaoRouteImport } from './routes/_authenticated/admin/manutencao'
@@ -131,10 +133,21 @@ const AuthenticatedAdminIdRoute = AuthenticatedAdminIdRouteImport.update({
   path: '/admin/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAdminAppRoute = AuthenticatedAdminAppRouteImport.update({
+  id: '/admin/app',
+  path: '/admin/app',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAdminContasRoute =
   AuthenticatedAdminContasRouteImport.update({
     id: '/admin/contas',
     path: '/admin/contas',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminGenerosRoute =
+  AuthenticatedAdminGenerosRouteImport.update({
+    id: '/admin/generos',
+    path: '/admin/generos',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminHomeRoute = AuthenticatedAdminHomeRouteImport.update({
@@ -226,7 +239,9 @@ export interface FileRoutesByFullPath {
   '/u/$username': typeof UUsernameRoute
   '/listas/': typeof ListasIndexRoute
   '/admin/$id': typeof AuthenticatedAdminIdRoute
+  '/admin/app': typeof AuthenticatedAdminAppRoute
   '/admin/contas': typeof AuthenticatedAdminContasRoute
+  '/admin/generos': typeof AuthenticatedAdminGenerosRoute
   '/admin/home': typeof AuthenticatedAdminHomeRoute
   '/admin/imagens': typeof AuthenticatedAdminImagensRoute
   '/admin/manutencao': typeof AuthenticatedAdminManutencaoRoute
@@ -259,7 +274,9 @@ export interface FileRoutesByTo {
   '/u/$username': typeof UUsernameRoute
   '/listas': typeof ListasIndexRoute
   '/admin/$id': typeof AuthenticatedAdminIdRoute
+  '/admin/app': typeof AuthenticatedAdminAppRoute
   '/admin/contas': typeof AuthenticatedAdminContasRoute
+  '/admin/generos': typeof AuthenticatedAdminGenerosRoute
   '/admin/home': typeof AuthenticatedAdminHomeRoute
   '/admin/imagens': typeof AuthenticatedAdminImagensRoute
   '/admin/manutencao': typeof AuthenticatedAdminManutencaoRoute
@@ -294,7 +311,9 @@ export interface FileRoutesById {
   '/u/$username': typeof UUsernameRoute
   '/listas/': typeof ListasIndexRoute
   '/_authenticated/admin/$id': typeof AuthenticatedAdminIdRoute
+  '/_authenticated/admin/app': typeof AuthenticatedAdminAppRoute
   '/_authenticated/admin/contas': typeof AuthenticatedAdminContasRoute
+  '/_authenticated/admin/generos': typeof AuthenticatedAdminGenerosRoute
   '/_authenticated/admin/home': typeof AuthenticatedAdminHomeRoute
   '/_authenticated/admin/imagens': typeof AuthenticatedAdminImagensRoute
   '/_authenticated/admin/manutencao': typeof AuthenticatedAdminManutencaoRoute
@@ -329,7 +348,9 @@ export interface FileRouteTypes {
     | '/u/$username'
     | '/listas/'
     | '/admin/$id'
+    | '/admin/app'
     | '/admin/contas'
+    | '/admin/generos'
     | '/admin/home'
     | '/admin/imagens'
     | '/admin/manutencao'
@@ -362,7 +383,9 @@ export interface FileRouteTypes {
     | '/u/$username'
     | '/listas'
     | '/admin/$id'
+    | '/admin/app'
     | '/admin/contas'
+    | '/admin/generos'
     | '/admin/home'
     | '/admin/imagens'
     | '/admin/manutencao'
@@ -396,7 +419,9 @@ export interface FileRouteTypes {
     | '/u/$username'
     | '/listas/'
     | '/_authenticated/admin/$id'
+    | '/_authenticated/admin/app'
     | '/_authenticated/admin/contas'
+    | '/_authenticated/admin/generos'
     | '/_authenticated/admin/home'
     | '/_authenticated/admin/imagens'
     | '/_authenticated/admin/manutencao'
@@ -560,11 +585,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/app': {
+      id: '/_authenticated/admin/app'
+      path: '/admin/app'
+      fullPath: '/admin/app'
+      preLoaderRoute: typeof AuthenticatedAdminAppRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/contas': {
       id: '/_authenticated/admin/contas'
       path: '/admin/contas'
       fullPath: '/admin/contas'
       preLoaderRoute: typeof AuthenticatedAdminContasRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/generos': {
+      id: '/_authenticated/admin/generos'
+      path: '/admin/generos'
+      fullPath: '/admin/generos'
+      preLoaderRoute: typeof AuthenticatedAdminGenerosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin/home': {
@@ -666,7 +705,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedHistoricoRoute: typeof AuthenticatedHistoricoRoute
   AuthenticatedPedidosRoute: typeof AuthenticatedPedidosRoute
   AuthenticatedAdminIdRoute: typeof AuthenticatedAdminIdRoute
+  AuthenticatedAdminAppRoute: typeof AuthenticatedAdminAppRoute
   AuthenticatedAdminContasRoute: typeof AuthenticatedAdminContasRoute
+  AuthenticatedAdminGenerosRoute: typeof AuthenticatedAdminGenerosRoute
   AuthenticatedAdminHomeRoute: typeof AuthenticatedAdminHomeRoute
   AuthenticatedAdminImagensRoute: typeof AuthenticatedAdminImagensRoute
   AuthenticatedAdminManutencaoRoute: typeof AuthenticatedAdminManutencaoRoute
@@ -685,7 +726,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedHistoricoRoute: AuthenticatedHistoricoRoute,
   AuthenticatedPedidosRoute: AuthenticatedPedidosRoute,
   AuthenticatedAdminIdRoute: AuthenticatedAdminIdRoute,
+  AuthenticatedAdminAppRoute: AuthenticatedAdminAppRoute,
   AuthenticatedAdminContasRoute: AuthenticatedAdminContasRoute,
+  AuthenticatedAdminGenerosRoute: AuthenticatedAdminGenerosRoute,
   AuthenticatedAdminHomeRoute: AuthenticatedAdminHomeRoute,
   AuthenticatedAdminImagensRoute: AuthenticatedAdminImagensRoute,
   AuthenticatedAdminManutencaoRoute: AuthenticatedAdminManutencaoRoute,
