@@ -38,6 +38,7 @@ import { Route as AuthenticatedAdminObrasRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminPedidosRouteImport } from './routes/_authenticated/admin/pedidos'
 import { Route as AuthenticatedAdminSelosRouteImport } from './routes/_authenticated/admin/selos'
 import { Route as AuthenticatedAdminSuporteRouteImport } from './routes/_authenticated/admin/suporte'
+import { Route as ApiPublicVersionRouteImport } from './routes/api/public/version'
 import { Route as ObraSlugIndexRouteImport } from './routes/obra/$slug/index'
 import { Route as ObraSlugChapterRouteImport } from './routes/obra/$slug/$chapter'
 
@@ -192,6 +193,11 @@ const AuthenticatedAdminSuporteRoute =
     path: '/admin/suporte',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicVersionRoute = ApiPublicVersionRouteImport.update({
+  id: '/api/public/version',
+  path: '/api/public/version',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ObraSlugIndexRoute = ObraSlugIndexRouteImport.update({
   id: '/obra/$slug/',
   path: '/obra/$slug/',
@@ -231,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
   '/admin/selos': typeof AuthenticatedAdminSelosRoute
   '/admin/suporte': typeof AuthenticatedAdminSuporteRoute
+  '/api/public/version': typeof ApiPublicVersionRoute
   '/obra/$slug/$chapter': typeof ObraSlugChapterRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/obra/$slug/': typeof ObraSlugIndexRoute
@@ -263,6 +270,7 @@ export interface FileRoutesByTo {
   '/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
   '/admin/selos': typeof AuthenticatedAdminSelosRoute
   '/admin/suporte': typeof AuthenticatedAdminSuporteRoute
+  '/api/public/version': typeof ApiPublicVersionRoute
   '/obra/$slug/$chapter': typeof ObraSlugChapterRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/obra/$slug': typeof ObraSlugIndexRoute
@@ -297,6 +305,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
   '/_authenticated/admin/selos': typeof AuthenticatedAdminSelosRoute
   '/_authenticated/admin/suporte': typeof AuthenticatedAdminSuporteRoute
+  '/api/public/version': typeof ApiPublicVersionRoute
   '/obra/$slug/$chapter': typeof ObraSlugChapterRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/obra/$slug/': typeof ObraSlugIndexRoute
@@ -331,6 +340,7 @@ export interface FileRouteTypes {
     | '/admin/pedidos'
     | '/admin/selos'
     | '/admin/suporte'
+    | '/api/public/version'
     | '/obra/$slug/$chapter'
     | '/admin/'
     | '/obra/$slug/'
@@ -363,6 +373,7 @@ export interface FileRouteTypes {
     | '/admin/pedidos'
     | '/admin/selos'
     | '/admin/suporte'
+    | '/api/public/version'
     | '/obra/$slug/$chapter'
     | '/admin'
     | '/obra/$slug'
@@ -396,6 +407,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/pedidos'
     | '/_authenticated/admin/selos'
     | '/_authenticated/admin/suporte'
+    | '/api/public/version'
     | '/obra/$slug/$chapter'
     | '/_authenticated/admin/'
     | '/obra/$slug/'
@@ -415,6 +427,7 @@ export interface RootRouteChildren {
   ListasIdRoute: typeof ListasIdRoute
   UUsernameRoute: typeof UUsernameRoute
   ListasIndexRoute: typeof ListasIndexRoute
+  ApiPublicVersionRoute: typeof ApiPublicVersionRoute
   ObraSlugChapterRoute: typeof ObraSlugChapterRoute
   ObraSlugIndexRoute: typeof ObraSlugIndexRoute
 }
@@ -624,6 +637,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSuporteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/version': {
+      id: '/api/public/version'
+      path: '/api/public/version'
+      fullPath: '/api/public/version'
+      preLoaderRoute: typeof ApiPublicVersionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/obra/$slug/': {
       id: '/obra/$slug/'
       path: '/obra/$slug'
@@ -696,6 +716,7 @@ const rootRouteChildren: RootRouteChildren = {
   ListasIdRoute: ListasIdRoute,
   UUsernameRoute: UUsernameRoute,
   ListasIndexRoute: ListasIndexRoute,
+  ApiPublicVersionRoute: ApiPublicVersionRoute,
   ObraSlugChapterRoute: ObraSlugChapterRoute,
   ObraSlugIndexRoute: ObraSlugIndexRoute,
 }
