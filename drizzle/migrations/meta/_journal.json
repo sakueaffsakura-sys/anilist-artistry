@@ -288,6 +288,13 @@
       "when": 1791586277523,
       "tag": "0040_app_releases_and_custom_genres",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1791592518487,
+      "tag": "0041_restrict_app_releases_downloads_to_admins",
+      "breakpoints": true
     }
   ]
 }
