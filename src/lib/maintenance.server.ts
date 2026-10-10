@@ -45,7 +45,7 @@ async function loadMaintenance(resolveMedia: boolean) {
   }
   return { enabled: data?.enabled ?? false, title: data?.title ?? "Voltamos em breve.",
     message: data?.message ?? "Estamos preparando o próximo capítulo do Better Mangá. Obrigado por esperar.",
-    media_kind: data?.media_kind ?? "image", media_path: data?.media_path ?? "", media_url, apk_min_version: (data as any)?.min_apk_version ?? 0, apk_latest_version: (data as any)?.latest_apk_version ?? 0, apk_download_url: (data as any)?.apk_download_url ?? "" };
+    media_kind: data?.media_kind ?? "image", media_path: data?.media_path ?? "", media_url };
 }
 
 export async function verifiedMaintenanceAdmin(token: string | undefined) {
@@ -57,12 +57,4 @@ export async function verifiedMaintenanceAdmin(token: string | undefined) {
     const role = await client.rpc("has_role", { _user_id: data.user.id, _role: "admin" });
     return !role.error && role.data === true;
   } catch { return false; }
-}
-export async function getAppVersion() {
-  const settings = await readMaintenance(false);
-  return {
-    min_apk_version: settings.apk_min_version,
-    latest_apk_version: settings.apk_latest_version,
-    apk_download_url: settings.apk_download_url,
-  };
 }
