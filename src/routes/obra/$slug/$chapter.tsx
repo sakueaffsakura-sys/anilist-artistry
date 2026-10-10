@@ -13,14 +13,19 @@ import { CommentComposer, type CommentDraft } from "@/components/CommentComposer
 import { uploadCommentImage } from "@/lib/comments";
 import { parseNovelContent } from "@/lib/novel-content";
 import { NovelNarrator } from "@/components/NovelNarrator";
+import { chapterQueryOptions } from "@/lib/chapter-query";
 
 export const Route = createFileRoute("/obra/$slug/$chapter")({
   staticData: { sitemap: false },
-  loader: ({ params, context }) =>
-    context.queryClient.ensureQueryData({
+  loader: async ({ params, context }) => {
+    const series = await context.queryClient.ensureQueryData({
       queryKey: ["series", params.slug],
       queryFn: () => fetchSeriesBySlug(params.slug),
-    }),
+    });
+    const current = series?.chapters.find((item) => formatChapter(item.number) === params.chapter);
+    if (current) await context.queryClient.ensureQueryData(chapterQueryOptions(current.id));
+    return series;
+  },
   head: ({ params, loaderData }) => {
     const seriesTitle = loaderData?.title ?? params.slug.replace(/-/g, " ");
     const chapterLabel = params.chapter.replace(/-/g, " ");
@@ -51,6 +56,17 @@ export const Route = createFileRoute("/obra/$slug/$chapter")({
 });
 
 function Reader() {
+  const series = Route.useLoaderData();
+  const { slug, chapter } = Route.useParams();
+  const current = series?.chapters.find((item) => formatChapter(item.number) === chapter);
+  if (!current) return <div className="grid min-h-screen place-items-center px-4 text-center"><div>
+    <h1 className="font-display text-2xl font-extrabold">Capítulo não encontrado</h1>
+    <Button asChild className="mt-6"><Link to="/obra/$slug" params={{ slug }}>Ver a obra</Link></Button>
+  </div></div>;
+  return <ChapterReader key={current.id} chapterId={current.id} />;
+}
+
+function ChapterReader({ chapterId }: { chapterId: string }) {
   const { slug, chapter } = Route.useParams();
   const navigate = useNavigate();
   const { user } = useSession();
@@ -59,6 +75,7 @@ function Reader() {
     queryKey: ["series", slug],
     queryFn: () => fetchSeriesBySlug(slug),
   });
+  const { data: chapterContent } = useSuspenseQuery(chapterQueryOptions(chapterId));
 
   const obra = series.data;
   const index = useMemo(
@@ -70,14 +87,14 @@ function Reader() {
   const next = obra && index >= 0 && index < obra.chapters.length - 1 ? obra.chapters[index + 1] : undefined;
 
   const pages = useMemo(() => {
-    const raw = (current?.pages ?? []) as unknown;
+    const raw = (chapterContent?.pages ?? []) as unknown;
     return Array.isArray(raw) ? (raw.filter((item) => typeof item === "string") as string[]) : [];
-  }, [current]);
+  }, [chapterContent]);
 
   const isNovel = obra?.kind === "Novel";
   const novelBlocks = useMemo(
-    () => isNovel ? parseNovelContent(current?.content ?? "") : [],
-    [current, isNovel],
+    () => isNovel ? parseNovelContent(chapterContent?.content ?? "") : [],
+    [chapterContent, isNovel],
   );
   // Empty entries preserve DOM paragraph indexes while narration skips illustrations.
   const paragraphs = useMemo(() => novelBlocks.map((block) => block.type === "text" ? block.text : ""), [novelBlocks]);
@@ -500,6 +517,8 @@ function Reader() {
               src={page}
               alt={`Página ${pageIndex + 1}`}
               loading={pageIndex < 2 ? "eager" : "lazy"}
+              decoding="async"
+              fetchPriority={pageIndex === 0 ? "high" : "auto"}
               className="w-full"
             />
           ))

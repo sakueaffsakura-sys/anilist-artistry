@@ -1,5 +1,7 @@
 # Tarefas
 
+- [x] Otimizar detalhes e leitor para carregar somente o conteúdo do capítulo aberto; dez testes passaram, detalhes, avanço de capítulos e novel conferidos no navegador sem erros: uma consulta de conteúdo por capítulo e nenhuma carga de todos os textos/imagens; sem publicar ou alterar conteúdos, ganho de tempo em produção ainda não medido
+
 - [x] Mostrar APKs na navegação administrativa e melhorar manutenção; cinco testes passaram, telas reais verificadas com administrador sem salvar alterações; áudio ativou na primeira interação e retomou com mídia local de teste, sem publicar
 
 - [ ] Corrigir endpoint de versões incompatível e validar abertura do site; concluir os três ajustes de painel pendentes
