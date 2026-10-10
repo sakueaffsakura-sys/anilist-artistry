@@ -1,6 +1,12 @@
 import { expect, test } from "bun:test";
 import { importNovelFiles, parseNovelFile } from "../src/lib/novel-txt";
 
+test("novel TXT imports accept dot and hyphen chapter numbers", () => {
+  expect(parseNovelFile("1.1.txt", "Texto do capítulo completo.").number).toBe(1.1);
+  expect(parseNovelFile("1-1.txt", "Texto do capítulo completo.")).toEqual({ number: 1.1, title: null, content: "Texto do capítulo completo.", pages: [] });
+  expect(parseNovelFile("Capítulo 2-2 - Extra.txt", "Texto do capítulo completo.")).toEqual({ number: 2.2, title: "Extra", content: "Texto do capítulo completo.", pages: [] });
+});
+
 test("TXT numbering and title come from filename, including zero and decimals", () => {
   expect(parseNovelFile("Capítulo 2,5 - Extra.txt", "Um parágrafo de texto.")).toEqual({ number: 2.5, title: "Extra", content: "Um parágrafo de texto.", pages: [] });
   expect(parseNovelFile("0.txt", "Um parágrafo de texto.").number).toBe(0);

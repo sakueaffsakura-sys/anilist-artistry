@@ -1,5 +1,7 @@
 # Tarefas
 
+- [ ] Conferir ZIP enviado e reconhecer numeração TXT com ponto ou hífen, preservando títulos, ordem numérica e proteção contra duplicados; testar sem publicar capítulos reais
+
 - [x] Embelezar manutenção com aviso centralizado, emblema, contraste e rodapé refinado; computador e celular conferidos sem sobreposição, cinco testes passaram, build OK; mídia, áudio e permissões preservados, sem publicar ou alterar dados
 
 - [x] Corrigir Unauthorized na manutenção: consulta pública sem depender da sessão, aviso alternativo em falhas e recusa administrativa segura; cinco testes passaram, navegador confirmou aviso com 401 simulado e sem erros, build OK; sem publicar ou alterar dados, produção ainda não verificada

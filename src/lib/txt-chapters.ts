@@ -1,12 +1,13 @@
+import { parseChapterFilename } from "./chapter-filename";
+
 export type TxtChapter = { number: number; title: string | null; pages: string[] };
 
 /** A TXT describes one image chapter; the filename supplies its number. */
 export function parseTxtChapter(name: string, raw: string): TxtChapter {
   if (!/\.txt$/i.test(name)) throw new Error("Selecione um arquivo TXT.");
-  const stem = name.replace(/\.txt$/i, "").trim();
-  const match = stem.match(/^(?:cap(?:[íi]tulo|itulo|[.]?)?|chapter)?\s*(\d+(?:[.,]\d+)?)(?:\s*[-–—_]\s*(.+))?$/i);
-  if (!match?.[1]) throw new Error("Nome sem numeração: use 0.txt ou Capítulo 12 - Título.txt.");
-  const number = Number(match[1].replace(",", "."));
+  const filename = parseChapterFilename(name);
+  if (!filename) throw new Error("Nome sem numeração: use 0.txt, 1.1.txt, 1-1.txt ou Capítulo 12 - Título.txt.");
+  const { number } = filename;
   if (!Number.isFinite(number) || number < 0 || number > 100000) throw new Error("Número do capítulo inválido.");
   const pages: string[] = [];
   const seen = new Set<string>();
@@ -21,7 +22,7 @@ export function parseTxtChapter(name: string, raw: string): TxtChapter {
     if (!seen.has(value)) { pages.push(value); seen.add(value); }
   }
   if (!pages.length) throw new Error("Nenhum link de página encontrado no TXT.");
-  const title = match[2]?.trim() || null;
+  const { title } = filename;
   if (title && title.length > 150) throw new Error("Título muito longo (máx. 150).");
   return { number, title, pages };
 }

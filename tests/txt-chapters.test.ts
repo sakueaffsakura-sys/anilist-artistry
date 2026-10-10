@@ -1,7 +1,26 @@
 import { describe, expect, test } from "bun:test";
 import { parseTxtChapter, publishTxtChapters } from "../src/lib/txt-chapters";
+import { compareChapterFilenames } from "../src/lib/chapter-filename";
 
 describe("work TXT chapters", () => {
+  test("dot and hyphen filenames represent the same decimal chapter", () => {
+    for (const name of ["1.1.txt", "1-1.txt"]) {
+      expect(parseTxtChapter(name, "https://example.com/a.webp")).toEqual({ number: 1.1, title: null, pages: ["https://example.com/a.webp"] });
+    }
+    expect(parseTxtChapter("2-2.txt", "https://example.com/a.webp").number).toBe(2.2);
+    expect(parseTxtChapter("Capítulo 12-2 - Extra.txt", "https://example.com/a.webp").title).toBe("Extra");
+  });
+  test("selection sorts by normalized chapter number, not filename punctuation", () => {
+    const files = ["12.txt", "2.5.txt", "2-2.txt", "1-1.txt", "2.txt", "0.txt"].map(name => ({ name }));
+    expect(files.sort(compareChapterFilenames).map(file => parseTxtChapter(file.name, "https://example.com/a.webp").number)).toEqual([0, 1.1, 2, 2.2, 2.5, 12]);
+  });
+  test("equivalent dot and hyphen filenames cannot publish twice", async () => {
+    const saved: number[] = [];
+    const failures: number[] = [];
+    await publishTxtChapters(["1.1.txt", "1-1.txt", "2-2.txt"].map(name => ({ name, text: async () => "https://example.com/a.webp" })), [], async chapter => { saved.push(chapter.number); }, (index, error) => { if (error) failures.push(index); });
+    expect(saved).toEqual([1.1, 2.2]);
+    expect(failures).toEqual([1]);
+  });
   test("filename supplies chapter numbering including zero and decimals", () => {
     expect(parseTxtChapter("0.txt", "https://example.com/a.webp").number).toBe(0);
     expect(parseTxtChapter("Capítulo 12,5 - Extra.txt", "https://example.com/a.webp")).toEqual({ number: 12.5, title: "Extra", pages: ["https://example.com/a.webp"] });

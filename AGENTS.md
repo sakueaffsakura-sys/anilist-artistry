@@ -29,7 +29,7 @@
 - Work category options and AniList classification live in a browser-safe shared module so catalog filters, administration and requests use consistent values without importing database clients into classification tests.
 
 - Novel illustrations use validated standalone image markers in chapters.content and a browser-safe shared HTML parser; reader and preview consume ordered blocks, and narration receives empty image entries to preserve paragraph indexes without speaking URLs.
-- Work TXT imports use a browser-safe page-link parser and sequential chapter writes through the existing authenticated client, never Storage uploads; this avoids retaining source files or loading an unbounded batch into memory.
+- Work TXT imports parse page links and write sequentially through the authenticated client, never Storage; image and novel imports share filename parsing and numeric sorting for consistent numbering without retaining source files.
 
 - Genre selectors, import writes and public genre labels use the browser-safe work-genres module; alias-aware catalog filtering preserves old records without bulk rewrites.
 - Homepage discovery shelves use admin-only persisted selection settings and lightweight published-work queries; automatic ordering uses saved AniList metrics so home visits never call AniList, while manual selection preserves its order without fallback.

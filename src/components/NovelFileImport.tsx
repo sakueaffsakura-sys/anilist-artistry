@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { importNovelFiles } from "@/lib/novel-txt";
+import { compareChapterFilenames } from "@/lib/chapter-filename";
 
 type Entry = { name: string; file?: File | undefined; status: "pending" | "saved" | "error"; error?: string | undefined };
 
@@ -21,7 +22,7 @@ export function NovelFileImport({ novelId, onChange }: { novelId: string; onChan
   const select = (files: File[]) => {
     const accepted = files.filter(file => /\.(txt|html?)$/i.test(file.name));
     if (accepted.length !== files.length) toast.error("Somente TXT e HTML são aceitos.");
-    setEntries(previous => [...previous, ...accepted.map((file): Entry => ({ name: file.name, file, status: "pending" }))].sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { numeric: true })));
+    setEntries(previous => [...previous, ...accepted.map((file): Entry => ({ name: file.name, file, status: "pending" }))].sort(compareChapterFilenames));
   };
   const submit = async () => {
     if (busy || !pending.length) return;

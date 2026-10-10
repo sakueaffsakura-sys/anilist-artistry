@@ -1,16 +1,16 @@
 import { prepareChapterText } from "./novel-content";
+import { parseChapterFilename } from "./chapter-filename";
 
 export function parseNovelFile(name: string, raw: string) {
   if (!/\.(txt|html?)$/i.test(name)) throw new Error("Selecione arquivos TXT ou HTML.");
   const prepared = prepareChapterText(raw.replace(/^\uFEFF/, ""));
-  const stem = name.replace(/\.(txt|html?)$/i, "").trim();
-  const match = stem.match(/^(?:cap(?:[íi]tulo|[.]?)?|chapter)?\s*(\d+(?:[.,]\d+)?)(?:\s*[-–—_]\s*(.+))?$/i);
-  const value = /\.txt$/i.test(name) ? match?.[1] : prepared.number ?? match?.[1];
-  if (!value) throw new Error("Nome sem número: use 1.txt ou Capítulo 2 - Título.txt.");
-  const number = Number(value.replace(",", "."));
+  const filename = parseChapterFilename(name);
+  const value = /\.txt$/i.test(name) ? filename?.number : prepared.number ?? filename?.number;
+  if (value === undefined || value === null || value === "") throw new Error("Nome sem número: use 1.txt, 1.1.txt, 1-1.txt ou Capítulo 2 - Título.txt.");
+  const number = Number(String(value).replace(",", "."));
   if (!Number.isFinite(number) || number < 0) throw new Error("Número de capítulo inválido.");
   if (prepared.content.length < 10) throw new Error("Nenhum texto de capítulo encontrado.");
-  return { number, title: match?.[2]?.trim() || prepared.title || null, content: prepared.content, pages: [] as string[] };
+  return { number, title: filename?.title || prepared.title || null, content: prepared.content, pages: [] as string[] };
 }
 
 export async function importNovelFiles(

@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { publishTxtChapters } from "@/lib/txt-chapters";
+import { compareChapterFilenames } from "@/lib/chapter-filename";
 
 type Entry = { name: string; file?: File | undefined; status: "pending" | "saved" | "error"; error?: string | undefined };
 
@@ -22,7 +23,7 @@ export function TxtChapterImport({ seriesId, onChange }: { seriesId: string; onC
     const txt = files.filter((file) => /\.txt$/i.test(file.name));
     if (txt.length !== files.length) toast.error("Somente arquivos TXT são aceitos.");
     setEntries((previous) => [...previous, ...txt.map((file): Entry => ({ name: file.name, file, status: "pending" }))]
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })));
+      .sort(compareChapterFilenames));
   };
   const publish = async () => {
     if (busy || !pending.length) return;
