@@ -5,15 +5,27 @@ import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { MAINTENANCE_PUBLIC_FUNCTIONS, maintenanceExemptPath, canEnterMaintenance } from "@/lib/maintenance-policy";
 import { getCookie } from "@tanstack/react-start/server";
 
-const maintenanceMiddleware = createMiddleware().server(async ({ next, request, pathname, handlerType, serverFnMeta }) => {
-  if (handlerType === "serverFn" && MAINTENANCE_PUBLIC_FUNCTIONS.includes(serverFnMeta?.name ?? "")) return next();
+// Function metadata is available here, not in request middleware.
+const maintenanceFunctionMiddleware = createMiddleware({ type: "function" }).server(async ({ next, serverFnMeta }) => {
+  if (MAINTENANCE_PUBLIC_FUNCTIONS.includes(serverFnMeta.name)) return next();
+  const { getRequestHeader } = await import("@tanstack/react-start/server");
+  const { readMaintenance, verifiedMaintenanceAdmin } = await import("./lib/maintenance.server");
+  const settings = await readMaintenance(false);
+  if (!settings.enabled) return next();
+  const token = getRequestHeader("authorization")?.replace(/^Bearer /, "") || getCookie("bm-maintenance-session");
+  if (await verifiedMaintenanceAdmin(token)) return next();
+  throw new Error("Site em manutenção.");
+});
+
+const maintenanceMiddleware = createMiddleware().server(async ({ next, request, pathname, handlerType }) => {
+  if (handlerType === "serverFn") return next();
   if (handlerType === "router" && maintenanceExemptPath(pathname)) return next();
   const { readMaintenance, verifiedMaintenanceAdmin } = await import("./lib/maintenance.server");
   const settings = await readMaintenance(false);
   if (!settings.enabled) return next();
   const token = request.headers.get("authorization")?.replace(/^Bearer /, "") || getCookie("bm-maintenance-session");
   if (canEnterMaintenance(settings.enabled, await verifiedMaintenanceAdmin(token))) return next();
-  if (handlerType === "serverFn" || pathname.startsWith("/api/")) return new Response("Site em manutenção.", { status: 503, headers: { "Retry-After": "300", "Cache-Control": "no-store" } });
+  if (pathname.startsWith("/api/")) return new Response("Site em manutenção.", { status: 503, headers: { "Retry-After": "300", "Cache-Control": "no-store" } });
   return new Response(null, { status: 302, headers: { Location: "/manutencao", "Cache-Control": "no-store" } });
 });
 
@@ -40,6 +52,6 @@ const csrfMiddleware = createCsrfMiddleware({
 });
 
 export const startInstance = createStart(() => ({
-  functionMiddleware: [attachSupabaseAuth],
+  functionMiddleware: [attachSupabaseAuth, maintenanceFunctionMiddleware],
   requestMiddleware: [errorMiddleware, csrfMiddleware, maintenanceMiddleware],
 }));
