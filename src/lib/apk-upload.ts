@@ -24,7 +24,7 @@ export async function uploadApk(file: File, onProgress: (progress: number) => vo
       },
       onProgress: (sent, total) => onProgress(Math.min(99, Math.round(sent / total * 100))),
       onError: reject,
-      onSuccess: resolve,
+      onSuccess: () => resolve(),
     });
     upload.start();
   });
