@@ -1,5 +1,7 @@
 # Tarefas
 
+- [x] Reconhecer numeração TXT com ponto ou hífen nos dois painéis, com ordem numérica e proteção contra duplicados; 217 TXT enviados analisados sem erros de leitura/numeração, 13 testes passaram e build OK; nenhum capítulo publicado, imagens remotas não verificadas
+
 - [x] Embelezar manutenção com aviso centralizado, emblema, contraste e rodapé refinado; computador e celular conferidos sem sobreposição, cinco testes passaram, build OK; mídia, áudio e permissões preservados, sem publicar ou alterar dados
 
 - [x] Corrigir Unauthorized na manutenção: consulta pública sem depender da sessão, aviso alternativo em falhas e recusa administrativa segura; cinco testes passaram, navegador confirmou aviso com 401 simulado e sem erros, build OK; sem publicar ou alterar dados, produção ainda não verificada
