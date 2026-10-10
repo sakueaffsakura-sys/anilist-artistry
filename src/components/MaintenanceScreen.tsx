@@ -23,13 +23,19 @@ export function MaintenanceScreen({ settings, preview = false }: { settings: Mai
     const resume = () => { if (document.visibilityState === "visible") void attempt(); };
     const target = preview ? screen.current : document;
     target?.addEventListener("pointerdown", interaction);
+    target?.addEventListener("pointerup", interaction);
+    target?.addEventListener("click", interaction);
     target?.addEventListener("keydown", interaction);
+    element.addEventListener("canplay", interaction);
     document.addEventListener("visibilitychange", resume);
     void attempt();
     return () => {
       active = false;
       target?.removeEventListener("pointerdown", interaction);
+      target?.removeEventListener("pointerup", interaction);
+      target?.removeEventListener("click", interaction);
       target?.removeEventListener("keydown", interaction);
+      element.removeEventListener("canplay", interaction);
       document.removeEventListener("visibilitychange", resume);
       element.pause();
     };
