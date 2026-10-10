@@ -12,7 +12,7 @@ test("blocked audio keeps video playing muted until a fresh interaction", async 
   let calls = 0;
   const video = { muted: true, volume: 0, play: async () => {
     calls++;
-    if (!video.muted) throw new Error("Autoplay blocked");
+    if (!video.muted) throw new DOMException("Autoplay blocked", "NotAllowedError");
   } };
   expect(await playMaintenanceAudio(video)).toBe(false);
   expect(video.muted).toBe(true);
@@ -20,4 +20,15 @@ test("blocked audio keeps video playing muted until a fresh interaction", async 
   video.play = async () => {};
   expect(await playMaintenanceAudio(video)).toBe(true);
   expect(video.muted).toBe(false);
+});
+
+test("media loading failures do not disable audio before a ready retry", async () => {
+  const video = { muted: false, volume: 0, play: async () => {
+    throw new DOMException("Media not ready", "AbortError");
+  } };
+  expect(await playMaintenanceAudio(video)).toBe(false);
+  expect(video.muted).toBe(false);
+  video.play = async () => {};
+  expect(await playMaintenanceAudio(video)).toBe(true);
+  expect(video.volume).toBe(1);
 });
