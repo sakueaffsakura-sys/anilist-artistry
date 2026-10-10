@@ -48,11 +48,11 @@ export function MaintenanceScreen({ settings, preview = false }: { settings: Mai
     <div className="maintenance-shade" />
     <header className="maintenance-topbar"><div className="maintenance-brand"><BookOpen aria-hidden="true" /><span>BETTER <strong>MANGÁ</strong></span></div><div className="maintenance-header-status"><Wrench className="maintenance-tool" aria-hidden="true" /><span>Em manutenção</span></div></header>
     <div className="maintenance-copy">
-      <div className="maintenance-emblem" aria-hidden="true"><BookOpen /><span /></div>
+      <div className="maintenance-emblem" aria-hidden="true"><span /><BookOpen /><span /></div>
       <div className="maintenance-status"><span /> EM MANUTENÇÃO</div>
       <h1>{settings.title}</h1>
       <p>{settings.message}</p>
-      <div className="maintenance-divider" aria-hidden="true"><span /><BookOpen /><span /></div>
+      <div className="maintenance-divider" aria-hidden="true"><span /><span /><span /><span /><span /></div>
     </div>
     <footer className="maintenance-footer"><div className="maintenance-categories"><span><BookOpen aria-hidden="true" />MANGÁS</span><span><Library aria-hidden="true" />MANHWAS</span><span><ScrollText aria-hidden="true" />NOVELS</span></div><span>Voltamos em breve<span className="maintenance-footer-dot">.</span></span></footer>
   </section>;
