@@ -34,3 +34,4 @@
 - Homepage discovery shelves use admin-only persisted selection settings and lightweight published-work queries; automatic ordering uses saved AniList metrics so home visits never call AniList, while manual selection preserves its order without fallback.
 - Recent updates uses the shared horizontal shelf and browser-safe selection helper for both query and display limits, keeping layout and result counts consistent.
 - Novel file imports use a browser-safe text parser and sequential authenticated chapter writes with an explicit review step; original TXT/HTML files never enter Storage, preserving illustrations without retaining source files.
+- Work details cache only the chapter index; the reader loads content by chapter ID into a separate Query cache so opening a work never downloads all chapter text or page URLs.
