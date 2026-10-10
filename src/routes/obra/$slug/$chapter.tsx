@@ -57,11 +57,11 @@ export const Route = createFileRoute("/obra/$slug/$chapter")({
 
 function Reader() {
   const series = Route.useLoaderData();
-  const { chapter } = Route.useParams();
+  const { slug, chapter } = Route.useParams();
   const current = series?.chapters.find((item) => formatChapter(item.number) === chapter);
   if (!current) return <div className="grid min-h-screen place-items-center px-4 text-center"><div>
     <h1 className="font-display text-2xl font-extrabold">Capítulo não encontrado</h1>
-    <Button asChild className="mt-6"><Link to="/obra/$slug" params={{ slug: Route.useParams().slug }}>Ver a obra</Link></Button>
+    <Button asChild className="mt-6"><Link to="/obra/$slug" params={{ slug }}>Ver a obra</Link></Button>
   </div></div>;
   return <ChapterReader key={current.id} chapterId={current.id} />;
 }
