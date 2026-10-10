@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Award, BookOpen, BookText, BookPlus, LayoutDashboard, PlusCircle, Shield, Users, ExternalLink, Frame, Headset, Wrench } from "lucide-react";
+import { Award, BookOpen, BookText, BookPlus, LayoutDashboard, PlusCircle, Shield, Users, ExternalLink, Frame, Headset, Wrench, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { claimFirstAdmin } from "@/lib/staff.functions";
 const NAV = [
   { to: "/admin", label: "Visão geral", icon: LayoutDashboard, exact: true },
   { to: "/admin/home", label: "Colunas da home", icon: BookOpen, exact: true, adminOnly: true },
+  { to: "/admin/app", label: "App Android · APKs", icon: Smartphone, exact: true, adminOnly: true },
   { to: "/admin/obras", label: "Obras", icon: BookOpen, exact: false },
   { to: "/admin/nova", label: "Nova obra", icon: PlusCircle, exact: true },
   { to: "/admin/novels", label: "Novels", icon: BookText, exact: false },
