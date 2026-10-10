@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { MaintenanceScreen } from "@/components/MaintenanceScreen";
-import { getMaintenanceStatus, verifyMaintenanceAdmin } from "@/lib/maintenance.functions";
+import { verifyMaintenanceAdmin } from "@/lib/maintenance.functions";
+import { fetchMaintenanceStatus, maintenanceUnavailable } from "@/lib/maintenance-status";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/manutencao")({
   staticData: { sitemap: false },
-  loader: () => getMaintenanceStatus(),
+  loader: () => fetchMaintenanceStatus().catch(() => maintenanceUnavailable),
   head: () => ({ meta: [
     { title: "Em manutenção — Better Mangá" }, { name: "description", content: "O Better Mangá está recebendo melhorias. Voltamos em breve." },
     { property: "og:title", content: "Em manutenção — Better Mangá" }, { property: "og:description", content: "O próximo capítulo do Better Mangá está chegando." },
@@ -26,7 +27,7 @@ function MaintenancePage() {
       const result = await verify();
       if (result.isAdmin && !cancelled && settings.enabled) window.location.replace("/");
     }).catch(() => undefined);
-    const interval = setInterval(() => { void getMaintenanceStatus().then((s) => { if (!s.enabled && initial.enabled) window.location.replace("/"); else setSettings(s); }).catch(() => undefined); }, 30000);
+    const interval = setInterval(() => { void fetchMaintenanceStatus().then((s) => { if (cancelled) return; if (!s.enabled && initial.enabled) window.location.replace("/"); else setSettings(s); }).catch(() => undefined); }, 30000);
     return () => { cancelled = true; clearInterval(interval); };
   }, [verify, initial.enabled]);
   return <MaintenanceScreen settings={settings} />;
