@@ -1,5 +1,9 @@
 # Tarefas
 
+- [ ] Android 2.17: corrigir assinatura de APK e painel, documentar migrations e validar endpoints sem publicar ou alterar dados
+- [ ] Android 2.17: aplicar anúncios e regenerar tipos — bloqueado pelo anexo 0042_ad_counter.sql ausente
+- [ ] Android 2.17: validar atualização com APK real publicado — bloqueado por ausência de releases e APK de teste
+
 - [x] Reconhecer numeração TXT com ponto ou hífen nos dois painéis, com ordem numérica e proteção contra duplicados; 217 TXT enviados analisados sem erros de leitura/numeração, 13 testes passaram e build OK; nenhum capítulo publicado, imagens remotas não verificadas
 
 - [x] Embelezar manutenção com aviso centralizado, emblema, contraste e rodapé refinado; computador e celular conferidos sem sobreposição, cinco testes passaram, build OK; mídia, áudio e permissões preservados, sem publicar ou alterar dados

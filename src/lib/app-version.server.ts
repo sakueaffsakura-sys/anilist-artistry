@@ -17,7 +17,8 @@ export async function appVersionResponse(request: Request) {
     const minimum = Math.max(0, ...(data ?? []).map((row) => row.minimum_version_code));
     let download = "";
     if (latest) {
-      const signed = await client.storage.from("app-releases").createSignedUrl(latest.apk_path, 3600);
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const signed = await supabaseAdmin.storage.from("app-releases").createSignedUrl(latest.apk_path, 3600);
       if (signed.error || !signed.data) throw new Error("Download indisponível.");
       const signedUrl = new URL(signed.data.signedUrl);
       const browserUrl = new URL(import.meta.env['VITE_SUPABASE_URL']);
