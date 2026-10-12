@@ -74,7 +74,7 @@ function AuthPage() {
   async function google() {
     // Fora da Lovable (cPanel), o Google usa o OAuth nativo do Supabase: configure o provedor Google no
     // painel de Auth do seu banco e adicione o domínio final às URLs de redirecionamento permitidas.
-    if (import.meta.env.VITE_GOOGLE_LOGIN_MODE === "native") {
+    if (import.meta.env['VITE_GOOGLE_LOGIN_MODE'] === "native") {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: window.location.origin + "/" },
