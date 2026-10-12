@@ -14,6 +14,13 @@ export function requiresAppUpdate(installed: number, minimum: number) {
   return installed < minimum;
 }
 
+export const appMinimumSchema = z.object({
+  version_code: z.number().int().positive().max(2147483647),
+  minimum_version_code: z.number().int().positive().max(2147483647),
+}).refine((value) => value.minimum_version_code <= value.version_code, {
+  message: "A versão mínima não pode superar a versão do APK.", path: ["minimum_version_code"],
+});
+
 export function validateApk(file: { name: string; size: number }) {
   if (!/\.apk$/i.test(file.name) || file.size <= 0) throw new Error("Escolha um arquivo APK válido.");
   if (file.size > 1024 ** 3) throw new Error("O APK deve ter até 1 GB.");
