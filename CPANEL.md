@@ -58,6 +58,34 @@ Não fixe `PORT` ou `NITRO_PORT`: mantenha o valor escolhido pela hospedagem. De
 npm run check:cpanel
 ```
 
+## 3.1 Diferenças deste plano de hospedagem
+
+Confirmado na página do plano (Combinário, cPanel mensal ilimitado com SSL):
+
+- **Node.js:** a página lista Node.js, mas não informa a versão. Antes de contratar ou configurar, confirme com o provedor que a versão disponível é **22.12 ou superior**.
+- **PHP e MySQL:** não são usados por este site. O banco é o Supabase (PostgreSQL, externo), acessado por HTTPS.
+- **Domínio:** o plano exige um domínio já existente. Configure o HTTPS antes de publicar.
+- **Memória:** o plano informa 1 GB de RAM compartilhada. O servidor Node mantém poucos processos; a compilação deve ser feita no computador (seção 1).
+- **Tráfego:** o plano inclui 25 GB por mês. Imagens de capa e de páginas vêm do Supabase e de outros domínios, não do servidor cPanel. Acompanhe o consumo no painel do provedor.
+- **Entrada/saída de disco:** o plano limita a 1 a 5 MB/s. Uploads grandes (capítulos, APKs e mídia de manutenção) vão direto ao armazenamento do Supabase, não passam pelo servidor cPanel.
+- **Backup:** o provedor faz backup semanal e mensal, mas o aviso da própria página diz que a manutenção do backup atualizado é responsabilidade sua. Guarde uma cópia da pasta `.output/`, de `app.cjs` e das variáveis do aplicativo.
+
+### Login Google fora da Lovable
+
+Na Lovable, o login Google usa o broker de autenticação da Lovable. Na hospedagem própria, a versão preparada com `npm run build:cpanel` usa o OAuth nativo do Supabase (`VITE_GOOGLE_LOGIN_MODE=native`). Para funcionar:
+
+1. No painel de Auth do seu projeto Supabase, ative o provedor **Google** com as credenciais do Google Cloud.
+2. Em URLs de redirecionamento permitidas, inclua `https://SEU-DOMINIO/` e o endereço de retorno que o Supabase exibir.
+3. Teste o login no domínio final, não em `localhost`.
+
+### Voz realista
+
+A voz realista da Lovable (Gemini) depende de `LOVABLE_API_KEY`, que só existe na Lovable. Fora dela, a rota responde que a voz realista está indisponível e o leitor usa a voz do aparelho. A voz Fish Audio continua funcionando com `FISH_AUDIO_API_KEY` e saldo de API próprio.
+
+### Tarefas agendadas
+
+Não há tarefa agendada obrigatória neste código. A sincronização com o AniList é manual, pelo painel admin. Se você criar rotinas próprias, use o cron do cPanel e proteja o endereço com um segredo próprio.
+
 ## 4. Verificar antes de trocar o domínio
 
 Teste entrada e recarga da home, catálogo, detalhes, leitor, login, painel, uploads e manutenção. No serviço de autenticação do banco próprio, configure o endereço HTTPS final e as URLs permitidas de retorno. A integração Google atual é vinculada à Lovable e não está validada em hospedagem externa.
