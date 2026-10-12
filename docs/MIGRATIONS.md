@@ -6,7 +6,7 @@
 - Conferir o histórico do banco e o estado do schema antes de executar SQL. A existência de um arquivo não comprova sua aplicação.
 - Fazer backup antes de aplicar migrations. Não apagar dados, remover colunas ou publicar releases fictícias para testes.
 - `drizzle/migrations/meta/_journal.json` registra a sequência gerenciada até 0041. Os snapshots existentes não devem ser regenerados para tabelas ainda inexistentes.
-- A 0042 de anúncios está reservada e **não foi recebida nem aplicada**. Não executar a 0043 automaticamente antes de revisar a sequência e a necessidade das colunas legadas.
+- A 0042 de anúncios foi recebida e aplicada no banco em 2026-10-12. Não executar a 0043 automaticamente antes de revisar a necessidade das colunas legadas.
 
 ## Ordem dos arquivos
 
@@ -56,7 +56,7 @@ Todos os nomes abaixo são relativos a `drizzle/migrations/`.
 | 0039_chapter_notifications.sql | Avisos de novos capítulos nas obras favoritas. |
 | 0040_app_releases_and_custom_genres.sql | Releases Android, armazenamento de APKs e gêneros personalizados. |
 | 0041_restrict_app_releases_downloads_to_admins.sql | Acesso direto ao bucket de APKs somente para administradores. O endpoint público assina apenas o APK publicado selecionado, no servidor. |
-| 0042_ad_counter.sql | Contagem de capítulos distintos lidos para anúncios intersticiais (1 a cada 5). Tabelas `ad_reads` e `ad_counter`, RLS somente leitura da própria conta, RPCs `ad_state`, `ad_record_read` e `ad_ack_ad`. VIP (admin ou `subscription_tier` ≠ `none`) nunca recebe anúncio. Pendente de aplicação no banco. |
+| 0042_ad_counter.sql | Contagem de capítulos distintos lidos para anúncios intersticiais (1 a cada 5). Tabelas `ad_reads` e `ad_counter`, RLS somente leitura da própria conta, RPCs `ad_state`, `ad_record_read` e `ad_ack_ad`. VIP (admin ou `subscription_tier` ≠ `none`) nunca recebe anúncio. Aplicada no banco em 2026-10-12. |
 | 0043_apk_version_settings.sql — não aplicada | Colunas legadas de versão em `maintenance_settings`; antes chamada `0040_apk_version_settings.sql`. Não necessária para o contrato atual baseado em `app_releases`. |
 
 ## Duplicidade 0040
@@ -68,7 +68,7 @@ Nenhum SQL foi executado nesta revisão. A consulta comprova ausência das colun
 ## Ordem de publicação Android 2.17
 
 1. Implantar a correção do site que gera o link de APK com assinatura no servidor.
-2. Receber, revisar e aplicar o SQL original 0042; atualizar os tipos pelo mecanismo gerenciado.
+2. (Concluído) SQL 0042 aplicado e tipos atualizados.
 3. Executar os testes reais de atualização e anúncios de `docs/TEST_RUNTIME.md`.
 4. Somente após aprovação, publicar o APK 2.17 e exigir a nova versão.
 
