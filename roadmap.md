@@ -1,6 +1,7 @@
 # Tarefas
 
-- [ ] Android 2.17: corrigir assinatura de APK e painel, documentar migrations e validar endpoints sem publicar ou alterar dados
+- [x] Android 2.17: assinatura e painel ajustados, migrations documentadas, 68 testes passaram, build OK e endpoints públicos HTTP 200 sem releases; sem publicar ou alterar dados
+- [ ] Android 2.17: validar painel administrativo real — conta solicitante uploader, sem administração
 - [ ] Android 2.17: aplicar anúncios e regenerar tipos — bloqueado pelo anexo 0042_ad_counter.sql ausente
 - [ ] Android 2.17: validar atualização com APK real publicado — bloqueado por ausência de releases e APK de teste
 

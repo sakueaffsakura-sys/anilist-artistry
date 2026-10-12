@@ -31,3 +31,9 @@ Após recebimento e aplicação: testar funções reais `ad_state`, `ad_record_r
 - Banco consultado em 2026-10-12: nenhuma release; download/atualização obrigatória com release real pendentes.
 - Colunas legadas `min_apk_version`, `latest_apk_version`, `apk_download_url` ausentes de `maintenance_settings`.
 - Não houve mudança de dados, políticas, vídeo nem publicação do site/APK.
+- `bun test`: 68 testes passaram em 16 arquivos; build automático OK.
+- Prévia local: `/api/public/version` e `/api/public/maintenance` HTTP 200 com `no-store`; código 0 HTTP 400. Sem releases, versões 0 e link vazio; download real não validado.
+- Conta solicitante autenticada: `/admin/app` mostrou “Acesso restrito” por possuir papel uploader. Status, validação visual e upload administrativos permanecem pendentes; permissões preservadas.
+- Arquivo legado renomeado para `0043_apk_version_settings.sql` sem modificar conteúdo nem aplicar SQL; ver `docs/MIGRATIONS.md`.
+- Upload de manutenção conferido no código: MP4 até 1 GiB retorna `media_kind = video` e `backgrounds/<UUID>.mp4`, encaminhados pelo painel ao salvamento. Testes de limite passaram; vídeo existente preservado, sem upload real.
+- Produção e APK 2.17 não testados; anúncios e tipos aguardam SQL original 0042.
