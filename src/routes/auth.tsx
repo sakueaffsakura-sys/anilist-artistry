@@ -56,7 +56,9 @@ function AuthPage() {
         if (error) throw error;
         if (!data.session) {
           setSent(true);
-          toast.success("Confira seu e-mail para confirmar a conta.");
+          toast.success("Conta criada! Confira seu e-mail para ativar.");
+        } else {
+          toast.success("Conta criada! Bem-vindo ao Better Mangá.");
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
