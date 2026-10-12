@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CatalogoRouteImport } from './routes/catalogo'
 import { Route as ManutencaoRouteImport } from './routes/manutencao'
+import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as RankingRouteImport } from './routes/ranking'
 import { Route as RankingLeitoresRouteImport } from './routes/ranking-leitores'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
@@ -67,6 +68,11 @@ const CatalogoRoute = CatalogoRouteImport.update({
 const ManutencaoRoute = ManutencaoRouteImport.update({
   id: '/manutencao',
   path: '/manutencao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacidadeRoute = PrivacidadeRouteImport.update({
+  id: '/privacidade',
+  path: '/privacidade',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RankingRoute = RankingRouteImport.update({
@@ -233,6 +239,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/catalogo': typeof CatalogoRoute
   '/manutencao': typeof ManutencaoRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/ranking': typeof RankingRoute
   '/ranking-leitores': typeof RankingLeitoresRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -269,6 +276,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/catalogo': typeof CatalogoRoute
   '/manutencao': typeof ManutencaoRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/ranking': typeof RankingRoute
   '/ranking-leitores': typeof RankingLeitoresRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -307,6 +315,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/catalogo': typeof CatalogoRoute
   '/manutencao': typeof ManutencaoRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/ranking': typeof RankingRoute
   '/ranking-leitores': typeof RankingLeitoresRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -345,6 +354,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/catalogo'
     | '/manutencao'
+    | '/privacidade'
     | '/ranking'
     | '/ranking-leitores'
     | '/sitemap.xml'
@@ -381,6 +391,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/catalogo'
     | '/manutencao'
+    | '/privacidade'
     | '/ranking'
     | '/ranking-leitores'
     | '/sitemap.xml'
@@ -418,6 +429,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/catalogo'
     | '/manutencao'
+    | '/privacidade'
     | '/ranking'
     | '/ranking-leitores'
     | '/sitemap.xml'
@@ -456,6 +468,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CatalogoRoute: typeof CatalogoRoute
   ManutencaoRoute: typeof ManutencaoRoute
+  PrivacidadeRoute: typeof PrivacidadeRoute
   RankingRoute: typeof RankingRoute
   RankingLeitoresRoute: typeof RankingLeitoresRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -505,6 +518,13 @@ declare module '@tanstack/react-router' {
       path: '/manutencao'
       fullPath: '/manutencao'
       preLoaderRoute: typeof ManutencaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacidade': {
+      id: '/privacidade'
+      path: '/privacidade'
+      fullPath: '/privacidade'
+      preLoaderRoute: typeof PrivacidadeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ranking': {
@@ -771,6 +791,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CatalogoRoute: CatalogoRoute,
   ManutencaoRoute: ManutencaoRoute,
+  PrivacidadeRoute: PrivacidadeRoute,
   RankingRoute: RankingRoute,
   RankingLeitoresRoute: RankingLeitoresRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
