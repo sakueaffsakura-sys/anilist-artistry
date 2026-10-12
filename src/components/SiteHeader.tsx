@@ -309,6 +309,12 @@ export function SiteFooter() {
               >
                 Listas
               </Link>
+              <Link
+                to="/privacidade"
+                className="transition-colors hover:text-primary"
+              >
+                Privacidade
+              </Link>
             </div>
           </div>
           <div
