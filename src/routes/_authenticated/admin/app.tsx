@@ -38,6 +38,13 @@ function AppAdmin() {
   const [required, setRequired] = useState(true);
   const [progress, setProgress] = useState(0);
   const [uploadedPath, setUploadedPath] = useState<string | null>(null);
+  const endpoint = useQuery({ queryKey: ["admin-app-version-status"], enabled: isAdmin, retry: false, queryFn: async () => {
+    const response = await fetch("/api/public/version", { cache: "no-store" });
+    if (!response.ok) throw new Error(response.status === 503
+      ? "Atualização indisponível: a URL do APK não pôde ser gerada (503)"
+      : `Atualização indisponível: a consulta falhou (${response.status})`);
+    return response.json() as Promise<{ latest_apk_version: number }>;
+  } });
   const releases = useQuery({ queryKey: ["admin-app-releases"], enabled: isAdmin, queryFn: async () => {
     const { data, error } = await supabase.from("app_releases").select("*").order("version_code", { ascending: false });
     if (error) throw error; return data;
@@ -55,17 +62,23 @@ function AppAdmin() {
     setUploadedPath(path);
     const { error } = await supabase.from("app_releases").insert({ ...result.data, apk_path: path });
     if (error) throw new Error("APK enviado, mas a versão não foi salva. Tente novamente sem reenviar o arquivo.");
-  }, onSuccess: () => { setFile(null); setUploadedPath(null); setProgress(0); setVersion(""); setCode(""); setMinimum(""); setNotes(""); if (fileInput.current) fileInput.current.value = ""; void qc.invalidateQueries({ queryKey: ["admin-app-releases"] }); toast.success("Versão publicada."); }, onError: (error) => toast.error(error.message) });
+  }, onSuccess: () => { setFile(null); setUploadedPath(null); setProgress(0); setVersion(""); setCode(""); setMinimum(""); setNotes(""); if (fileInput.current) fileInput.current.value = ""; void qc.invalidateQueries({ queryKey: ["admin-app-releases"] }); void qc.invalidateQueries({ queryKey: ["admin-app-version-status"] }); toast.success("Versão publicada."); }, onError: (error) => toast.error(error.message) });
   const toggle = useMutation({ mutationFn: async (row: { id: string; published: boolean }) => {
     const { data, error } = await supabase.from("app_releases").update({ published: !row.published }).eq("id", row.id).select("id");
     if (error || !data?.length) throw new Error("Não foi possível alterar a versão.");
-  }, onSuccess: () => void qc.invalidateQueries({ queryKey: ["admin-app-releases"] }), onError: (error) => toast.error(error.message) });
+  }, onSuccess: () => { void qc.invalidateQueries({ queryKey: ["admin-app-releases"] }); void qc.invalidateQueries({ queryKey: ["admin-app-version-status"] }); }, onError: (error) => toast.error(error.message) });
   async function download(path: string) {
     const { data, error } = await supabase.storage.from("app-releases").createSignedUrl(path, 3600);
     if (error || !data) { toast.error("Download indisponível."); return; }
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }
   return <AdminShell title="Versões do app" subtitle="Android" adminOnly>
+    <div role="status" className="mb-5 border-b border-border pb-4 text-sm">
+      {endpoint.isPending ? <p className="text-muted-foreground">Verificando atualização…</p> : endpoint.isError
+        ? <p className="text-destructive">{endpoint.error.message}</p>
+        : <p className="text-primary">Atualização: OK{endpoint.data?.latest_apk_version === 0 ? " · Nenhum APK publicado; download ainda não validado." : ""}</p>}
+      <Button type="button" variant="ghost" size="sm" disabled={endpoint.isFetching} onClick={() => void endpoint.refetch()}>Verificar novamente</Button>
+    </div>
     <form onSubmit={(event) => { event.preventDefault(); save.mutate(); }} className="space-y-5 border-b border-border pb-6">
       <fieldset disabled={save.isPending || !isAdmin || releases.isPending || releases.isError} className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2"><Label htmlFor="version-name">Nome da versão</Label><Input id="version-name" placeholder="2.0.0" value={version} maxLength={40} onChange={(event) => setVersion(event.target.value)} required /></div>
@@ -76,6 +89,7 @@ function AppAdmin() {
         <div className="space-y-2 sm:col-span-2"><Label htmlFor="apk-file">Arquivo APK</Label><Input ref={fileInput} id="apk-file" type="file" accept=".apk" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setUploadedPath(null); setProgress(0); }} /></div>
       </fieldset>
       {save.isPending ? <div><progress aria-label="Progresso do envio" value={progress} max={100} className="h-2 w-full accent-primary" /><p className="mt-2 text-sm text-muted-foreground">{progress}% · {progress === 100 ? "Salvando versão…" : "Enviando APK…"}</p></div> : null}
+      <p className="break-words text-sm text-muted-foreground">Teste antes de publicar: abra /api/public/version?version_code=&lt;versão anterior&gt; e confirme update_required = true e apk_download_url preenchido.</p>
       <Button type="submit" disabled={save.isPending || !file || !isAdmin || releases.isPending || releases.isError}><Upload className="h-4 w-4" />{save.isPending ? "Enviando…" : "Publicar nova versão"}</Button>
     </form>
     {releases.isError ? <div className="py-6"><p className="text-destructive">Não foi possível carregar as versões.</p><Button variant="outline" onClick={() => void releases.refetch()}>Tentar novamente</Button></div> : null}
