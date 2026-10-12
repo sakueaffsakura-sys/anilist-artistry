@@ -315,6 +315,12 @@ export function SiteFooter() {
               >
                 Privacidade
               </Link>
+              <Link
+                to="/excluir-conta"
+                className="transition-colors hover:text-primary"
+              >
+                Excluir conta
+              </Link>
             </div>
           </div>
           <div
