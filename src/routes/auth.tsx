@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,6 +72,18 @@ function AuthPage() {
   }
 
   async function google() {
+    // Fora da Lovable (cPanel), o Google usa o OAuth nativo do Supabase: configure o provedor Google no
+    // painel de Auth do seu banco e adicione o domínio final às URLs de redirecionamento permitidas.
+    if (import.meta.env.VITE_GOOGLE_LOGIN_MODE === "native") {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin + "/" },
+      });
+      if (error) toast.error("Não foi possível entrar com o Google.");
+      return;
+    }
+    // Na Lovable, o broker de autenticação continua sendo usado. Carregado só aqui, nunca no servidor.
+    const { lovable } = await import("@/integrations/lovable/index");
     const result = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: window.location.origin,
     });

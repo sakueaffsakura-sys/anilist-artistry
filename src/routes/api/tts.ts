@@ -9,10 +9,12 @@ export const Route = createFileRoute("/api/tts")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // LOVABLE_API_KEY só serve à voz realista da Lovable. Fora da Lovable (cPanel) ela fica ausente
+        // e a Fish Audio continua funcionando; sem voz disponível o cliente usa a voz do aparelho.
         const apiKey = process.env["LOVABLE_API_KEY"];
         const url = process.env["SUPABASE_URL"];
         const pub = process.env["SUPABASE_PUBLISHABLE_KEY"];
-        if (!apiKey || !url || !pub) return new Response("Servidor sem configuração", { status: 500 });
+        if (!url || !pub) return new Response("Servidor sem configuração", { status: 500 });
 
         // Only signed-in users may generate speech (it costs credits).
         const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -47,6 +49,7 @@ export const Route = createFileRoute("/api/tts")({
             throw e;
           }
         }
+        if (!apiKey) return new Response("Voz realista indisponível neste servidor. Use a voz do aparelho.", { status: 503 });
         const voice = body?.voice && VOICES.has(body.voice) ? body.voice : "Kore";
 
         try {
