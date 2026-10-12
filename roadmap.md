@@ -1,5 +1,8 @@
 # Tarefas
 
+- [x] Relatório Android: edição de mínimo adicionada, diff da assinatura entregue e 70 testes passaram; nenhum APK publicado, nenhum dado alterado
+- [ ] Relatório Android: excluir arquivo legado 0043 — aguarda confirmação explícita
+
 - [x] Android 2.17: assinatura e painel ajustados, migrations documentadas, 68 testes passaram, build OK e endpoints públicos HTTP 200 sem releases; sem publicar ou alterar dados
 - [ ] Android 2.17: validar painel administrativo real — conta solicitante uploader, sem administração
 - [ ] Android 2.17: aplicar anúncios e regenerar tipos — bloqueado pelo anexo 0042_ad_counter.sql ausente

@@ -37,3 +37,5 @@ Após recebimento e aplicação: testar funções reais `ad_state`, `ad_record_r
 - Arquivo legado renomeado para `0043_apk_version_settings.sql` sem modificar conteúdo nem aplicar SQL; ver `docs/MIGRATIONS.md`.
 - Upload de manutenção conferido no código: MP4 até 1 GiB retorna `media_kind = video` e `backgrounds/<UUID>.mp4`, encaminhados pelo painel ao salvamento. Testes de limite passaram; vídeo existente preservado, sem upload real.
 - Produção e APK 2.17 não testados; anúncios e tipos aguardam SQL original 0042.
+- Revisão seguinte: 70 testes passaram. Edição de mínimo no painel atualiza somente esse campo, sem upload nem alteração de publicação; valida inteiro positivo até o código do APK. Testes incluem release 19/mínimo 1 e versão instalada 18 sem bloqueio. Salvamento real segue pendente por falta de administração e release real.
+- Arquivo legado 0043 mantido: exclusão aguarda confirmação explícita.
