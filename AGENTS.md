@@ -37,5 +37,5 @@
 - Novel file imports use a browser-safe text parser and sequential authenticated chapter writes with an explicit review step; original TXT/HTML files never enter Storage, preserving illustrations without retaining source files.
 - Work details cache only the chapter index; the reader loads content by chapter ID into a separate Query cache so opening a work never downloads all chapter text or page URLs.
 
-- Read published releases via RLS; dynamically sign only their APK with the privileged client.
+- Use RLS reads and server APK signing; minimum-only edits preserve files and publication.
 - Follow docs/MIGRATIONS.md; never auto-run unjournaled SQL containing pending changes.
