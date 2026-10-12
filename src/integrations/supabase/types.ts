@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_counter: {
+        Row: {
+          last_ad_at_reads: number
+          user_id: string
+        }
+        Insert: {
+          last_ad_at_reads?: number
+          user_id: string
+        }
+        Update: {
+          last_ad_at_reads?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ad_reads: {
+        Row: {
+          chapter_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          chapter_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          chapter_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_reads_chapter_id_fkey"
+            columns: ["chapter_id"]
+            isOneToOne: false
+            referencedRelation: "chapters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_releases: {
         Row: {
           apk_path: string
@@ -1029,6 +1070,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ad_ack_ad: { Args: never; Returns: Json }
+      ad_record_read: { Args: { _chapter: string }; Returns: Json }
+      ad_state: { Args: never; Returns: Json }
       award_xp: {
         Args: { _amount: number; _reason: string; _ref: string; _user: string }
         Returns: undefined
