@@ -35,6 +35,38 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Mantém a sessão viva: renova o token periodicamente e sempre que o
+  // usuário volta para a aba, evitando que a sessão expire por inatividade.
+  useEffect(() => {
+    let active = true;
+    const refreshIfNeeded = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const expiresAt = data.session?.expires_at;
+        const expiringSoon = !expiresAt || expiresAt * 1000 - Date.now() < 10 * 60_000;
+        if (!active || !data.session || !expiringSoon) return;
+        await supabase.auth.refreshSession();
+      } catch {
+        // Falhou agora: o próximo ciclo tenta de novo sem deslogar ninguém.
+      }
+    };
+    void refreshIfNeeded();
+    const interval = setInterval(() => {
+      if (!document.hidden) void refreshIfNeeded();
+    }, 5 * 60_000);
+    const onVisible = () => {
+      if (!document.hidden) void refreshIfNeeded();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      active = false;
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, []);
+
   return createElement(SessionContext.Provider, {
     value: { session, user: session?.user ?? null, loading },
   }, children);
