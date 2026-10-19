@@ -513,16 +513,17 @@ function SeriesPage() {
                 <TabsContent value="information" className="mt-0 p-4 md:p-5">
                   <h2 className="mb-5 font-display text-lg font-bold">{obra.title}</h2>
                   <dl className="divide-y divide-border text-sm">
-                    {[
+                    {([
+
                       ["Tipo", obra.kind],
                       ["Status", obra.status],
                       ["Capítulos", String(obra.chapters.length)],
                       ["Autor", obra.author || "Não informado"],
                       ["Artista", obra.artist || "Não informado"],
                       ["Gêneros", normalizeGenres(obra.genres).join(", ") || "Não informado"],
-                      ["Classificação", ageRatingLabel(obra.age_rating)],
+                      ["Classificação", <span className="flex flex-wrap items-center gap-2"><AgeRatingBadge value={obra.age_rating} size="sm" />{ageRatingLabel(obra.age_rating)}</span>],
                       ["Última atualização", new Date(obra.updated_at).toLocaleDateString("pt-BR")],
-                    ].map(([label, value]) => <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-4"><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 break-words font-medium">{value}</dd></div>)}
+                    ] as [string, ReactNode][]).map(([label, value]) => <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-4"><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 break-words font-medium">{value}</dd></div>)}
                   </dl>
                 </TabsContent>
                 <TabsContent value="chapters" className="mt-0 p-4 md:p-5">
