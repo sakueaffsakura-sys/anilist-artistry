@@ -1,5 +1,7 @@
 # Tarefas
 
+- [ ] Adicionar classificação por IA em Obras para preencher gêneros ausentes e identificar tipos; testar regras, chamada real e painel sem publicar.
+
 - [x] Relatório Android: edição de mínimo adicionada, diff da assinatura entregue e 70 testes passaram; nenhum APK publicado, nenhum dado alterado
 - [ ] Relatório Android: excluir arquivo legado 0043 — aguarda confirmação explícita
 
