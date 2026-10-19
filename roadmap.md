@@ -1,6 +1,7 @@
 # Tarefas
 
-- [ ] Corrigir espera da classificação: progresso do grupo atual, revisão durante análise e encerramento na conclusão; validar sem alterar obras.
+- [x] Corrigir espera da classificação: progresso do grupo atual, aprovação durante análise e encerramento na conclusão; 22 testes passaram e build OK, sem alterar obras nem publicar.
+- [ ] Validar progresso e revisão com IA real — teste autenticado interrompido por “Not enough credits”; aguardando créditos, sem novas tentativas automáticas.
 
 - [x] Classificação IA: comparação antes/depois, revisão de classificações existentes, justificativas e aprovação individual sem alterações automáticas; 80 testes passaram, IA real HTTP 200, computador/celular conferidos e aprovação recusou UUID inexistente com conta real, sem alterar dados nem publicar.
 - [ ] Validar aprovação com gravação de uma obra real — pendente de obra autorizada para teste; comparação, explicação e recusa de conflito verificadas sem modificar conteúdos.
