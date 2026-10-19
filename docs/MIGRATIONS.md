@@ -73,3 +73,6 @@ Nenhum SQL foi executado nesta revisão. A consulta comprova ausência das colun
 4. Somente após aprovação, publicar o APK 2.17 e exigir a nova versão.
 
 Nenhum APK ou site foi publicado automaticamente.
+## Classificação por IA — 2026-10-19
+
+A 0042 já aplicada foi registrada no histórico Drizzle com seu hash, sem reexecutar SQL. A ferramenta aplicou `0043_ai_work_classification.sql` (pausa persistida e trava administrativa) e regenerou os tipos. O arquivo legado `0043_apk_version_settings.sql` permanece fora do journal e não foi executado.

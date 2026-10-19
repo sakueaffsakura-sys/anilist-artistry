@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { coverUrl, timeAgo } from "@/lib/media";
 import { getMediaSettings, saveMediaSettings } from "@/lib/media.functions";
 import { useRoles, useSession } from "@/hooks/useAuth";
+import { WorkClassificationButton } from "@/components/WorkClassificationButton";
 
 function CloudinaryKeys() {
   const getS = useServerFn(getMediaSettings);
@@ -170,11 +171,14 @@ function ObrasAdmin() {
       title="Obras"
       subtitle={`${series.data?.length ?? 0} obras no catálogo`}
       actions={
+        <div className="flex flex-wrap items-center gap-2">
         <Button asChild className="font-semibold">
           <Link to="/admin/nova">
             <Plus className="mr-2 h-4 w-4" /> Nova obra
           </Link>
         </Button>
+        {isAdmin ? <WorkClassificationButton /> : null}
+        </div>
       }
     >
       {isAdmin ? <CloudinaryKeys /> : null}
