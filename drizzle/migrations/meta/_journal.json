@@ -302,6 +302,13 @@
       "when": 1791600000000,
       "tag": "0042_ad_counter",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1792432017023,
+      "tag": "0043_ai_work_classification",
+      "breakpoints": true
     }
   ]
 }
