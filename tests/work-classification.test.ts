@@ -1,8 +1,15 @@
 import { describe, expect, it } from "bun:test";
-import { classificationUpdate, missingGenres, reviewClassificationSchema } from "../src/lib/work-classification";
+import { canApproveClassification, classificationUpdate, missingGenres, reviewClassificationSchema } from "../src/lib/work-classification";
 const work = { id: "one", kind: "Manga", genres: [] };
 const suggestion = { id: "one", kind: "Manhwa" as const, genres: ["Action", "Fantasy"], age_rating: "14" as const, confident: true };
 describe("AI work classification", () => {
+ it("allows received suggestions to be approved independently of ongoing analysis", () => {
+  const review = { work: { id: "one", title: "Test", kind: "Manga", genres: [], age_rating: null, updated_at: "2026-10-19" }, suggestion: { ...suggestion, justification: "Recognized", missing_information: [] }, changes: { age_rating: "14" } };
+  expect(canApproveClassification(review, "pending", false)).toBe(true);
+  expect(canApproveClassification(review, "pending", true)).toBe(false);
+  expect(canApproveClassification(review, "saved", false)).toBe(false);
+  expect(canApproveClassification({ ...review, changes: null }, "pending", false)).toBe(false);
+ });
   it("suggests corrections to existing classifications only in review mode", () => {
     const existing = { ...work, genres: ["Drama"], age_rating: "12" };
     expect(classificationUpdate(existing, suggestion, ["Ação", "Fantasia"], "missing")).toBeNull();

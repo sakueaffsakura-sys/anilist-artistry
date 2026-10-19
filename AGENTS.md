@@ -11,7 +11,7 @@
 
 - Public SEO metadata for database-backed pages must come from route loaders so the initial HTML is content-specific and shareable.
 - The sitemap includes only public static pages, published works, and public community lists; private and authenticated areas stay excluded.
-- Keep work rankings at `/ranking` and reader XP rankings at `/ranking-leitores` so each audience has a focused page.
+- Keep work rankings at `/ranking` and reader XP rankings at `/ranking-leitores` to separate audiences.
 - Use Sora for headings and Manrope for body text; the profile follows a dark cyan bento layout so dense achievements stay contained and scannable.
 - Keep novels on the shared work details route, but give them a dedicated text reader while manga/comics retain the image reader, so both formats share catalog data without compromising reading ergonomics.
 - Novel narration uses Lovable AI TTS via the signed-in /api/tts route with device speech as fallback, because AI voices sound natural while fallback keeps reading working.
@@ -40,4 +40,4 @@
 - Use RLS reads and server APK signing; minimum-only edits preserve files and publication.
 - Follow docs/MIGRATIONS.md; never auto-run unjournaled SQL containing pending changes.
 
-- AI streams explained suggestions only; explicit approval uses a separate admin-verified RLS function with updated_at compare-and-set. Keep lease/pause and sequential analysis batches.
+- AI streams suggestions and batch progress; allow review during analysis and end waiting on terminal events. Approval uses admin-verified RLS with updated_at CAS; preserve lease/pause and sequential batches.

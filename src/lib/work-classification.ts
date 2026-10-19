@@ -10,6 +10,9 @@ export const classificationSnapshotSchema = z.object({ id: z.string().uuid(), ti
 export type ClassificationSnapshot = z.infer<typeof classificationSnapshotSchema>;
 export type ClassificationChanges = { genres?: string[]; kind?: (typeof KINDS)[number]; age_rating?: string };
 export type ClassificationReview = { work: ClassificationSnapshot; suggestion: ClassificationSuggestion | null; changes: ClassificationChanges | null };
+export function canApproveClassification(review: ClassificationReview, status: string, saving: boolean) {
+  return !saving && status === "pending" && Boolean(review.suggestion?.confident && review.changes);
+}
 export function missingGenres(genres: readonly string[] | null) { return !genres?.some((genre) => genre.trim()); }
 export function needsClassification(work: { genres: string[] | null; age_rating: string | null }) { return missingGenres(work.genres) || !isAgeRating(work.age_rating); }
 type Work = { id: string; kind: string; genres: string[] | null; age_rating?: string | null };
@@ -30,6 +33,7 @@ export function classificationUpdate(work: Work, suggestion: z.infer<typeof clas
 }
 export type ClassificationEvent =
  | { type: "start"; total: number }
+ | { type: "batch"; first: number; last: number; total: number; titles: string[] }
  | { type: "work"; title: string; saved: boolean; processed: number; updated: number; total: number }
   | { type: "review"; review: ClassificationReview; processed: number; suggested: number; total: number }
  | { type: "done"; processed: number; updated: number; total: number }

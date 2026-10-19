@@ -1,5 +1,8 @@
 # Tarefas
 
+- [x] Corrigir espera da classificação: progresso do grupo atual, aprovação durante análise e encerramento na conclusão; 22 testes passaram e build OK, sem alterar obras nem publicar.
+- [ ] Validar progresso e revisão com IA real — teste autenticado interrompido por “Not enough credits”; aguardando créditos, sem novas tentativas automáticas.
+
 - [x] Classificação IA: comparação antes/depois, revisão de classificações existentes, justificativas e aprovação individual sem alterações automáticas; 80 testes passaram, IA real HTTP 200, computador/celular conferidos e aprovação recusou UUID inexistente com conta real, sem alterar dados nem publicar.
 - [ ] Validar aprovação com gravação de uma obra real — pendente de obra autorizada para teste; comparação, explicação e recusa de conflito verificadas sem modificar conteúdos.
 - [x] Selos de classificação de idade com ícone e cor por faixa (verde ao vermelho escuro) na obra, nas capas da home e rankings, nas listas e no painel; 76 testes passaram, typecheck e build OK, computador e celular conferidos sem sobreposição, sem alterar dados ou publicar.
