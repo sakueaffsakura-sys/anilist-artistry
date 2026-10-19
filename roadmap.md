@@ -1,4 +1,5 @@
 # Tarefas
+- [ ] Impedir obras duplicadas por título principal/alternativos no cadastro, edição e importação; preservar registros existentes e validar a proteção.
 
 - [x] Corrigir espera da classificação: progresso do grupo atual, aprovação durante análise e encerramento na conclusão; 22 testes passaram e build OK, sem alterar obras nem publicar.
 - [ ] Validar progresso e revisão com IA real — teste autenticado interrompido por “Not enough credits”; aguardando créditos, sem novas tentativas automáticas.
