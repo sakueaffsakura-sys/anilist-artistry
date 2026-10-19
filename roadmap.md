@@ -1,5 +1,5 @@
 # Tarefas
-- [ ] Impedir obras duplicadas por título principal/alternativos no cadastro, edição e importação; preservar registros existentes e validar a proteção.
+- [x] Impedir obras duplicadas por título principal/alternativos com proteção atômica em todos os cadastros/edições/importações; cadastro real recusou título e alternativo (409), 13 testes passaram e build OK. Preservadas 158 obras e três títulos compartilhados legados, sem publicar. Teste SQL transacional adicional disponível, ainda não executado.
 
 - [x] Corrigir espera da classificação: progresso do grupo atual, aprovação durante análise e encerramento na conclusão; 22 testes passaram e build OK, sem alterar obras nem publicar.
 - [ ] Validar progresso e revisão com IA real — teste autenticado interrompido por “Not enough credits”; aguardando créditos, sem novas tentativas automáticas.
