@@ -40,4 +40,4 @@
 - Use RLS reads and server APK signing; minimum-only edits preserve files and publication.
 - Follow docs/MIGRATIONS.md; never auto-run unjournaled SQL containing pending changes.
 
-- AI enrichment uses admin-verified streaming, persistent lease/pause and sequential batches; compare-and-set RLS writes preserve editor changes.
+- AI streams explained suggestions only; explicit approval uses a separate admin-verified RLS function with updated_at compare-and-set. Keep lease/pause and sequential analysis batches.
