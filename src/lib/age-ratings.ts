@@ -5,3 +5,7 @@ export function ageRatingLabel(value: string | null | undefined) {
   if (!isAgeRating(value)) return "Não informada";
   return value === "L" ? "Livre para todos" : `${value} anos ou mais`;
 }
+export function ageRatingShort(value: string | null | undefined) {
+  if (!isAgeRating(value)) return null;
+  return value === "L" ? "Livre" : `${value}+`;
+}
