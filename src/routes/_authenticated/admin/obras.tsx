@@ -14,6 +14,7 @@ import { getMediaSettings, saveMediaSettings } from "@/lib/media.functions";
 import { useRoles, useSession } from "@/hooks/useAuth";
 import { WorkClassificationButton } from "@/components/WorkClassificationButton";
 import { AgeRatingBadge } from "@/components/AgeRatingBadge";
+import { DuplicateWorksPanel } from "@/components/DuplicateWorksPanel";
 function CloudinaryKeys() {
   const getS = useServerFn(getMediaSettings);
   const saveS = useServerFn(saveMediaSettings);
@@ -182,6 +183,7 @@ function ObrasAdmin() {
       }
     >
       {isAdmin ? <CloudinaryKeys /> : null}
+      {isAdmin ? <DuplicateWorksPanel /> : null}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-56 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

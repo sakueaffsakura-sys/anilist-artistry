@@ -42,4 +42,4 @@
 
 - AI streams suggestions and batch progress; allow review during analysis and end waiting on terminal events. Approval uses admin-verified RLS with updated_at CAS; preserve lease/pause and sequential batches.
 
-- Atomic DB title claims guard all series writes; preserve legacy owners and share save errors.
+- DB title claims guard writes; duplicate scans mirror normalization, page published reads, group matches and confirm individual RLS deletes.
