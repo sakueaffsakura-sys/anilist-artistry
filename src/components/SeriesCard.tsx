@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
 import { useSession } from "@/hooks/useAuth";
+import { AgeRatingBadge } from "@/components/AgeRatingBadge";
+
 
 type ChapterRef = { id: string; number: number | string; created_at?: string };
 
@@ -17,7 +19,7 @@ type Props = {
   chapterList?: ChapterRef[];
   progress?: number | null;
   badge?: string | null;
-  ageRating?: string | null;
+  ageRating?: string | null | undefined;
 
   showTitle?: boolean;
   favorite?: boolean;
