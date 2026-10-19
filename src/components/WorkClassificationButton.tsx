@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClassificationReviewItem, type ReviewRow } from "@/components/ClassificationReviewItem";
 import { useSession } from "@/hooks/useAuth";
 import { approveWorkClassification } from "@/lib/work-classification.functions";
-import type { ClassificationEvent, ClassificationMode } from "@/lib/work-classification";
+import { canApproveClassification, type ClassificationEvent, type ClassificationMode } from "@/lib/work-classification";
 
 export function WorkClassificationButton() {
  const { session } = useSession();
@@ -19,15 +19,24 @@ export function WorkClassificationButton() {
  const [progress, setProgress] = useState({ total: 0, processed: 0, suggested: 0 });
  const [rows, setRows] = useState<ReviewRow[]>([]);
  const [savingId, setSavingId] = useState<string | null>(null);
+ const [batch, setBatch] = useState<{ first: number; last: number; titles: string[] } | null>(null);
+ const [elapsed, setElapsed] = useState(0);
  const controller = useRef<AbortController | null>(null);
  const saving = useRef(false);
  useEffect(() => () => controller.current?.abort(), []);
+ useEffect(() => {
+  if (!running) return;
+  const started = Date.now();
+  setElapsed(0);
+  const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+  return () => window.clearInterval(timer);
+ }, [running, batch]);
  const busy = running || savingId !== null;
  const run = async () => {
   if (!session?.access_token || busy) return;
   if (rows.some((row) => row.status === "pending" && row.changes) && !window.confirm("Iniciar uma nova análise descarta as sugestões ainda não aprovadas. Continuar?")) return;
   const abort = new AbortController(); controller.current = abort;
-  setRunning(true); setMessage(""); setRows([]); setProgress({ total: 0, processed: 0, suggested: 0 });
+  setRunning(true); setMessage(""); setRows([]); setBatch(null); setProgress({ total: 0, processed: 0, suggested: 0 });
   let terminal = false;
   try {
    const response = await fetch("/api/admin/classificar-obras", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ resume: paused, mode }), signal: abort.signal });
@@ -43,6 +52,7 @@ export function WorkClassificationButton() {
     if (!line.trim()) return;
     const event = JSON.parse(line) as ClassificationEvent;
     if (event.type === "start") setProgress({ total: event.total, processed: 0, suggested: 0 });
+    if (event.type === "batch") setBatch({ first: event.first, last: event.last, titles: event.titles });
     if (event.type === "review") { setProgress({ total: event.total, processed: event.processed, suggested: event.suggested }); setRows((previous) => [...previous, { ...event.review, status: "pending" }]); }
     if (event.type === "done") { terminal = true; setMessage(event.total === 0 ? "Nenhuma obra pendente de análise." : `${event.updated} sugestões para revisão. Nenhuma alteração foi salva automaticamente.`); }
     if (event.type === "error") { terminal = true; setPaused(event.paused); setMessage(event.message); }
@@ -50,15 +60,16 @@ export function WorkClassificationButton() {
    while (true) {
     const { value, done } = await reader.read(); buffer += decoder.decode(value, { stream: !done });
     const lines = buffer.split("\n"); buffer = lines.pop() ?? ""; lines.forEach(consume);
+    if (terminal) { await reader.cancel(); break; }
     if (done) { consume(buffer); break; }
    }
    if (!terminal) throw new Error("A conexão foi interrompida. As sugestões recebidas continuam disponíveis para revisão.");
   } catch (error) {
    setMessage(abort.signal.aborted ? "Análise interrompida. Você ainda pode revisar as sugestões recebidas." : error instanceof Error ? error.message : "Não foi possível analisar as obras.");
-  } finally { setRunning(false); controller.current = null; }
+  } finally { setRunning(false); setBatch(null); controller.current = null; }
  };
  const save = async (row: ReviewRow) => {
-  if (busy || saving.current || !row.suggestion || !row.changes || row.status !== "pending") return;
+  if (!canApproveClassification(row, row.status, saving.current) || !row.suggestion) return;
   saving.current = true; setSavingId(row.work.id);
   try {
    const result = await approve({ data: { work: row.work, suggestion: row.suggestion, mode } });
@@ -78,7 +89,8 @@ export function WorkClassificationButton() {
     {running || rows.length ? <div className="space-y-3">
      <p role="status" className="text-sm">{progress.processed} de {progress.total} analisadas · {progress.suggested} sugestões · {rows.filter((row) => row.status === "saved").length} salvas</p>
      <progress aria-label="Progresso da análise" className="h-2 w-full accent-primary" value={progress.processed} max={Math.max(1, progress.total)} />
-     <ul className="max-h-[45dvh] overflow-y-auto divide-y divide-border pr-1">{rows.map((row) => <ClassificationReviewItem key={row.work.id} row={row} busy={busy} saving={savingId === row.work.id} onApprove={() => void save(row)} onDismiss={() => setRows((previous) => previous.map((item) => item.work.id === row.work.id ? { ...item, status: "dismissed" } : item))} />)}</ul>
+     {running ? <div role="status" className="space-y-1 text-sm text-muted-foreground"><p className="flex items-center gap-2"><Loader2 className="h-4 w-4 shrink-0 animate-spin" />{batch ? `Analisando obras ${batch.first}–${batch.last} · ${elapsed}s` : "Carregando obras…"}</p>{batch ? <p className="break-words">{batch.titles.join(" · ")}</p> : null}</div> : null}
+     <ul className="max-h-[45dvh] overflow-y-auto divide-y divide-border pr-1">{rows.map((row) => <ClassificationReviewItem key={row.work.id} row={row} busy={savingId !== null} saving={savingId === row.work.id} onApprove={() => void save(row)} onDismiss={() => setRows((previous) => previous.map((item) => item.work.id === row.work.id ? { ...item, status: "dismissed" } : item))} />)}</ul>
     </div> : null}
     {message ? <p role="status" className="break-words text-sm text-muted-foreground">{message}</p> : null}
     <div className="flex flex-wrap justify-end gap-2">
