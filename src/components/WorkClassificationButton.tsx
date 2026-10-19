@@ -33,7 +33,7 @@ export function WorkClassificationButton() {
     const event = JSON.parse(line) as ClassificationEvent;
     if (event.type === "start") setProgress({ total: event.total, processed: 0, updated: 0 });
     if (event.type === "work") { setProgress({ total: event.total, processed: event.processed, updated: event.updated }); setRows((previous) => [...previous, { title: event.title, saved: event.saved }]); }
-    if (event.type === "done") { terminal = true; setMessage(event.total === 0 ? "Todas as obras já têm gêneros." : `${event.updated} obras atualizadas. ${event.processed - event.updated} mantidas sem alteração.`); }
+    if (event.type === "done") { terminal = true; setMessage(event.total === 0 ? "Todas as obras já têm gêneros e classificação de idade." : `${event.updated} obras atualizadas. ${event.processed - event.updated} mantidas sem alteração.`); }
     if (event.type === "error") { terminal = true; setPaused(event.paused); setMessage(event.message); }
    };
    while (true) {
@@ -53,7 +53,7 @@ export function WorkClassificationButton() {
   <Button variant="outline" onClick={() => setOpen(true)}><Sparkles className="h-4 w-4 text-primary" /> Classificar com IA</Button>
   <Dialog open={open} onOpenChange={(value) => { if (!running) setOpen(value); }}>
    <DialogContent className="max-h-[85dvh] overflow-y-auto" onEscapeKeyDown={(event) => { if (running) event.preventDefault(); }} onInteractOutside={(event) => { if (running) event.preventDefault(); }}>
-    <DialogHeader><DialogTitle>Classificar obras com IA</DialogTitle><DialogDescription>Preencher gêneros ausentes e identificar o tipo das obras sem gêneros, incluindo rascunhos. Obras que já têm gêneros não serão alteradas. Novels permanecem no painel próprio. O uso da Lovable AI consome créditos.</DialogDescription></DialogHeader>
+    <DialogHeader><DialogTitle>Classificar obras com IA</DialogTitle><DialogDescription>Preencher gêneros e classificação de idade ausentes e identificar o tipo das obras sem gêneros, incluindo rascunhos. Informações já preenchidas não serão alteradas. Novels permanecem no painel próprio. O uso da Lovable AI consome créditos.</DialogDescription></DialogHeader>
     {running || rows.length ? <div className="space-y-3">
      <p role="status" className="text-sm">{progress.processed} de {progress.total} analisadas · {progress.updated} atualizadas</p>
      <progress className="h-2 w-full accent-primary" value={progress.processed} max={Math.max(1, progress.total)} />
@@ -62,7 +62,7 @@ export function WorkClassificationButton() {
     {message ? <p role="status" className="break-words text-sm text-muted-foreground">{message}</p> : null}
     <div className="flex flex-wrap justify-end gap-2">
      {running ? <Button variant="outline" onClick={() => controller.current?.abort()}><Square className="h-4 w-4" /> Interromper</Button> : <Button variant="outline" onClick={() => setOpen(false)}>Fechar</Button>}
-     <Button disabled={running || !session} onClick={() => void run()}>{running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{running ? "Classificando…" : paused ? "Retomar após liberar acesso" : "Classificar obras sem gêneros"}</Button>
+     <Button disabled={running || !session} onClick={() => void run()}>{running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{running ? "Classificando…" : paused ? "Retomar após liberar acesso" : "Classificar obras pendentes"}</Button>
     </div>
    </DialogContent>
   </Dialog>

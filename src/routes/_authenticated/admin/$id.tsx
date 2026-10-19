@@ -17,6 +17,7 @@ import { coverUrl, formatChapter, slugify, timeAgo } from "@/lib/media";
 import { KINDS } from "@/lib/queries";
 import { GenreSelect } from "@/components/GenreSelect";
 import { normalizeGenres } from "@/lib/work-genres";
+import { AGE_RATINGS, ageRatingLabel } from "@/lib/age-ratings";
 import { useRoles, useSession } from "@/hooks/useAuth";
 import { signCloudinaryUpload } from "@/lib/media.functions";
 import { TxtChapterImport } from "@/components/TxtChapterImport";
@@ -234,7 +235,7 @@ function SeriesEditor() {
 
 type Obra = {
   id: string; title: string; slug: string; alt_titles: string | null; synopsis: string | null; cover_url: string | null;
-  banner_url: string | null; kind: string; status: string; author: string | null; artist: string | null; genres: string[];
+  banner_url: string | null; kind: string; status: string; author: string | null; artist: string | null; genres: string[]; age_rating: string | null;
   published: boolean; pinned: boolean;
 };
 
@@ -260,6 +261,7 @@ function InfoForm({ obra, onSaved }: { obra: Obra; onSaved: () => void }) {
           author: f.author || null,
           artist: f.artist || null,
           genres: normalizeGenres(f.genres),
+          age_rating: f.age_rating || null,
           published: f.published,
           pinned: f.pinned,
         })
@@ -309,6 +311,13 @@ function InfoForm({ obra, onSaved }: { obra: Obra; onSaved: () => void }) {
             <Label>Status</Label>
             <select value={f.status} onChange={(e) => set("status", e.target.value)} className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm">
               {[...new Set([f.status, ...STATUSES])].map((s) => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Classificação de idade</Label>
+            <select value={f.age_rating ?? ""} onChange={(e) => set("age_rating", e.target.value || null)} className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm">
+              <option value="">Não informada</option>
+              {AGE_RATINGS.map((r) => <option key={r} value={r}>{ageRatingLabel(r)}</option>)}
             </select>
           </div>
           {field("Autor", "author")}
