@@ -55,6 +55,33 @@ export type Database = {
           },
         ]
       }
+      ai_classification_state: {
+        Row: {
+          id: string
+          lease_token: string | null
+          lease_until: string | null
+          paused: boolean
+          reason: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          lease_token?: string | null
+          lease_until?: string | null
+          paused?: boolean
+          reason?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          lease_token?: string | null
+          lease_until?: string | null
+          paused?: boolean
+          reason?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       app_releases: {
         Row: {
           apk_path: string
@@ -1070,6 +1097,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      acquire_classification_lease: {
+        Args: { _token: string }
+        Returns: boolean
+      }
       ad_ack_ad: { Args: never; Returns: Json }
       ad_record_read: { Args: { _chapter: string }; Returns: Json }
       ad_state: { Args: never; Returns: Json }

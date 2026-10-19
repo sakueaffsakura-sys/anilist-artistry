@@ -42,6 +42,7 @@ import { Route as AuthenticatedAdminObrasRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminPedidosRouteImport } from './routes/_authenticated/admin/pedidos'
 import { Route as AuthenticatedAdminSelosRouteImport } from './routes/_authenticated/admin/selos'
 import { Route as AuthenticatedAdminSuporteRouteImport } from './routes/_authenticated/admin/suporte'
+import { Route as ApiAdminClassificarObrasRouteImport } from './routes/api/admin/classificar-obras'
 import { Route as ApiPublicMaintenanceRouteImport } from './routes/api/public/maintenance'
 import { Route as ApiPublicVersionRouteImport } from './routes/api/public/version'
 import { Route as ObraSlugIndexRouteImport } from './routes/obra/$slug/index'
@@ -219,6 +220,12 @@ const AuthenticatedAdminSuporteRoute =
     path: '/admin/suporte',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiAdminClassificarObrasRoute =
+  ApiAdminClassificarObrasRouteImport.update({
+    id: '/api/admin/classificar-obras',
+    path: '/api/admin/classificar-obras',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicMaintenanceRoute = ApiPublicMaintenanceRouteImport.update({
   id: '/api/public/maintenance',
   path: '/api/public/maintenance',
@@ -272,6 +279,7 @@ export interface FileRoutesByFullPath {
   '/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
   '/admin/selos': typeof AuthenticatedAdminSelosRoute
   '/admin/suporte': typeof AuthenticatedAdminSuporteRoute
+  '/api/admin/classificar-obras': typeof ApiAdminClassificarObrasRoute
   '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/obra/$slug/$chapter': typeof ObraSlugChapterRoute
@@ -310,6 +318,7 @@ export interface FileRoutesByTo {
   '/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
   '/admin/selos': typeof AuthenticatedAdminSelosRoute
   '/admin/suporte': typeof AuthenticatedAdminSuporteRoute
+  '/api/admin/classificar-obras': typeof ApiAdminClassificarObrasRoute
   '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/obra/$slug/$chapter': typeof ObraSlugChapterRoute
@@ -350,6 +359,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
   '/_authenticated/admin/selos': typeof AuthenticatedAdminSelosRoute
   '/_authenticated/admin/suporte': typeof AuthenticatedAdminSuporteRoute
+  '/api/admin/classificar-obras': typeof ApiAdminClassificarObrasRoute
   '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/obra/$slug/$chapter': typeof ObraSlugChapterRoute
@@ -390,6 +400,7 @@ export interface FileRouteTypes {
     | '/admin/pedidos'
     | '/admin/selos'
     | '/admin/suporte'
+    | '/api/admin/classificar-obras'
     | '/api/public/maintenance'
     | '/api/public/version'
     | '/obra/$slug/$chapter'
@@ -428,6 +439,7 @@ export interface FileRouteTypes {
     | '/admin/pedidos'
     | '/admin/selos'
     | '/admin/suporte'
+    | '/api/admin/classificar-obras'
     | '/api/public/maintenance'
     | '/api/public/version'
     | '/obra/$slug/$chapter'
@@ -467,6 +479,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/pedidos'
     | '/_authenticated/admin/selos'
     | '/_authenticated/admin/suporte'
+    | '/api/admin/classificar-obras'
     | '/api/public/maintenance'
     | '/api/public/version'
     | '/obra/$slug/$chapter'
@@ -490,6 +503,7 @@ export interface RootRouteChildren {
   ListasIdRoute: typeof ListasIdRoute
   UUsernameRoute: typeof UUsernameRoute
   ListasIndexRoute: typeof ListasIndexRoute
+  ApiAdminClassificarObrasRoute: typeof ApiAdminClassificarObrasRoute
   ApiPublicMaintenanceRoute: typeof ApiPublicMaintenanceRoute
   ApiPublicVersionRoute: typeof ApiPublicVersionRoute
   ObraSlugChapterRoute: typeof ObraSlugChapterRoute
@@ -729,6 +743,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSuporteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/admin/classificar-obras': {
+      id: '/api/admin/classificar-obras'
+      path: '/api/admin/classificar-obras'
+      fullPath: '/api/admin/classificar-obras'
+      preLoaderRoute: typeof ApiAdminClassificarObrasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/maintenance': {
       id: '/api/public/maintenance'
       path: '/api/public/maintenance'
@@ -821,6 +842,7 @@ const rootRouteChildren: RootRouteChildren = {
   ListasIdRoute: ListasIdRoute,
   UUsernameRoute: UUsernameRoute,
   ListasIndexRoute: ListasIndexRoute,
+  ApiAdminClassificarObrasRoute: ApiAdminClassificarObrasRoute,
   ApiPublicMaintenanceRoute: ApiPublicMaintenanceRoute,
   ApiPublicVersionRoute: ApiPublicVersionRoute,
   ObraSlugChapterRoute: ObraSlugChapterRoute,
