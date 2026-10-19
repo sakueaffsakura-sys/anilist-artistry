@@ -18,7 +18,6 @@ export type SeriesRow = {
   synopsis: string | null;
   genres: string[] | null;
   age_rating: string | null;
-
   kind: string;
   status: string;
   rating: number;

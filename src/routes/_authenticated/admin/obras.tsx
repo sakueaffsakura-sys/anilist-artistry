@@ -14,8 +14,6 @@ import { getMediaSettings, saveMediaSettings } from "@/lib/media.functions";
 import { useRoles, useSession } from "@/hooks/useAuth";
 import { WorkClassificationButton } from "@/components/WorkClassificationButton";
 import { AgeRatingBadge } from "@/components/AgeRatingBadge";
-
-
 function CloudinaryKeys() {
   const getS = useServerFn(getMediaSettings);
   const saveS = useServerFn(saveMediaSettings);
@@ -225,7 +223,6 @@ function ObrasAdmin() {
                   <span className="shrink-0 rounded-full bg-accent px-2 py-px text-[10px] font-bold text-accent-foreground">No slide</span>
                 ) : null}
                 <AgeRatingBadge value={r.age_rating} size="sm" />
-
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 {r.kind} · {r.status} · {r.chapters?.length ?? 0} capítulos · {r.views} views · {timeAgo(r.updated_at)}

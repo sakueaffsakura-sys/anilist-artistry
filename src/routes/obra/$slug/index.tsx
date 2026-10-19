@@ -36,8 +36,6 @@ import { uploadCommentImage } from "@/lib/comments";
 import { normalizeGenres } from "@/lib/work-genres";
 import { ageRatingLabel } from "@/lib/age-ratings";
 import { AgeRatingBadge } from "@/components/AgeRatingBadge";
-
-
 export const Route = createFileRoute("/obra/$slug/")({
   staticData: { sitemap: true },
   loader: ({ params, context }) =>
@@ -410,7 +408,6 @@ function SeriesPage() {
                 <span className="rounded border border-border px-2 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">{obra.kind}</span>
                 <span className="rounded border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-400">{obra.status}</span>
                 <AgeRatingBadge value={obra.age_rating} size="sm" />
-
               </div>
               <h1 className="font-display text-2xl font-black leading-tight md:text-3xl">{obra.title}</h1>
               {obra.alt_titles ? (
@@ -518,7 +515,6 @@ function SeriesPage() {
                   <h2 className="mb-5 font-display text-lg font-bold">{obra.title}</h2>
                   <dl className="divide-y divide-border text-sm">
                     {([
-
                       ["Tipo", obra.kind],
                       ["Status", obra.status],
                       ["Capítulos", String(obra.chapters.length)],

@@ -86,7 +86,6 @@
   --color-age-16: var(--age-16);
   --color-age-18: var(--age-18);
   --color-age-ink: var(--age-ink);
-
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-chart-1: var(--primary);
@@ -135,7 +134,6 @@
   --age-16: oklch(0.63 0.22 12);
   --age-18: oklch(0.54 0.23 20);
   --age-ink: oklch(0.17 0.03 285);
-
   --gradient-primary: linear-gradient(135deg, var(--primary), var(--gold));
   --gradient-maintenance: linear-gradient(180deg, color-mix(in oklab, var(--background) 86%, transparent), color-mix(in oklab, var(--background) 45%, transparent) 25%, color-mix(in oklab, var(--background) 68%, transparent) 65%, color-mix(in oklab, var(--background) 96%, transparent));
   --maintenance-border: color-mix(in oklab, var(--foreground) 16%, transparent);

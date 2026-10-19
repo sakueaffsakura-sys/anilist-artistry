@@ -195,7 +195,6 @@ function Home() {
                         favorite={favoriteIds.has(item.id)}
                         seriesId={item.id}
                         ageRating={item.age_rating}
-
                       />
                     </div>
                   </div>
