@@ -35,6 +35,8 @@ import { CommentComposer, type CommentDraft } from "@/components/CommentComposer
 import { uploadCommentImage } from "@/lib/comments";
 import { normalizeGenres } from "@/lib/work-genres";
 import { ageRatingLabel } from "@/lib/age-ratings";
+import { AgeRatingBadge } from "@/components/AgeRatingBadge";
+
 
 export const Route = createFileRoute("/obra/$slug/")({
   staticData: { sitemap: true },
@@ -393,7 +395,7 @@ function SeriesPage() {
               <div className="mb-2 flex flex-wrap justify-center gap-2 md:hidden">
                 <span className="rounded-full border border-border bg-surface-2 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{obra.kind}</span>
                 <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">{obra.status}</span>
-                {obra.age_rating ? <span title={ageRatingLabel(obra.age_rating)} className="rounded-full border border-primary/40 bg-primary/15 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-primary">{obra.age_rating === "L" ? "Livre" : `${obra.age_rating}+`}</span> : null}
+                <AgeRatingBadge value={obra.age_rating} />
               </div>
               <img
                 src={coverUrl(obra.cover_url)}
@@ -407,6 +409,8 @@ function SeriesPage() {
               <div className="mb-3 hidden flex-wrap items-center gap-3 md:flex">
                 <span className="rounded border border-border px-2 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">{obra.kind}</span>
                 <span className="rounded border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-400">{obra.status}</span>
+                <AgeRatingBadge value={obra.age_rating} size="sm" />
+
               </div>
               <h1 className="font-display text-2xl font-black leading-tight md:text-3xl">{obra.title}</h1>
               {obra.alt_titles ? (
