@@ -72,7 +72,7 @@ function ListaPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("lists")
-        .select("id, title, description, user_id, is_public, list_items(series(id, slug, title, cover_url, rating))")
+        .select("id, title, description, user_id, is_public, list_items(series(id, slug, title, cover_url, rating, age_rating))")
         .eq("id", id)
         .eq("is_public", true)
         .maybeSingle();
@@ -83,7 +83,7 @@ function ListaPage() {
         description: string | null;
         user_id: string;
          is_public: boolean;
-        list_items: { series: { id: string; slug: string; title: string; cover_url: string | null; rating: number } | null }[];
+        list_items: { series: { id: string; slug: string; title: string; cover_url: string | null; rating: number; age_rating?: string | null } | null }[];
       } | null;
     },
   });
