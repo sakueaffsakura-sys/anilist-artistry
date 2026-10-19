@@ -9,8 +9,8 @@
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
 
-- Public SEO metadata for database-backed pages must come from route loaders so the initial HTML is content-specific and shareable.
-- The sitemap includes only public static pages, published works, and public community lists; private and authenticated areas stay excluded.
+- Load database-backed SEO metadata in route loaders for shareable initial HTML.
+- Sitemap: only public static pages, published works and public community lists; exclude private/authenticated areas.
 - Keep work rankings at `/ranking` and reader XP rankings at `/ranking-leitores` to separate audiences.
 - Use Sora for headings and Manrope for body text; the profile follows a dark cyan bento layout so dense achievements stay contained and scannable.
 - Keep novels on the shared work details route, but give them a dedicated text reader while manga/comics retain the image reader, so both formats share catalog data without compromising reading ergonomics.
