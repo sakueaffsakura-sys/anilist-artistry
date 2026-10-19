@@ -75,8 +75,8 @@ export async function handleWorkClassification(request: Request): Promise<Respon
    if (genreError) throw new Error("Não foi possível carregar os gêneros.");
    const allowedGenres = normalizeGenres([...GENRES, ...(custom ?? []).map((genre) => genre.name)]);
    send({ type: "start", total: works.length });
-   // Fixed snapshot, five-work batches, sequential calls and no automatic retries.
-   for (let offset = 0; offset < works.length; offset += 5) {
+    // Fixed snapshot, ten-work batches, sequential calls and no automatic retries.
+    for (let offset = 0; offset < works.length; offset += 10) {
     if (request.signal.aborted || disconnected) break;
     const { data: lock, error: lockError } = await supabaseAdmin.from("ai_classification_state").update({ lease_until: new Date(Date.now() + 600000).toISOString() }).eq("id", "work-genres").eq("lease_token", lease).eq("paused", false).select("id").maybeSingle();
     if (lockError || !lock) throw new Error("A classificação foi pausada ou está em outra sessão.");
