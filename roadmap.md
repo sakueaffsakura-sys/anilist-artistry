@@ -1,5 +1,6 @@
 # Tarefas
 
+- [x] Selos de classificação de idade com ícone e cor por faixa (verde ao vermelho escuro) na obra, nas capas da home e rankings, nas listas e no painel; 76 testes passaram, typecheck e build OK, computador e celular conferidos sem sobreposição, sem alterar dados ou publicar.
 - [x] Adicionar botão Classificar com IA junto a Nova obra; 75 testes passaram, identificação real retornou HTTP 200 e recusa de conta uploader confirmada, sem alterar obras ou publicar.
 - [ ] Validar gravação real da classificação — conta solicitante tem papel uploader, precisa de sessão administrativa; tela conferida com papel visual simulado, sem alterar permissões.
 
