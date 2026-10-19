@@ -1,6 +1,7 @@
 # Tarefas
 
-- [ ] Adicionar classificação por IA em Obras para preencher gêneros ausentes e identificar tipos; testar regras, chamada real e painel sem publicar.
+- [x] Adicionar botão Classificar com IA junto a Nova obra; 75 testes passaram, identificação real retornou HTTP 200 e recusa de conta uploader confirmada, sem alterar obras ou publicar.
+- [ ] Validar gravação real da classificação — conta solicitante tem papel uploader, precisa de sessão administrativa; tela conferida com papel visual simulado, sem alterar permissões.
 
 - [x] Relatório Android: edição de mínimo adicionada, diff da assinatura entregue e 70 testes passaram; nenhum APK publicado, nenhum dado alterado
 - [ ] Relatório Android: excluir arquivo legado 0043 — aguarda confirmação explícita

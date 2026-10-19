@@ -43,9 +43,11 @@ export async function handleWorkClassification(request: Request): Promise<Respon
  if (leaseError || !acquired) return fail("Já existe uma classificação em andamento. Aguarde sua conclusão.", 409);
  const gateway = createLovableAiGatewayRunIdFetch(getLovableAiGatewayRunId(request));
  let upstreamMessage = "";
+ let upstreamStatus = 0;
  const provider = createOpenAI({ apiKey: aiKey, baseURL: GATEWAY, headers: { "Lovable-API-Key": aiKey, "X-Lovable-AIG-SDK": "vercel-ai-sdk" }, fetch: async (input, init) => {
   const response = await gateway.fetch(input, init);
   if (!response.ok) {
+   upstreamStatus = response.status;
    const body = await response.clone().json().catch(() => null) as { message?: string; error?: { message?: string } } | null;
    upstreamMessage = body?.message || body?.error?.message || "Lovable AI está indisponível. Tente novamente mais tarde.";
    if (response.status === 402 || response.status === 403) {
@@ -94,7 +96,7 @@ export async function handleWorkClassification(request: Request): Promise<Respon
      let saved = false;
      if (update) {
       // Compare-and-set prevents overwriting concurrent editor changes.
-      const { data, error } = await supabase.from("series").update(update).eq("id", work.id).eq("kind", work.kind).eq("genres", work.genres).select("id").maybeSingle();
+      const { data, error } = await supabase.from("series").update(update).eq("id", work.id).eq("kind", work.kind).contains("genres", work.genres).containedBy("genres", work.genres).select("id").maybeSingle();
       if (error) throw new Error(`Não foi possível salvar a classificação de ${work.title}.`);
       saved = Boolean(data);
      }
@@ -105,7 +107,7 @@ export async function handleWorkClassification(request: Request): Promise<Respon
    if (!request.signal.aborted && !disconnected) send({ type: "done", processed, updated, total: works.length });
   } catch (error) {
    if (!request.signal.aborted) {
-    const status = APICallError.isInstance(error) ? error.statusCode ?? 502 : 500;
+    const status = upstreamStatus || (APICallError.isInstance(error) ? error.statusCode ?? 502 : 500);
     const message = upstreamMessage || (NoObjectGeneratedError.isInstance(error) ? "A IA não retornou uma classificação segura. Nenhuma alteração deste lote foi salva." : error instanceof Error ? error.message : "Não foi possível classificar as obras.");
     send({ type: "error", message, status, paused: status === 402 || status === 403 });
    }
