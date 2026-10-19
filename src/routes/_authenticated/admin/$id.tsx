@@ -1,3 +1,4 @@
+import { workSaveError } from "@/lib/work-save-error";
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -273,7 +274,7 @@ function InfoForm({ obra, onSaved }: { obra: Obra; onSaved: () => void }) {
       toast.success("Obra salva!");
       onSaved();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Não foi possível salvar."),
+    onError: (e) => toast.error(workSaveError(e, "Não foi possível salvar.")),
   });
 
   const field = (label: string, k: keyof typeof f, ph?: string) => (

@@ -35,9 +35,11 @@
 - Homepage discovery shelves use admin-only persisted selection settings and lightweight published-work queries; automatic ordering uses saved AniList metrics so home visits never call AniList, while manual selection preserves its order without fallback.
 - Recent updates uses the shared horizontal shelf and browser-safe selection helper for both query and display limits, keeping layout and result counts consistent.
 - Novel file imports use a browser-safe text parser and sequential authenticated chapter writes with an explicit review step; original TXT/HTML files never enter Storage, preserving illustrations without retaining source files.
-- Work details cache only the chapter index; the reader loads content by chapter ID into a separate Query cache so opening a work never downloads all chapter text or page URLs.
+- Cache chapter indexes separately from reader content by ID to avoid full-text/page downloads on work details.
 
 - Use RLS reads and server APK signing; minimum-only edits preserve files and publication.
 - Follow docs/MIGRATIONS.md; never auto-run unjournaled SQL containing pending changes.
 
 - AI streams suggestions and batch progress; allow review during analysis and end waiting on terminal events. Approval uses admin-verified RLS with updated_at CAS; preserve lease/pause and sequential batches.
+
+- Atomic DB title claims guard all series writes; preserve legacy owners and share save errors.

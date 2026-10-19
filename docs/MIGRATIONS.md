@@ -76,3 +76,7 @@ Nenhum APK ou site foi publicado automaticamente.
 ## Classificação por IA — 2026-10-19
 
 A 0042 já aplicada foi registrada no histórico Drizzle com seu hash, sem reexecutar SQL. A ferramenta aplicou `0043_ai_work_classification.sql` (pausa persistida e trava administrativa) e regenerou os tipos. O arquivo legado `0043_apk_version_settings.sql` permanece fora do journal e não foi executado.
+
+## Títulos duplicados — 2026-10-19
+
+Aplicada `0045_prevent_duplicate_work_titles.sql`: reservas atômicas internas com RLS e acesso somente privilegiado, gatilho em inserção/edição/exclusão e normalização de caixa, acentos latinos e espaços. Alternativos aceitam vírgula, ponto e vírgula, barra vertical e quebra de linha. Todos os tipos compartilham a proteção, inclusive rascunhos e importações. Os três títulos já compartilhados foram preservados; nenhuma obra foi apagada ou mesclada. Atualizações sem mudança nos nomes continuam permitidas. A migration legada de APK permaneceu fora do journal.
