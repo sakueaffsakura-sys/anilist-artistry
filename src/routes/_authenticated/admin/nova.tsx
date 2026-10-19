@@ -1,3 +1,4 @@
+import { workSaveError } from "@/lib/work-save-error";
 import { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
@@ -117,7 +118,7 @@ function NovaObra() {
       toast.success("Obra criada!");
       navigate({ to: "/admin/$id", params: { id } });
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Erro ao criar"),
+    onError: (error) => toast.error(workSaveError(error, "Erro ao criar")),
   });
 
   return (

@@ -1,3 +1,4 @@
+import { workSaveError } from "@/lib/work-save-error";
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -101,7 +102,7 @@ function AdminPage() {
       queryClient.invalidateQueries({ queryKey: ["section-admin-works"] });
     },
     onError: (e) =>
-      toast.error(e instanceof Error ? (e.message.includes("duplicate") ? "Essa obra já está no catálogo." : e.message) : "Não foi possível importar."),
+      toast.error(workSaveError(e, "Não foi possível importar.")),
   });
 
   const d = stats.data;

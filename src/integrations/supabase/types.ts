@@ -1068,6 +1068,21 @@ export type Database = {
           },
         ]
       }
+      work_title_claims: {
+        Row: {
+          series_ids: string[]
+          title_key: string
+        }
+        Insert: {
+          series_ids: string[]
+          title_key: string
+        }
+        Update: {
+          series_ids?: string[]
+          title_key?: string
+        }
+        Relationships: []
+      }
       xp_events: {
         Row: {
           amount: number
@@ -1150,6 +1165,11 @@ export type Database = {
       resolve_work_request: {
         Args: { _note?: string; _request: string; _series?: string }
         Returns: undefined
+      }
+      work_title_key: { Args: { value: string }; Returns: string }
+      work_title_keys: {
+        Args: { alternatives: string; title: string }
+        Returns: string[]
       }
       xp_ranking: {
         Args: { _period: string }

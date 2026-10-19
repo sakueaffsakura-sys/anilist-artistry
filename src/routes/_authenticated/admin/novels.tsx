@@ -1,3 +1,4 @@
+import { workSaveError } from "@/lib/work-save-error";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -98,7 +99,7 @@ function AdminNovels() {
       setForm({ title: "", synopsis: "", coverUrl: "", bannerUrl: "", author: "", genres: [] as string[], status: "Em andamento" });
       queryClient.invalidateQueries({ queryKey: ["admin-novels"] });
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao criar novel"),
+    onError: (e) => toast.error(workSaveError(e, "Erro ao criar novel")),
   });
 
   const removeNovel = useMutation({

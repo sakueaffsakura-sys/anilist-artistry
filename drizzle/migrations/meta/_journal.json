@@ -316,6 +316,13 @@
       "when": 1792435534256,
       "tag": "0044_series_age_rating",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1792446706733,
+      "tag": "0045_prevent_duplicate_work_titles",
+      "breakpoints": true
     }
   ]
 }
