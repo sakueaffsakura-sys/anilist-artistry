@@ -309,6 +309,13 @@
       "when": 1792432017023,
       "tag": "0043_ai_work_classification",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1792435534256,
+      "tag": "0044_series_age_rating",
+      "breakpoints": true
     }
   ]
 }
