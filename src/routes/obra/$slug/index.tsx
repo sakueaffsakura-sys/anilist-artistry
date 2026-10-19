@@ -34,6 +34,7 @@ import { CommentThreads } from "@/components/CommentThreads";
 import { CommentComposer, type CommentDraft } from "@/components/CommentComposer";
 import { uploadCommentImage } from "@/lib/comments";
 import { normalizeGenres } from "@/lib/work-genres";
+import { ageRatingLabel } from "@/lib/age-ratings";
 
 export const Route = createFileRoute("/obra/$slug/")({
   staticData: { sitemap: true },
@@ -392,6 +393,7 @@ function SeriesPage() {
               <div className="mb-2 flex flex-wrap justify-center gap-2 md:hidden">
                 <span className="rounded-full border border-border bg-surface-2 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{obra.kind}</span>
                 <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">{obra.status}</span>
+                {obra.age_rating ? <span title={ageRatingLabel(obra.age_rating)} className="rounded-full border border-primary/40 bg-primary/15 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-primary">{obra.age_rating === "L" ? "Livre" : `${obra.age_rating}+`}</span> : null}
               </div>
               <img
                 src={coverUrl(obra.cover_url)}
@@ -518,6 +520,7 @@ function SeriesPage() {
                       ["Autor", obra.author || "Não informado"],
                       ["Artista", obra.artist || "Não informado"],
                       ["Gêneros", normalizeGenres(obra.genres).join(", ") || "Não informado"],
+                      ["Classificação", ageRatingLabel(obra.age_rating)],
                       ["Última atualização", new Date(obra.updated_at).toLocaleDateString("pt-BR")],
                     ].map(([label, value]) => <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-4"><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 break-words font-medium">{value}</dd></div>)}
                   </dl>

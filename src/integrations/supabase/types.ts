@@ -812,6 +812,7 @@ export type Database = {
       }
       series: {
         Row: {
+          age_rating: string | null
           alt_titles: string | null
           anilist_id: number | null
           anilist_popularity: number
@@ -837,6 +838,7 @@ export type Database = {
           views: number
         }
         Insert: {
+          age_rating?: string | null
           alt_titles?: string | null
           anilist_id?: number | null
           anilist_popularity?: number
@@ -862,6 +864,7 @@ export type Database = {
           views?: number
         }
         Update: {
+          age_rating?: string | null
           alt_titles?: string | null
           anilist_id?: number | null
           anilist_popularity?: number

@@ -1,0 +1,2 @@
+ALTER TABLE public.series ADD COLUMN IF NOT EXISTS age_rating text;
+ALTER TABLE public.series ADD CONSTRAINT series_age_rating_check CHECK (age_rating IS NULL OR age_rating IN ('L','10','12','14','16','18'));
