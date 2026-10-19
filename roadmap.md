@@ -1,6 +1,7 @@
 # Tarefas
 
-- [ ] Classificação IA: revisar sugestões antes de salvar, analisar classificações existentes e mostrar justificativas; nenhuma alteração automática.
+- [x] Classificação IA: comparação antes/depois, revisão de classificações existentes, justificativas e aprovação individual sem alterações automáticas; 80 testes passaram, IA real HTTP 200, computador/celular conferidos e aprovação recusou UUID inexistente com conta real, sem alterar dados nem publicar.
+- [ ] Validar aprovação com gravação de uma obra real — pendente de obra autorizada para teste; comparação, explicação e recusa de conflito verificadas sem modificar conteúdos.
 - [x] Selos de classificação de idade com ícone e cor por faixa (verde ao vermelho escuro) na obra, nas capas da home e rankings, nas listas e no painel; 76 testes passaram, typecheck e build OK, computador e celular conferidos sem sobreposição, sem alterar dados ou publicar.
 - [x] Adicionar botão Classificar com IA junto a Nova obra; 75 testes passaram, identificação real retornou HTTP 200 e recusa de conta uploader confirmada, sem alterar obras ou publicar.
 - [ ] Validar gravação real da classificação — conta solicitante tem papel uploader, precisa de sessão administrativa; tela conferida com papel visual simulado, sem alterar permissões.
