@@ -26,7 +26,7 @@
 - Global click audio uses one client-only player and delegated document listener mounted in the root, so navigation preserves playback without per-control subscriptions.
 - The shared header uses CSS sticky positioning without scroll-driven React state; the hero pauses its timer outside the viewport to avoid unnecessary work during scrolling.
 - Work requests and availability notifications are user-scoped tables; database triggers fulfill exact title/type matches on publication and an admin-only RPC resolves other matches atomically, so imports and manual publications share one notification path.
-- Share work categories across filters, AniList, administration, requests and tests.
+- Share work categories and age-rating display through browser-safe modules and one badge component, so filters, cards, details, shelves and the panel stay consistent.
 
 - Novel illustrations use validated standalone image markers in chapters.content and a browser-safe shared HTML parser; reader and preview consume ordered blocks, and narration receives empty image entries to preserve paragraph indexes without speaking URLs.
 - Work TXT imports parse page links and write sequentially through the authenticated client, never Storage; image and novel imports share filename parsing and numeric sorting for consistent numbering.
