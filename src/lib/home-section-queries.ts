@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { HOME_SECTIONS, orderManualWorks, type HomeSectionKey, type SectionConfig, type ShelfWork } from "@/lib/home-sections";
 
-const SHELF_SELECT = "id, slug, title, cover_url, rating, kind";
+const SHELF_SELECT = "id, slug, title, cover_url, rating, kind, age_rating";
 
 export async function fetchSectionConfigs(): Promise<SectionConfig[]> {
   const { data, error } = await supabase.from("home_sections").select("section, mode, series_ids");

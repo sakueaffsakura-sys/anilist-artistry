@@ -18,6 +18,8 @@ import { KINDS } from "@/lib/queries";
 import { GenreSelect } from "@/components/GenreSelect";
 import { normalizeGenres } from "@/lib/work-genres";
 import { AGE_RATINGS, ageRatingLabel } from "@/lib/age-ratings";
+import { AgeRatingBadge } from "@/components/AgeRatingBadge";
+
 import { useRoles, useSession } from "@/hooks/useAuth";
 import { signCloudinaryUpload } from "@/lib/media.functions";
 import { TxtChapterImport } from "@/components/TxtChapterImport";
@@ -314,7 +316,11 @@ function InfoForm({ obra, onSaved }: { obra: Obra; onSaved: () => void }) {
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label>Classificação de idade</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label>Classificação de idade</Label>
+              <AgeRatingBadge value={f.age_rating} size="sm" />
+            </div>
+
             <select value={f.age_rating ?? ""} onChange={(e) => set("age_rating", e.target.value || null)} className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm">
               <option value="">Não informada</option>
               {AGE_RATINGS.map((r) => <option key={r} value={r}>{ageRatingLabel(r)}</option>)}

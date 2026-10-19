@@ -17,6 +17,8 @@ type Props = {
   chapterList?: ChapterRef[];
   progress?: number | null;
   badge?: string | null;
+  ageRating?: string | null;
+
   showTitle?: boolean;
   favorite?: boolean;
   seriesId?: string;
@@ -31,6 +33,8 @@ export function SeriesCard({
   chapterList,
   progress,
   badge,
+  ageRating,
+
   showTitle = true,
   favorite = false,
   seriesId,
@@ -139,6 +143,8 @@ export function SeriesCard({
               ) : null}
             </span>
           ) : null}
+          <AgeRatingBadge value={ageRating} size="sm" variant="solid" />
+
           {favorite ? (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/45 bg-black/65 px-2.5 py-1 shadow-[0_2px_14px_rgba(0,0,0,0.45)]">
               <Heart className="h-3 w-3 shrink-0 fill-red-400 text-red-400" />

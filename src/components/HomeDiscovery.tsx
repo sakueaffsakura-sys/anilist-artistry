@@ -20,7 +20,7 @@ export function HomeDiscovery({ sections, favoriteIds }: HomeDiscoveryProps) {
         action={<Button asChild variant="ghost" size="sm" className="text-primary"><Link to="/catalogo" search={key === "manhwa" ? { kind: "Manhwa" } : {}}>Ver todas</Link></Button>}>
         {sections[key].length ? <HScroll>{sections[key].map((item) => <div key={item.id} className="w-[160px] shrink-0">
           <SeriesCard slug={item.slug} title={item.title} cover={item.cover_url} rating={item.rating}
-            seriesId={item.id} favorite={favoriteIds.has(item.id)} />
+            seriesId={item.id} favorite={favoriteIds.has(item.id)} ageRating={item.age_rating} />
         </div>)}</HScroll> : <p className="py-6 text-sm text-muted-foreground">Nenhuma obra disponível nesta seção.</p>}
       </SectionRow>
     </div>;

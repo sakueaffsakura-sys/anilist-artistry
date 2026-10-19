@@ -13,6 +13,8 @@ import { coverUrl, timeAgo } from "@/lib/media";
 import { getMediaSettings, saveMediaSettings } from "@/lib/media.functions";
 import { useRoles, useSession } from "@/hooks/useAuth";
 import { WorkClassificationButton } from "@/components/WorkClassificationButton";
+import { AgeRatingBadge } from "@/components/AgeRatingBadge";
+
 
 function CloudinaryKeys() {
   const getS = useServerFn(getMediaSettings);
@@ -112,7 +114,7 @@ function ObrasAdmin() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("series")
-        .select("id, slug, title, cover_url, kind, status, published, in_slider, views, rating, updated_at, chapters(id)")
+        .select("id, slug, title, cover_url, kind, status, published, in_slider, views, rating, updated_at, age_rating, chapters(id)")
         .neq("kind", "Novel")
         .order("updated_at", { ascending: false });
       if (error) throw error;
@@ -222,6 +224,8 @@ function ObrasAdmin() {
                 {r.in_slider ? (
                   <span className="shrink-0 rounded-full bg-accent px-2 py-px text-[10px] font-bold text-accent-foreground">No slide</span>
                 ) : null}
+                <AgeRatingBadge value={r.age_rating} size="sm" />
+
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 {r.kind} · {r.status} · {r.chapters?.length ?? 0} capítulos · {r.views} views · {timeAgo(r.updated_at)}

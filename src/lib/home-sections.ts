@@ -18,6 +18,8 @@ export interface ShelfWork {
   cover_url: string | null;
   rating: number;
   kind: string;
+  age_rating?: string | null;
+
 }
 
 export function eligibleForSection(section: HomeSectionKey, kind: string): boolean {

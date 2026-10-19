@@ -161,7 +161,7 @@ function Home() {
             {novels.data.length ? <HScroll>
               {novels.data.map((item) => <div key={item.id} className="w-[160px] shrink-0">
                 <SeriesCard slug={item.slug} title={item.title} cover={item.cover_url} rating={item.rating}
-                  favorite={favoriteIds.has(item.id)} seriesId={item.id} />
+                  favorite={favoriteIds.has(item.id)} seriesId={item.id} ageRating={item.age_rating} />
               </div>)}
             </HScroll> : <p className="py-6 text-sm text-muted-foreground">Nenhuma novel publicada ainda.</p>}
           </SectionRow>
@@ -194,6 +194,8 @@ function Home() {
                         rating={item.rating}
                         favorite={favoriteIds.has(item.id)}
                         seriesId={item.id}
+                        ageRating={item.age_rating}
+
                       />
                     </div>
                   </div>

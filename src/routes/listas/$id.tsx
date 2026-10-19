@@ -17,7 +17,8 @@ export const Route = createFileRoute("/listas/$id")({
       queryFn: async () => {
         const { data, error } = await supabase
           .from("lists")
-          .select("id, title, description, user_id, is_public, list_items(series(id, slug, title, cover_url, rating))")
+          .select("id, title, description, user_id, is_public, list_items(series(id, slug, title, cover_url, rating, age_rating))")
+
           .eq("id", params.id)
           .eq("is_public", true)
           .maybeSingle();
@@ -28,7 +29,8 @@ export const Route = createFileRoute("/listas/$id")({
           description: string | null;
           user_id: string;
           is_public: boolean;
-          list_items: { series: { id: string; slug: string; title: string; cover_url: string | null; rating: number } | null }[];
+          list_items: { series: { id: string; slug: string; title: string; cover_url: string | null; rating: number; age_rating?: string | null } | null }[];
+
         } | null;
       },
     }),
@@ -155,7 +157,7 @@ function ListaPage() {
               {data.list_items.map((i) =>
                 i.series ? (
                   <div key={i.series.id} className="relative">
-                    <SeriesCard slug={i.series.slug} title={i.series.title} cover={i.series.cover_url} rating={i.series.rating} seriesId={i.series.id} />
+                    <SeriesCard slug={i.series.slug} title={i.series.title} cover={i.series.cover_url} rating={i.series.rating} seriesId={i.series.id} ageRating={i.series.age_rating} />
                     {isOwner ? (
                       <button
                         onClick={() => removeItem.mutate(i.series!.id)}
