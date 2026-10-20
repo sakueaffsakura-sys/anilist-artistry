@@ -1,5 +1,5 @@
 # Tarefas
-- [ ] Otimizar carregamento global, home, catálogo e perfis; medir dados antes/depois e verificar navegação sem modificar conteúdos.
+- [x] Otimização fase 1: home ~644 KB → ~61 KB de respostas de dados, mesmos 133 links; capítulos resumidos com totais reais no catálogo, favoritos, histórico e perfis; seções fora da tela adiam renderização. 92 testes passaram, build OK; conta real, catálogo, perfil e detalhes conferidos sem escrita nem publicação. Tempo em produção e revisão completa de todas as páginas não medidos.
 - [x] Buscar obras publicadas duplicadas: leitura paginada, títulos/alternativos normalizados, grupos e exclusão individual confirmada. Sete testes passaram; conta real encontrou dois grupos/quatro obras entre 158 publicadas, confirmação cancelada sem DELETE, tela 720px sem overflow e build OK. Exclusão real não executada para preservar dados; sem publicar.
 - [x] Impedir obras duplicadas por título principal/alternativos com proteção atômica em todos os cadastros/edições/importações; cadastro real recusou título e alternativo (409), 13 testes passaram e build OK. Preservadas 158 obras e três títulos compartilhados legados, sem publicar. Teste SQL transacional adicional disponível, ainda não executado.
 
@@ -64,7 +64,7 @@
 - [x] Ampliar categorias no catálogo, painel e pedidos com Manhwa, Manhua, Webtoon, One-shot, Doujinshi e HQ; nove testes passaram e filtros conferidos no computador/celular, sem reclassificar obras existentes nem publicar
 
 - [ ] Mostrar no slide somente obras ativadas no painel, sem alternativa automática
-- [ ] Reduzir consultas repetidas e trabalho do carregamento da home
+- [x] Reduzir trabalho do carregamento da home: prévias limitadas a dois capítulos, totais agregados e renderização adiada de seções fora da tela.
 - [ ] Criar pedidos de obras, atendimento administrativo e notificações de publicação
 - [ ] Verificar permissões e fluxo de pedidos sem excluir dados nem publicar o site
 
