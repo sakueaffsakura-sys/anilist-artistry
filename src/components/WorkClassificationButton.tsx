@@ -82,7 +82,7 @@ export function WorkClassificationButton() {
   <Button variant="outline" onClick={() => setOpen(true)}><Sparkles className="h-4 w-4 text-primary" /> Classificar com IA</Button>
   <Dialog open={open} onOpenChange={(value) => { if (!busy) setOpen(value); }}>
    <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-3xl" onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }} onInteractOutside={(event) => { if (busy) event.preventDefault(); }}>
-    <DialogHeader><DialogTitle>Classificar obras com IA</DialogTitle><DialogDescription>Revise as sugestões antes de aprovar. Rascunhos são incluídos; novels permanecem no painel próprio. Classificação de idade sugerida, não oficial. Usa sua chave do Claude.</DialogDescription></DialogHeader>
+    <DialogHeader><DialogTitle>Classificar obras com IA</DialogTitle><DialogDescription>Revise as sugestões antes de aprovar. Rascunhos são incluídos; novels permanecem no painel próprio. Classificação de idade sugerida, não oficial. Usa Claude pelo Lovable AI e consome créditos.</DialogDescription></DialogHeader>
     <Tabs value={mode} onValueChange={(value) => { if (!busy && !rows.length && (value === "missing" || value === "review")) setMode(value); }}>
      <TabsList className="grid h-auto w-full grid-cols-2"><TabsTrigger className="whitespace-normal" value="missing" disabled={busy || rows.length > 0}>Preencher ausentes</TabsTrigger><TabsTrigger className="whitespace-normal" value="review" disabled={busy || rows.length > 0}>Revisar todas as obras</TabsTrigger></TabsList>
     </Tabs>
