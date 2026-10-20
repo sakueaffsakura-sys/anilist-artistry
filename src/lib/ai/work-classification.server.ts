@@ -1,13 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
-import { createOpenAI } from "@ai-sdk/openai";
+import { createAnthropic } from "@ai-sdk/anthropic";
 import { streamText, Output, APICallError, NoObjectGeneratedError } from "ai";
 import { reviewClassificationSchema, classificationUpdate, needsClassification, type ClassificationEvent, type ClassificationMode } from "../work-classification";
 import { GENRES, normalizeGenres } from "../work-genres";
 import { KINDS } from "../work-categories";
-import { createLovableAiGatewayRunIdFetch, getLovableAiGatewayRunId, withLovableAiGatewayRunIdHeader } from "./run-id.ts";
 import type { Database } from "@/integrations/supabase/types";
-const MODEL = "openai/gpt-6-astra";
-const GATEWAY = "https://ai.gateway.lovable.dev/v1";
+// Uses the owner's own Anthropic key; larger batches without extended thinking for speed.
+const MODEL = "claude-sonnet-4-5";
+const ANTHROPIC = "https://api.anthropic.com/v1";
+const BATCH = 10;
 
 export async function handleWorkClassification(request: Request): Promise<Response> {
  const fail = (message: string, status: number, paused = false) => Response.json({ message, paused }, { status, headers: { "Cache-Control": "no-store" } });
