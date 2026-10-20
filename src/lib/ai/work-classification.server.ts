@@ -92,7 +92,7 @@ export async function handleWorkClassification(request: Request): Promise<Respon
      send({ type: "batch", first: offset + 1, last: end, total: works.length, titles: group.flat().map((work) => work.title) });
      const outputs = await Promise.all(group.map(classify));
      for (const [index, batch] of group.entries()) {
-     const output = outputs[index];
+     const output = outputs[index] ?? { works: [] };
     for (const work of batch) {
      if (request.signal.aborted || disconnected) break;
      const matches = output.works.filter((suggestion) => suggestion.id === work.id);
