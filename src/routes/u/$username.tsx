@@ -78,7 +78,8 @@ type ProfileSeries = {
   cover_url: string | null;
   kind: string;
   rating: number;
-  chapters: { number: number }[];
+  latest_chapters: { number: number }[];
+  chapter_total: { count: number }[];
 };
 
 function Perfil() {
@@ -113,9 +114,9 @@ function Perfil() {
       const [followers, following, favs, readingStatuses, readingHistory, mine, lists, profileComments, workComments, badges, roles, totalRank, weeklyRank] = await Promise.all([
         supabase.from("user_follows").select("*", { count: "exact", head: true }).eq("following_id", p.id),
         supabase.from("user_follows").select("*", { count: "exact", head: true }).eq("follower_id", p.id),
-        supabase.from("favorites").select("created_at, series(id, slug, title, cover_url, kind, rating, chapters(number))").eq("user_id", p.id).order("created_at", { ascending: false }).limit(48),
-        supabase.from("reading_status").select("status, updated_at, series(id, slug, title, cover_url, kind, rating, chapters(number))").eq("user_id", p.id).order("updated_at", { ascending: false }).limit(48),
-        supabase.from("reading_history").select("updated_at, series_id, chapters(number), series(id, slug, title, cover_url, kind, rating, chapters(number))").eq("user_id", p.id).order("updated_at", { ascending: false }).limit(48),
+        supabase.from("favorites").select("created_at, series(id, slug, title, cover_url, kind, rating, chapter_total:chapters(count), latest_chapters:chapters(number))").eq("user_id", p.id).order("created_at", { ascending: false }).order("number", { referencedTable: "series.latest_chapters", ascending: false }).limit(1, { referencedTable: "series.latest_chapters" }).limit(48),
+        supabase.from("reading_status").select("status, updated_at, series(id, slug, title, cover_url, kind, rating, chapter_total:chapters(count), latest_chapters:chapters(number))").eq("user_id", p.id).order("updated_at", { ascending: false }).order("number", { referencedTable: "series.latest_chapters", ascending: false }).limit(1, { referencedTable: "series.latest_chapters" }).limit(48),
+        supabase.from("reading_history").select("updated_at, series_id, chapters(number), series(id, slug, title, cover_url, kind, rating, chapter_total:chapters(count), latest_chapters:chapters(number))").eq("user_id", p.id).order("updated_at", { ascending: false }).order("number", { referencedTable: "series.latest_chapters", ascending: false }).limit(1, { referencedTable: "series.latest_chapters" }).limit(48),
         user
           ? supabase.from("user_follows").select("follower_id").eq("follower_id", user.id).eq("following_id", p.id).maybeSingle()
           : Promise.resolve({ data: null }),
@@ -152,14 +153,16 @@ function Perfil() {
 
   const comments = useQuery({
     queryKey: ["profile-comments", p?.id],
-    enabled: Boolean(p),
+    enabled: Boolean(p) && tab === "comentarios",
     queryFn: async () => {
-      const { data } = await supabase
+      if (!p) throw new Error("Perfil não encontrado");
+      const { data, error } = await supabase
         .from("profile_comments")
         .select("id, body, created_at, author_id")
-        .eq("profile_id", p!.id)
+        .eq("profile_id", p.id)
         .order("created_at", { ascending: false })
         .limit(50);
+      if (error) throw error;
       const rows = data ?? [];
       const ids = [...new Set(rows.map((r) => r.author_id))];
       const map = new Map<string, { username: string; avatar_url: string | null; level: number }>();
@@ -383,7 +386,8 @@ function Perfil() {
                     </div>
                     <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 xl:grid-cols-4">
                       {collectionItems.map((series) => {
-                        const chapters = series.chapters ?? [];
+                        const chapters = series.latest_chapters ?? [];
+                        const total = series.chapter_total?.[0]?.count ?? chapters.length;
                         const latest = chapters.reduce((max, chapter) => Math.max(max, Number(chapter.number)), 0);
                         return (
                           <article key={series.id} className="group min-w-0">
@@ -392,14 +396,14 @@ function Perfil() {
                                 <img src={coverUrl(series.cover_url)} alt={series.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" loading="lazy" />
                                 <span className="cover-fade" />
                                 <div className="absolute left-2 top-2 flex items-center gap-1.5 rounded-md bg-background/85 px-2 py-1 text-[11px] font-extrabold">
-                                  <span className="flex items-center gap-1"><BookOpen className="h-3 w-3 text-primary" />{chapters.length}</span>
+                                  <span className="flex items-center gap-1"><BookOpen className="h-3 w-3 text-primary" />{total}</span>
                                   <span className="h-3 w-px bg-border" />
                                   <span className="flex items-center gap-1 text-gold"><Star className="h-3 w-3 fill-current" />{Number(series.rating || 0).toFixed(1).replace(".", ",")}</span>
                                 </div>
                                 <span className="absolute bottom-2 left-2 rounded-md border border-primary/50 bg-background/85 px-2 py-1 text-[10px] font-extrabold uppercase text-primary">{series.kind || "Mangá"}</span>
                               </div>
                               <h3 className="mt-2 line-clamp-2 text-sm font-bold leading-tight transition group-hover:text-primary">{series.title}</h3>
-                              <p className="mt-1 text-xs text-muted-foreground">{latest > 0 ? `Cap. ${latest}` : `${chapters.length} capítulos`}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">{latest > 0 ? `Cap. ${latest}` : `${total} capítulos`}</p>
                             </Link>
                           </article>
                         );
@@ -460,6 +464,8 @@ function Perfil() {
               <p className="mt-4 text-sm text-muted-foreground"><Link to="/auth" className="text-primary">Entre</Link> para comentar.</p>
               )}
               <ul className="mt-6 space-y-5">
+              {comments.isPending ? <li role="status" className="py-5 text-sm text-muted-foreground">Carregando comentários...</li> : null}
+              {comments.isError ? <li role="alert"><Button variant="outline" onClick={() => void comments.refetch()}>Tentar novamente</Button></li> : null}
               {(comments.data ?? []).map((c) => (
                 <li
                   key={c.id}

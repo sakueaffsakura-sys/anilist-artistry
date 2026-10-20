@@ -12,7 +12,7 @@ export type ContinueRow = {
   updated_at: string;
   chapter_id: string | null;
   chapters: { id: string; number: number } | null;
-  series: { id: string; slug: string; title: string; cover_url: string | null; chapters: Array<{ id: string }> };
+  series: { id: string; slug: string; title: string; cover_url: string | null; chapters: Array<{ count: number }> };
 };
 
 export function ContinueReading({ rows, userId }: { rows: ContinueRow[]; userId: string }) {
@@ -83,7 +83,7 @@ export function ContinueReading({ rows, userId }: { rows: ContinueRow[]; userId:
         >
           <div className="flex gap-4 sm:gap-6">
             {rows.map((row) => {
-              const total = row.series.chapters.length;
+              const total = row.series.chapters[0]?.count ?? 0;
               const current = row.chapters?.number ?? 0;
               const pct = total > 0 ? Math.min(100, (current / total) * 100) : 0;
               return (
