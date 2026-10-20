@@ -40,6 +40,6 @@
 - Use RLS reads and server APK signing; minimum-only edits preserve files and publication.
 - Follow docs/MIGRATIONS.md; never auto-run unjournaled SQL containing pending changes.
 
-- AI streams suggestions and batch progress; allow review during analysis and end waiting on terminal events. Approval uses admin-verified RLS with updated_at CAS; preserve lease/pause and sequential batches.
+- Classification uses admin RLS/CAS approval. AI streams review/progress with lease/pause; manual AniList search requires identity selection, no AI credits or inferred age.
 
 - DB title claims guard writes; duplicate scans mirror normalization, paginate published works and confirm individual RLS deletes.

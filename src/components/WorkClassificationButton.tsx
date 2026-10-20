@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClassificationReviewItem, type ReviewRow } from "@/components/ClassificationReviewItem";
+import { ManualClassificationPanel } from "@/components/ManualClassificationPanel";
 import { useSession } from "@/hooks/useAuth";
 import { approveWorkClassification } from "@/lib/work-classification.functions";
 import { canApproveClassification, type ClassificationEvent, type ClassificationMode } from "@/lib/work-classification";
@@ -16,6 +17,7 @@ export function WorkClassificationButton() {
  const approve = useServerFn(approveWorkClassification);
  const [open, setOpen] = useState(false), [running, setRunning] = useState(false), [paused, setPaused] = useState(false), [message, setMessage] = useState("");
  const [mode, setMode] = useState<ClassificationMode>("missing");
+ const [source, setSource] = useState("ai");
  const [progress, setProgress] = useState({ total: 0, processed: 0, suggested: 0 });
  const [rows, setRows] = useState<ReviewRow[]>([]);
  const [savingId, setSavingId] = useState<string | null>(null);
@@ -82,7 +84,10 @@ export function WorkClassificationButton() {
   <Button variant="outline" onClick={() => setOpen(true)}><Sparkles className="h-4 w-4 text-primary" /> Classificar com IA</Button>
   <Dialog open={open} onOpenChange={(value) => { if (!busy) setOpen(value); }}>
    <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-3xl" onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }} onInteractOutside={(event) => { if (busy) event.preventDefault(); }}>
-    <DialogHeader><DialogTitle>Classificar obras com IA</DialogTitle><DialogDescription>Revise as sugestões antes de aprovar. Rascunhos são incluídos; novels permanecem no painel próprio. Classificação de idade sugerida, não oficial. Usa Claude pelo Lovable AI e consome créditos.</DialogDescription></DialogHeader>
+    <DialogHeader><DialogTitle>Classificar obras</DialogTitle><DialogDescription>{source === "ai" ? "Claude · Lovable AI" : "AniList · pesquisa manual · sem créditos de IA"}</DialogDescription></DialogHeader>
+    <Tabs value={source} onValueChange={setSource}><TabsList className="grid h-auto w-full grid-cols-2"><TabsTrigger value="ai" disabled={busy}>Claude IA</TabsTrigger><TabsTrigger value="manual" disabled={busy}>Pesquisa manual</TabsTrigger></TabsList></Tabs>
+    <div hidden={source !== "manual"}><ManualClassificationPanel /></div>
+    <div hidden={source !== "ai"} className="space-y-4">
     <Tabs value={mode} onValueChange={(value) => { if (!busy && !rows.length && (value === "missing" || value === "review")) setMode(value); }}>
      <TabsList className="grid h-auto w-full grid-cols-2"><TabsTrigger className="whitespace-normal" value="missing" disabled={busy || rows.length > 0}>Preencher ausentes</TabsTrigger><TabsTrigger className="whitespace-normal" value="review" disabled={busy || rows.length > 0}>Revisar todas as obras</TabsTrigger></TabsList>
     </Tabs>
@@ -97,6 +102,7 @@ export function WorkClassificationButton() {
      {rows.length > 0 && !busy ? <Button variant="ghost" onClick={() => { if (!rows.some((row) => row.status === "pending" && row.changes) || window.confirm("Descartar as sugestões não aprovadas?")) { setRows([]); setMessage(""); setProgress({ total: 0, processed: 0, suggested: 0 }); } }}>Limpar revisão</Button> : null}
      {running ? <Button variant="outline" onClick={() => controller.current?.abort()}><Square className="h-4 w-4" /> Interromper</Button> : <Button variant="outline" disabled={busy} onClick={() => setOpen(false)}>Fechar</Button>}
      <Button disabled={busy || !session} onClick={() => void run()}>{running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{running ? "Analisando…" : paused ? "Retomar após liberar acesso" : "Analisar obras"}</Button>
+    </div>
     </div>
    </DialogContent>
   </Dialog>
