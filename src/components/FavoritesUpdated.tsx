@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { BookOpen, ChevronLeft, ChevronRight, Heart, Star } from "lucide-react";
 import type { SeriesRow } from "@/lib/queries";
 import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
+import { chapterCount } from "@/lib/series-summary";
 
 export function FavoritesUpdated({ rows }: { rows: SeriesRow[] }) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -66,19 +67,19 @@ export function FavoritesUpdated({ rows }: { rows: SeriesRow[] }) {
                       src={coverUrl(item.cover_url)}
                       alt={item.title}
                       draggable={false}
-                      loading="eager"
+                      loading="lazy"
                       decoding="async"
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                     <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/10" />
                     <span
                       className="pointer-events-none absolute bottom-2 left-2 z-[12] inline-flex max-w-[calc(100%-1rem)] items-center gap-2 rounded-full border border-foreground/15 bg-black/25 px-2 py-1 shadow-[0_2px_14px_rgba(0,0,0,0.45)] backdrop-blur-2xl"
-                      title={`${item.chapters.length} capítulos · média ${Number(item.rating).toFixed(1).replace(".", ",")}/10`}
+                      title={`${chapterCount(item)} capítulos · média ${Number(item.rating).toFixed(1).replace(".", ",")}/10`}
                     >
                       <span className="inline-flex shrink-0 items-center gap-1">
                         <BookOpen className="h-[11px] w-[11px] shrink-0 text-white" strokeWidth={2.5} />
                         <span className="text-[10px] font-extrabold tabular-nums leading-none text-white">
-                          {item.chapters.length}
+                          {chapterCount(item)}
                         </span>
                       </span>
                       <span className="h-3 w-px shrink-0 bg-white/20" aria-hidden="true" />

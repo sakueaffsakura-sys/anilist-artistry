@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { BookOpen, Star } from "lucide-react";
 import type { SeriesRow } from "@/lib/queries";
 import { coverUrl } from "@/lib/media";
+import { chapterCount } from "@/lib/series-summary";
 
 export function TopRated({ rows }: { rows: SeriesRow[] }) {
   if (rows.length === 0) return null;
@@ -55,7 +56,7 @@ export function TopRated({ rows }: { rows: SeriesRow[] }) {
                     {Number(item.rating).toFixed(1).replace(".", ",")}
                   </span>
                 </div>
-                <p className="text-[13px] text-white/60">{item.chapters.length} capítulos</p>
+                <p className="text-[13px] text-white/60">{chapterCount(item)} capítulos</p>
               </div>
             </Link>
           ))}

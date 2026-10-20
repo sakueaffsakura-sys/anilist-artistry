@@ -18,7 +18,7 @@ mock.module("../src/integrations/supabase/client", () => ({
     return query;
   } },
 }));
-const { fetchSeries, fetchFavorites } = await import("../src/lib/queries");
+const { fetchSeries, fetchFavorites, fetchHistory } = await import("../src/lib/queries");
 
 describe("Lightweight work lists", () => {
   it("keeps the real total instead of treating two preview links as two chapters", () => {
@@ -41,5 +41,12 @@ describe("Lightweight work lists", () => {
     expect(calls).toContainEqual(["eq", "user_id", "reader-id"]);
     expect(calls).toContainEqual(["limit", 2, { referencedTable: "series.recent_chapters" }]);
     expect(calls).toContainEqual(["eq", "series.chapter_total.published", true]);
+  });
+  it("loads the history denominator as a count without downloading every chapter ID", async () => {
+    calls.length = 0;
+    await fetchHistory("reader-id");
+    expect(calls).toContainEqual(["select", "progress, updated_at, chapter_id, chapters(id, number), series!inner(id, slug, title, cover_url, chapters(count))"]);
+    expect(calls).toContainEqual(["eq", "user_id", "reader-id"]);
+    expect(calls).toContainEqual(["limit", 24, undefined]);
   });
 });
