@@ -12,7 +12,7 @@
 - Load database-backed SEO metadata in route loaders for shareable initial HTML.
 - Sitemap: only public static pages, published works and public community lists; exclude private/authenticated areas.
 - Keep work rankings at `/ranking` and reader XP rankings at `/ranking-leitores` to separate audiences.
-- Use Sora for headings and Manrope for body text; the profile follows a dark cyan bento layout so dense achievements stay contained and scannable.
+- Use Sora headings and Manrope body; profiles contain dense achievements in a scannable bento layout.
 - Keep novels on the shared work details route, but give them a dedicated text reader while manga/comics retain the image reader, so both formats share catalog data without compromising reading ergonomics.
 - Novel narration uses Lovable AI TTS via the signed-in /api/tts route with device speech as fallback, because AI voices sound natural while fallback keeps reading working.
 - Remote novel imports enforce an exact server host allowlist, deadline and byte budget; revalidate every redirect.
@@ -35,7 +35,7 @@
 - Homepage discovery shelves use admin-only persisted selection settings and lightweight published-work queries; automatic ordering uses saved AniList metrics so home visits never call AniList, while manual selection preserves its order without fallback.
 - Recent updates uses the shared horizontal shelf and browser-safe selection helper for both query and display limits, keeping layout and result counts consistent.
 - Novel file imports use a browser-safe text parser and sequential authenticated chapter writes with an explicit review step; original TXT/HTML files never enter Storage, preserving illustrations without retaining source files.
-- Cache chapter indexes separately from reader content by ID to avoid full-text/page downloads on work details.
+- List queries use aggregate chapter totals and aliased bounded previews; details cache full indexes separately from reader content to avoid oversized downloads.
 
 - Use RLS reads and server APK signing; minimum-only edits preserve files and publication.
 - Follow docs/MIGRATIONS.md; never auto-run unjournaled SQL containing pending changes.
