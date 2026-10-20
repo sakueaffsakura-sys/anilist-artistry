@@ -10,7 +10,10 @@ mock.module("../src/integrations/supabase/client", () => ({
       eq: (key: string, value: unknown) => { calls.push(["eq", key, value]); return query; },
       order: (key: string, options: unknown) => { calls.push(["order", key, options]); return query; },
       limit: (value: number, options?: unknown) => { calls.push(["limit", value, options]); return query; },
-      then: (resolve: (value: unknown) => unknown) => resolve({ data: [{ id: "work", chapters: [{ number: 41 }, { number: 42 }], chapter_total: [{ count: 500 }] }], error: null }),
+      then: (resolve: (value: unknown) => unknown) => {
+        const work = { id: "work", chapters: [{ number: 41, created_at: "2026-01-01" }, { number: 42, created_at: "2026-01-02" }], chapter_total: [{ count: 500 }] };
+        return resolve({ data: table === "favorites" ? [{ series: work }] : [work], error: null });
+      },
     };
     return query;
   } },

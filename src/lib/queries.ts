@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { SERIES_SUMMARY_SELECT } from "@/lib/series-summary";
 
 export { KINDS } from "@/lib/work-categories";
 
@@ -27,14 +28,15 @@ export type SeriesRow = {
   created_at: string;
   updated_at: string;
   chapters: ChapterLite[];
+  chapter_count?: number;
 };
 
-const SERIES_SELECT =
-  "id, slug, title, cover_url, banner_url, synopsis, genres, age_rating, kind, status, rating, views, pinned, in_slider, created_at, updated_at, chapters(id, number, title, created_at)";
+const SERIES_SELECT = SERIES_SUMMARY_SELECT;
 
 function normalize(rows: unknown): SeriesRow[] {
-  return ((rows ?? []) as SeriesRow[]).map((row) => ({
+  return ((rows ?? []) as Array<SeriesRow & { chapter_total?: Array<{ count: number }> }>).map((row) => ({
     ...row,
+    chapter_count: row.chapter_total?.[0]?.count ?? row.chapters?.length ?? 0,
     chapters: [...(row.chapters ?? [])].sort((a, b) => Number(b.number) - Number(a.number)),
   }));
 }
@@ -56,6 +58,9 @@ export async function fetchSeries(options: {
 
   query = query.order(options.order ?? "updated_at", { ascending: false }).limit(options.limit ?? 24);
   query = query.eq("chapters.published", true);
+  query = query.eq("chapter_total.published", true)
+    .order("number", { referencedTable: "chapters", ascending: false })
+    .limit(2, { referencedTable: "chapters" });
 
   const { data, error } = await query;
   if (error) throw error;
@@ -83,9 +88,13 @@ export async function fetchFavorites(userId: string) {
     .from("favorites")
     .select(`series_id, created_at, series!inner(${SERIES_SELECT})`)
     .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .eq("series.chapters.published", true)
+    .eq("series.chapter_total.published", true)
+    .order("number", { referencedTable: "series.chapters", ascending: false })
+    .limit(2, { referencedTable: "series.chapters" });
   if (error) throw error;
-  const rows = ((data ?? []) as unknown as { series: SeriesRow }[]).map((row) => row.series);
+  const rows = normalize(((data ?? []) as unknown as { series: SeriesRow }[]).map((row) => row.series));
   const latest = (row: SeriesRow) =>
     row.chapters.reduce((max, ch) => (ch.created_at > max ? ch.created_at : max), "");
   return rows.sort((a, b) => latest(b).localeCompare(latest(a)));

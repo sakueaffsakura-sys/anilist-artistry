@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { selectHeroItems } from "@/lib/hero-policy";
 import { normalizeGenres } from "@/lib/work-genres";
+import { chapterCount } from "@/lib/series-summary";
 
 const INTERVAL = 6000;
 
@@ -97,7 +98,7 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
             {active.synopsis ? <p className="hero-model-synopsis mt-5 hidden text-sm font-semibold italic leading-relaxed line-clamp-3 md:[display:-webkit-box] md:text-base"><Quote className="mr-1 inline h-4 w-4" />{active.synopsis.replace(/<[^>]*>/g, "")}</p> : null}
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3 text-xs md:text-sm">
               <span className="hero-model-rating flex items-center gap-2 text-xl font-extrabold md:text-2xl"><span className="flex gap-0.5" aria-hidden="true">{Array.from({ length: 5 }, (_, star) => <Star key={star} className={`h-4 w-4 md:h-5 md:w-5 ${star < Math.round(Number(active.rating) / 2) ? "fill-current" : "fill-none opacity-40"}`} />)}</span>{Number(active.rating).toFixed(1)}</span>
-              <span className="hero-model-tag inline-flex items-center gap-2 rounded-full px-3 py-0.5"><CirclePlus className="hero-model-status h-3 w-3" />{active.chapters.length} capítulos</span>
+              <span className="hero-model-tag inline-flex items-center gap-2 rounded-full px-3 py-0.5"><CirclePlus className="hero-model-status h-3 w-3" />{chapterCount(active)} capítulos</span>
               <span className="hero-model-tag inline-flex items-center gap-2 rounded-full px-3 py-0.5"><CirclePlus className="hero-model-status h-3 w-3" />{active.kind}</span>
             </div>
             {active.chapters.length ? <div className="mt-5 flex flex-wrap gap-3">

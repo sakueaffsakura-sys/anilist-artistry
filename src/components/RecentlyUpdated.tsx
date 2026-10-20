@@ -8,6 +8,7 @@ import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
 import { useSession } from "@/hooks/useAuth";
 import { HScroll, SectionRow } from "@/components/SectionRow";
 import { selectRecentUpdates } from "@/lib/recent-updates";
+import { chapterCount } from "@/lib/series-summary";
 
 export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
   const { user } = useSession();
@@ -96,7 +97,7 @@ export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/10 opacity-90" />
                 <span
                   className="pointer-events-none absolute bottom-2 left-2 z-[12] inline-flex max-w-[calc(100%-1rem)] items-center gap-2 rounded-full border border-white/15 bg-black/25 px-2 py-1 shadow-[0_2px_14px_rgba(0,0,0,0.45)]"
-                  title={`${item.chapters?.length ?? 0} capítulos · média ${Number(item.rating).toFixed(1).replace(".", ",")}/10`}
+                  title={`${chapterCount(item)} capítulos · média ${Number(item.rating).toFixed(1).replace(".", ",")}/10`}
                 >
                   <span className="inline-flex shrink-0 items-center gap-1">
                     <BookOpen
@@ -104,7 +105,7 @@ export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
                       strokeWidth={2.5}
                     />
                     <span className="text-[10px] font-extrabold leading-none tabular-nums text-white">
-                      {item.chapters?.length ?? 0}
+                      {chapterCount(item)}
                     </span>
                   </span>
                   <span className="h-3 w-px shrink-0 bg-white/20" aria-hidden="true" />
