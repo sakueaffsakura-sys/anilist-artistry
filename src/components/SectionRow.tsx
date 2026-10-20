@@ -14,7 +14,7 @@ export function SectionRow({
   children: ReactNode;
 }) {
   return (
-    <section className="mb-12">
+    <section className="cv-auto mb-12">
       <div className="mb-4 flex items-end justify-between gap-4">
         <div>
           <h2 className="section-title">

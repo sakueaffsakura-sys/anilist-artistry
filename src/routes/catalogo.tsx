@@ -79,7 +79,7 @@ function Pesquisar() {
     queryFn: async () => {
       let q = supabase
         .from("series")
-        .select("id, slug, title, cover_url, kind, rating, chapters(id)", { count: "exact" })
+        .select("id, slug, title, cover_url, kind, rating, chapters(count)", { count: "exact" })
         .eq("published", true);
       if (s.q) q = q.ilike("title", `%${s.q}%`);
       if (s.kind !== "Todos") q = q.eq("kind", s.kind);
@@ -225,7 +225,7 @@ function Pesquisar() {
                       <img src={coverUrl(r.cover_url)} alt={r.title} className="aspect-[2/3] w-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
                       <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
                         <span className="flex items-center gap-1 rounded-md bg-background/85 px-2 py-0.5 text-[11px] font-bold">
-                          <BookOpen className="h-3 w-3" /> {r.chapters.length} Capítulos
+                          <BookOpen className="h-3 w-3" /> {r.chapters[0]?.count ?? 0} Capítulos
                         </span>
                         <span className="rounded-md border border-primary/60 bg-background/85 px-1.5 py-0.5 text-[11px] font-bold text-primary">
                           {r.kind}
