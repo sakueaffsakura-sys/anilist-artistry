@@ -34,10 +34,10 @@ export type SeriesRow = {
 const SERIES_SELECT = SERIES_SUMMARY_SELECT;
 
 function normalize(rows: unknown): SeriesRow[] {
-  return ((rows ?? []) as Array<SeriesRow & { chapter_total?: Array<{ count: number }> }>).map((row) => ({
+  return ((rows ?? []) as Array<SeriesRow & { chapter_total?: Array<{ count: number }>; recent_chapters?: ChapterLite[] }>).map((row) => ({
     ...row,
     chapter_count: row.chapter_total?.[0]?.count ?? row.chapters?.length ?? 0,
-    chapters: [...(row.chapters ?? [])].sort((a, b) => Number(b.number) - Number(a.number)),
+    chapters: [...(row.recent_chapters ?? row.chapters ?? [])].sort((a, b) => Number(b.number) - Number(a.number)),
   }));
 }
 
@@ -57,10 +57,10 @@ export async function fetchSeries(options: {
   if (options.pinnedFirst) query = query.order("pinned", { ascending: false });
 
   query = query.order(options.order ?? "updated_at", { ascending: false }).limit(options.limit ?? 24);
-  query = query.eq("chapters.published", true);
+  query = query.eq("recent_chapters.published", true);
   query = query.eq("chapter_total.published", true)
-    .order("number", { referencedTable: "chapters", ascending: false })
-    .limit(2, { referencedTable: "chapters" });
+    .order("number", { referencedTable: "recent_chapters", ascending: false })
+    .limit(2, { referencedTable: "recent_chapters" });
 
   const { data, error } = await query;
   if (error) throw error;
@@ -89,10 +89,10 @@ export async function fetchFavorites(userId: string) {
     .select(`series_id, created_at, series!inner(${SERIES_SELECT})`)
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
-    .eq("series.chapters.published", true)
+    .eq("series.recent_chapters.published", true)
     .eq("series.chapter_total.published", true)
-    .order("number", { referencedTable: "series.chapters", ascending: false })
-    .limit(2, { referencedTable: "series.chapters" });
+    .order("number", { referencedTable: "series.recent_chapters", ascending: false })
+    .limit(2, { referencedTable: "series.recent_chapters" });
   if (error) throw error;
   const rows = normalize(((data ?? []) as unknown as { series: SeriesRow }[]).map((row) => row.series));
   const latest = (row: SeriesRow) =>
