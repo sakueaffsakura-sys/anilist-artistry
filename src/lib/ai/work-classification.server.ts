@@ -43,11 +43,10 @@ export async function handleWorkClassification(request: Request): Promise<Respon
  const lease = crypto.randomUUID();
  const { data: acquired, error: leaseError } = await supabase.rpc("acquire_classification_lease", { _token: lease });
  if (leaseError || !acquired) return fail("Já existe uma classificação em andamento. Aguarde sua conclusão.", 409);
- const gateway = createLovableAiGatewayRunIdFetch(getLovableAiGatewayRunId(request));
  let upstreamMessage = "";
  let upstreamStatus = 0;
- const provider = createOpenAI({ apiKey: aiKey, baseURL: GATEWAY, headers: { "Lovable-API-Key": aiKey, "X-Lovable-AIG-SDK": "vercel-ai-sdk" }, fetch: async (input, init) => {
-  const response = await gateway.fetch(input, init);
+ const provider = createAnthropic({ apiKey: aiKey, baseURL: ANTHROPIC, fetch: async (input, init) => {
+  const response = await fetch(input, init);
   if (!response.ok) {
    upstreamStatus = response.status;
    const body = await response.clone().json().catch(() => null) as { message?: string; error?: { message?: string } } | null;
