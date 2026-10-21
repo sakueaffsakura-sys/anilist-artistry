@@ -1,4 +1,5 @@
 # Tarefas
+- [ ] Otimizar carregamento do painel: consultas menores, paginação e configurações sob demanda; verificar navegação sem alterar dados.
 - [ ] Adicionar pesquisa manual no AniList à classificação, independente de créditos, com escolha do resultado e aprovação explícita.
 - [x] Otimização fase 1: home ~644 KB → ~61 KB de respostas de dados, mesmos 133 links; capítulos resumidos com totais reais no catálogo, favoritos, histórico e perfis; seções fora da tela adiam renderização. 92 testes passaram, build OK; conta real, catálogo, perfil e detalhes conferidos sem escrita nem publicação. Tempo em produção e revisão completa de todas as páginas não medidos.
 - [x] Buscar obras publicadas duplicadas: leitura paginada, títulos/alternativos normalizados, grupos e exclusão individual confirmada. Sete testes passaram; conta real encontrou dois grupos/quatro obras entre 158 publicadas, confirmação cancelada sem DELETE, tela 720px sem overflow e build OK. Exclusão real não executada para preservar dados; sem publicar.

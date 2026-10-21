@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ChevronDown, Eye, EyeOff, GalleryHorizontal, KeyRound, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +15,9 @@ import { useRoles, useSession } from "@/hooks/useAuth";
 import { WorkClassificationButton } from "@/components/WorkClassificationButton";
 import { AgeRatingBadge } from "@/components/AgeRatingBadge";
 import { DuplicateWorksPanel } from "@/components/DuplicateWorksPanel";
+import { Pager } from "@/components/Pager";
+import { ADMIN_PAGE_SIZE, fetchAdminWorks } from "@/lib/admin-lists";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 function CloudinaryKeys() {
   const getS = useServerFn(getMediaSettings);
   const saveS = useServerFn(saveMediaSettings);
@@ -24,13 +27,17 @@ function CloudinaryKeys() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (!open) return;
+    let active = true;
     getS()
       .then((s) => {
+        if (!active) return;
         setCfg((c) => ({ ...c, cloud_name: s.cloud_name, api_key: s.api_key, folder: s.folder }));
         setHasSecret(s.hasSecret);
       })
       .catch(() => {});
-  }, [getS]);
+    return () => { active = false; };
+  }, [getS, open]);
 
   const save = async () => {
     setSaving(true);
@@ -107,29 +114,17 @@ function ObrasAdmin() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "pub" | "draft" | "slide">("all");
 
+  const [page, setPage] = useState(1);
+  const term = useDebouncedValue(q);
   const series = useQuery({
-    queryKey: ["admin-series"],
+    queryKey: ["admin-series", page, term, filter],
     enabled: isStaff,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("series")
-        .select("id, slug, title, cover_url, kind, status, published, in_slider, views, rating, updated_at, age_rating, chapters(id)")
-        .neq("kind", "Novel")
-        .order("updated_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: ({ signal }) => fetchAdminWorks(page, term, filter, signal),
+    placeholderData: keepPreviousData,
   });
-
-  const rows = useMemo(
-    () =>
-      (series.data ?? []).filter(
-        (r) =>
-          r.title.toLowerCase().includes(q.toLowerCase()) &&
-          (filter === "all" || (filter === "slide" ? r.in_slider : filter === "pub" ? r.published : !r.published)),
-      ),
-    [series.data, q, filter],
-  );
+  const rows = series.data?.rows ?? [];
+  const pages = Math.max(1, Math.ceil((series.data?.total ?? 0) / ADMIN_PAGE_SIZE));
+  useEffect(() => { if (page > pages && !series.isFetching) setPage(pages); }, [page, pages, series.isFetching]);
 
   const toggle = useMutation({
     mutationFn: async (r: { id: string; published: boolean }) => {
@@ -170,7 +165,7 @@ function ObrasAdmin() {
   return (
     <AdminShell
       title="Obras"
-      subtitle={`${series.data?.length ?? 0} obras no catálogo`}
+      subtitle={`${series.data?.total ?? 0} obras no catálogo`}
       actions={
         <div className="flex flex-wrap items-center gap-2">
         <Button asChild className="font-semibold">
@@ -187,7 +182,7 @@ function ObrasAdmin() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-56 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar obra…" className="h-11 bg-surface pl-9" />
+          <Input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Buscar obra…" className="h-11 bg-surface pl-9" />
         </div>
         <div className="flex rounded-xl border border-border bg-surface p-1">
           {([
@@ -198,7 +193,7 @@ function ObrasAdmin() {
           ] as const).map(([k, l]) => (
             <button
               key={k}
-              onClick={() => setFilter(k)}
+              onClick={() => { setFilter(k); setPage(1); }}
               className={`rounded-lg px-4 py-1.5 text-sm font-semibold ${filter === k ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
             >
               {l}
@@ -207,10 +202,12 @@ function ObrasAdmin() {
         </div>
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-surface">
+      {series.isFetching ? <p role="status" className="mt-4 text-sm text-muted-foreground">Carregando obras…</p> : null}
+      {series.isError ? <div role="alert" className="mt-4 text-sm text-destructive">Não foi possível carregar as obras. <Button variant="outline" onClick={() => void series.refetch()}>Tentar novamente</Button></div> : null}
+      <div aria-busy={series.isFetching} className="mt-5 overflow-hidden rounded-2xl border border-border bg-surface">
         {rows.map((r) => (
           <div key={r.id} className="flex items-center gap-4 border-b border-border p-3 last:border-0 hover:bg-surface-2/50">
-            <img src={coverUrl(r.cover_url)} alt={r.title} className="h-20 w-14 shrink-0 rounded-lg object-cover" />
+            <img src={coverUrl(r.cover_url)} alt={r.title} loading="lazy" decoding="async" className="h-20 w-14 shrink-0 rounded-lg object-cover" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <p className="truncate font-bold">{r.title}</p>
@@ -227,7 +224,7 @@ function ObrasAdmin() {
                 <AgeRatingBadge value={r.age_rating} size="sm" />
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {r.kind} · {r.status} · {r.chapters?.length ?? 0} capítulos · {r.views} views · {timeAgo(r.updated_at)}
+                {r.kind} · {r.status} · {r.chapters?.[0]?.count ?? 0} capítulos · {r.views} views · {timeAgo(r.updated_at)}
               </p>
             </div>
             <Button
@@ -267,8 +264,9 @@ function ObrasAdmin() {
             ) : null}
           </div>
         ))}
-        {rows.length === 0 ? <p className="p-10 text-center text-sm text-muted-foreground">Nenhuma obra encontrada.</p> : null}
+        {rows.length === 0 && !series.isPending && !series.isError ? <p className="p-10 text-center text-sm text-muted-foreground">Nenhuma obra encontrada.</p> : null}
       </div>
+      <Pager page={page} pages={pages} onChange={setPage} />
     </AdminShell>
   );
 }

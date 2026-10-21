@@ -16,7 +16,7 @@ import { NovelFileImport } from "@/components/NovelFileImport";
 import { GenreSelect } from "@/components/GenreSelect";
 import { normalizeGenres } from "@/lib/work-genres";
 import { coverUrl, formatChapter } from "@/lib/media";
-import { useSession } from "@/hooks/useAuth";
+import { useRoles, useSession } from "@/hooks/useAuth";
 import { useServerFn } from "@tanstack/react-start";
 import { importNovelChapter } from "@/lib/novel-import.functions";
 import { parseNovelContent, prepareChapterText } from "@/lib/novel-content";
@@ -42,20 +42,22 @@ type NovelRow = {
   title: string;
   cover_url: string | null;
   status: string;
-  chapters: { id: string; number: number; title: string | null; content: string | null; published: boolean; created_at: string }[];
+  chapters: { id: string; number: number; title: string | null; published: boolean; created_at: string }[];
 };
 
 function AdminNovels() {
   const { user } = useSession();
+  const { isStaff } = useRoles(user?.id);
   const queryClient = useQueryClient();
   const [openId, setOpenId] = useState<string | null>(null);
 
   const novels = useQuery({
     queryKey: ["admin-novels"],
+    enabled: isStaff,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("series")
-        .select("id, slug, title, cover_url, status, chapters(id, number, title, content, published, created_at)")
+        .select("id, slug, title, cover_url, status, chapters(id, number, title, published, created_at)")
         .eq("kind", "Novel")
         .order("updated_at", { ascending: false });
       if (error) throw error;
@@ -158,7 +160,7 @@ function AdminNovels() {
                 return (
                   <div key={novel.id} className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border p-2 transition-colors ${active ? "border-primary/50 bg-primary/10" : "border-transparent hover:border-border hover:bg-surface-2/50"}`}>
                     <Button type="button" variant="ghost" className="contents" onClick={() => setOpenId(novel.id)}>
-                      <img src={coverUrl(novel.cover_url)} alt="" className="h-14 w-10 shrink-0 rounded object-cover" />
+                      <img src={coverUrl(novel.cover_url)} alt="" loading="lazy" decoding="async" className="h-14 w-10 shrink-0 rounded object-cover" />
                       <span className="min-w-0 text-left">
                         <span className={`block truncate text-sm font-bold ${active ? "text-primary" : "text-foreground"}`}>{novel.title}</span>
                         <span className="block truncate text-[11px] text-muted-foreground">{novel.status} · {novel.chapters.length} cap.</span>
@@ -290,7 +292,8 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
     setBulk({ done: 0, total: files.length });
     const sorted = [...files].sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { numeric: true }));
     for (let i = 0; i < sorted.length; i++) {
-      const file = sorted[i]!;
+      const file = sorted[i];
+      if (!file) continue;
       try {
         const raw = await file.text();
         const isHtml = /<\/?(p|div|html|body)[\s>]/i.test(raw);
@@ -386,7 +389,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
     return () => window.clearTimeout(timer);
   }, [content, draftKey, editingId, number, published, title]);
 
-  const blocks = parseNovelContent(prepareChapterText(content).content);
+  const blocks = useMemo(() => parseNovelContent(prepareChapterText(content).content), [content]);
   const textOnly = blocks.flatMap((block) => block.type === "text" ? [block.text] : []).join(" ");
   const wordCount = textOnly ? textOnly.split(/\s+/).length : 0;
   const readingMinutes = wordCount ? Math.max(1, Math.ceil(wordCount / 220)) : 0;
@@ -400,6 +403,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["admin-novels"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-novel-chapter", novel.id] });
     queryClient.invalidateQueries({ queryKey: ["series", novel.slug] });
   };
 
@@ -447,13 +451,32 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao excluir capítulo"),
   });
 
-  const editChapter = (chapter: NovelRow["chapters"][number]) => {
-    setEditingId(chapter.id);
-    setNumber(String(chapter.number));
-    setTitle(chapter.title ?? "");
-    setContent(chapter.content ?? "");
-    setPublished(chapter.published);
-    setShowPreview(false);
+  const [loadingChapter, setLoadingChapter] = useState(false);
+  const editChapter = async (chapter: NovelRow["chapters"][number]) => {
+    if (loadingChapter) return;
+    setLoadingChapter(true);
+    try {
+      const row = await queryClient.fetchQuery({
+        queryKey: ["admin-novel-chapter", novel.id, chapter.id],
+        queryFn: async () => {
+          const { data, error } = await supabase.from("chapters")
+            .select("id, number, title, content, published")
+            .eq("series_id", novel.id).eq("id", chapter.id).single();
+          if (error) throw error;
+          return data;
+        },
+      });
+      setEditingId(row.id);
+      setNumber(String(row.number));
+      setTitle(row.title ?? "");
+      setContent(row.content ?? "");
+      setPublished(row.published);
+      setShowPreview(false);
+    } catch {
+      toast.error("Não foi possível carregar o capítulo. Tente novamente.");
+    } finally {
+      setLoadingChapter(false);
+    }
   };
 
   return (
@@ -461,7 +484,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
       <aside className="min-w-0 rounded-lg border border-border bg-background/60 p-3 lg:max-h-[680px]">
         <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
           <div className="min-w-0"><h3 className="truncate font-display text-sm font-bold">Capítulos</h3><p className="text-[10px] text-muted-foreground">Selecione para editar</p></div>
-          <Button type="button" size="icon" className="h-8 w-8 shrink-0" onClick={resetEditor} aria-label="Novo capítulo" title="Novo capítulo"><FilePlus2 className="h-4 w-4" /></Button>
+          <Button type="button" size="icon" className="h-8 w-8 shrink-0" disabled={loadingChapter} onClick={resetEditor} aria-label="Novo capítulo" title="Novo capítulo"><FilePlus2 className="h-4 w-4" /></Button>
         </div>
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
           <div className="relative min-w-0">
@@ -469,11 +492,12 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar capítulo" className="pl-9" />
           </div>
         </div>
+        {loadingChapter ? <p role="status" className="mt-2 text-xs text-muted-foreground">Carregando texto…</p> : null}
         <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1 lg:max-h-[570px]">
           {visibleChapters.map((chapter) => (
             <div key={chapter.id} className={`rounded-md border p-3 ${editingId === chapter.id ? "border-primary bg-primary/10" : "border-border bg-surface/70"}`}>
               <div className="flex min-w-0 items-start justify-between gap-2">
-                <button type="button" onClick={() => editChapter(chapter)} className="min-w-0 flex-1 text-left">
+                <button type="button" disabled={loadingChapter} onClick={() => void editChapter(chapter)} className="min-w-0 flex-1 text-left">
                   <span className="block truncate text-sm font-bold">Cap. {formatChapter(chapter.number)}</span>
                   <span className="block truncate text-xs text-muted-foreground">{chapter.title || "Sem título"}</span>
                 </button>
@@ -485,7 +509,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
                 </button>
               </div>
               <div className="mt-2 flex justify-end gap-1">
-                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => editChapter(chapter)} aria-label="Editar capítulo" title="Editar capítulo">
+                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={loadingChapter} onClick={() => void editChapter(chapter)} aria-label="Editar capítulo" title="Editar capítulo">
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
                 <ConfirmDelete title={`Excluir capítulo ${formatChapter(chapter.number)}?`} description="O texto e os comentários ligados a este capítulo serão apagados permanentemente." onConfirm={() => remove.mutate(chapter.id)}>
@@ -607,7 +631,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
             <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} className="h-4 w-4 accent-primary" />
             <span><b>{published ? "Publicar agora" : "Salvar como rascunho"}</b><small className="block text-muted-foreground">{published ? "O capítulo ficará visível aos leitores." : "Somente a equipe poderá acessá-lo."}</small></span>
           </label>
-          <Button type="submit" disabled={publish.isPending || content.trim().length < 10} className="font-semibold">
+          <Button type="submit" disabled={loadingChapter || publish.isPending || content.trim().length < 10} className="font-semibold">
             {editingId ? <Save className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
             {publish.isPending ? "Salvando…" : editingId ? "Salvar alterações" : published ? "Publicar capítulo" : "Salvar rascunho"}
           </Button>
