@@ -60,15 +60,6 @@ function Contas() {
   const pages = Math.max(1, Math.ceil((accounts.data?.total ?? 0) / ADMIN_PAGE_SIZE));
   useEffect(() => { if (page > pages && !accounts.isFetching) setPage(pages); }, [page, pages, accounts.isFetching]);
 
-  return (p.data ?? []).map((a) => ({ ...a, roles: (r.data ?? []).filter((x) => x.user_id === a.id).map((x) => x.role as string) })) as Account[];
-    },
-  });
-
-  const rows = useMemo(
-    () => (accounts.data ?? []).filter((a) => `${a.username} ${a.display_name ?? ""}`.toLowerCase().includes(q.toLowerCase())),
-    [accounts.data, q],
-  );
-
   return (
     <AdminShell adminOnly title="Contas" subtitle={`${accounts.data?.total ?? 0} contas cadastradas`}>
       <div className="relative">
