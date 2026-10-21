@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Award, Ban, Check, Pencil, Save, Search, Shield, Trash2, Upload as UploadIcon } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/AdminShell";
@@ -13,6 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useRoles, useSession } from "@/hooks/useAuth";
+import { Pager } from "@/components/Pager";
+import { ADMIN_PAGE_SIZE, fetchAdminAccounts } from "@/lib/admin-lists";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 export const Route = createFileRoute("/_authenticated/admin/contas")({
   staticData: { sitemap: false },
@@ -45,16 +48,19 @@ function Contas() {
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<Account | null>(null);
 
+  const [page, setPage] = useState(1);
+  const term = useDebouncedValue(q);
   const accounts = useQuery({
-    queryKey: ["admin-accounts"],
+    queryKey: ["admin-accounts", page, term],
     enabled: isAdmin,
-    queryFn: async () => {
-      const [p, r] = await Promise.all([
-        supabase.from("profiles").select("id, username, display_name, avatar_url, bio, level, xp, banned, created_at, subscription_tier").order("created_at", { ascending: false }),
-        supabase.from("user_roles").select("user_id, role"),
-      ]);
-      if (p.error) throw p.error;
-      return (p.data ?? []).map((a) => ({ ...a, roles: (r.data ?? []).filter((x) => x.user_id === a.id).map((x) => x.role as string) })) as Account[];
+    queryFn: ({ signal }) => fetchAdminAccounts(page, term, signal),
+    placeholderData: keepPreviousData,
+  });
+  const rows = accounts.data?.rows ?? [];
+  const pages = Math.max(1, Math.ceil((accounts.data?.total ?? 0) / ADMIN_PAGE_SIZE));
+  useEffect(() => { if (page > pages && !accounts.isFetching) setPage(pages); }, [page, pages, accounts.isFetching]);
+
+  return (p.data ?? []).map((a) => ({ ...a, roles: (r.data ?? []).filter((x) => x.user_id === a.id).map((x) => x.role as string) })) as Account[];
     },
   });
 
@@ -64,17 +70,19 @@ function Contas() {
   );
 
   return (
-    <AdminShell adminOnly title="Contas" subtitle={`${accounts.data?.length ?? 0} contas cadastradas`}>
+    <AdminShell adminOnly title="Contas" subtitle={`${accounts.data?.total ?? 0} contas cadastradas`}>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nome ou @usuário…" className="h-11 bg-surface pl-9" />
+        <Input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Buscar por nome ou @usuário…" className="h-11 bg-surface pl-9" />
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
+      {accounts.isFetching ? <p role="status" className="mt-4 text-sm text-muted-foreground">Carregando contas…</p> : null}
+      {accounts.isError ? <div role="alert" className="mt-4 text-sm text-destructive">Não foi possível carregar as contas. <Button variant="outline" onClick={() => void accounts.refetch()}>Tentar novamente</Button></div> : null}
+      <div aria-busy={accounts.isFetching} className="mt-5 grid gap-3 md:grid-cols-2">
         {rows.map((a) => (
           <div key={a.id} className={`flex items-center gap-4 rounded-2xl border bg-surface p-4 ${a.banned ? "border-destructive/50" : "border-border"}`}>
             <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 text-lg font-bold text-primary ring-2 ring-border">
-              {a.avatar_url ? <img src={a.avatar_url} alt="" className="h-full w-full object-cover" /> : a.username.slice(0, 2).toUpperCase()}
+              {a.avatar_url ? <img src={a.avatar_url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : a.username.slice(0, 2).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-1.5">
@@ -103,8 +111,9 @@ function Contas() {
           </div>
         ))}
       </div>
-      {rows.length === 0 && !accounts.isLoading ? <p className="mt-10 text-center text-sm text-muted-foreground">Nenhuma conta encontrada.</p> : null}
+      {rows.length === 0 && !accounts.isLoading && !accounts.isError ? <p className="mt-10 text-center text-sm text-muted-foreground">Nenhuma conta encontrada.</p> : null}
 
+      <Pager page={page} pages={pages} onChange={setPage} />
       <AccountDialog account={editing} selfId={user?.id} onClose={() => setEditing(null)} />
     </AdminShell>
   );
