@@ -24,7 +24,10 @@ const searchSchema = z.object({
 });
 
 export const Route = createFileRoute("/_authenticated/catalogo")({
-  staticData: { sitemap: true },
+  staticData: { sitemap: false },
+  beforeLoad: ({ context }) => {
+    if (!context.user || !hasProfileChosen(context.user.id)) throw redirect({ to: "/perfis" });
+  },
   validateSearch: zodValidator(searchSchema),
   head: () => ({
     meta: [

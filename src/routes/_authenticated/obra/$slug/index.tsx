@@ -37,9 +37,12 @@ import { normalizeGenres } from "@/lib/work-genres";
 import { ageRatingLabel } from "@/lib/age-ratings";
 import { AgeRatingBadge } from "@/components/AgeRatingBadge";
 import { KidsBlocked } from "@/components/KidsBlocked";
-import { activeProfileId, isWorkAllowed, useActiveProfile } from "@/lib/active-profile";
+import { activeProfileId, hasProfileChosen, isWorkAllowed, useActiveProfile } from "@/lib/active-profile";
 export const Route = createFileRoute("/_authenticated/obra/$slug/")({
-  staticData: { sitemap: true },
+  staticData: { sitemap: false },
+  beforeLoad: ({ context }) => {
+    if (!context.user || !hasProfileChosen(context.user.id)) throw redirect({ to: "/perfis" });
+  },
   loader: ({ params, context }) =>
     context.queryClient.ensureQueryData({
       queryKey: ["series", params.slug],
