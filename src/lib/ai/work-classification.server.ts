@@ -5,6 +5,7 @@ import { reviewClassificationSchema, classificationUpdate, needsClassification, 
 import { GENRES, normalizeGenres } from "../work-genres";
 import { KINDS } from "../work-categories";
 import type { Database } from "@/integrations/supabase/types";
+import { deliverClassificationBatches } from "../classification-batches";
 // Claude through Lovable AI Gateway; two batches run concurrently for speed.
 const MODEL = "anthropic/claude-opus-5";
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
@@ -90,9 +91,8 @@ export async function handleWorkClassification(request: Request): Promise<Respon
      const group = Array.from({ length: PARALLEL }, (_, i) => works.slice(offset + i * BATCH, offset + (i + 1) * BATCH)).filter((batch) => batch.length);
      const end = offset + group.reduce((sum, batch) => sum + batch.length, 0);
      send({ type: "batch", first: offset + 1, last: end, total: works.length, titles: group.flat().map((work) => work.title) });
-     const outputs = await Promise.all(group.map(classify));
-     for (const [index, batch] of group.entries()) {
-     const output = outputs[index] ?? { works: [] };
+     await deliverClassificationBatches(group, classify, (batch, result) => {
+     const output = result ?? { works: [] };
     for (const work of batch) {
      if (request.signal.aborted || disconnected) break;
      const matches = output.works.filter((suggestion) => suggestion.id === work.id);
@@ -101,7 +101,7 @@ export async function handleWorkClassification(request: Request): Promise<Respon
      processed++; if (update) updated++;
      send({ type: "review", review: { work: { id: work.id, title: work.title, kind: work.kind, genres: work.genres, age_rating: work.age_rating, updated_at: work.updated_at }, suggestion: suggestion ? { ...suggestion, justification: suggestion.justification.slice(0, 2000), missing_information: suggestion.missing_information.slice(0, 10).map((item) => item.slice(0, 300)) } : null, changes: update }, processed, suggested: updated, total: works.length });
     }
-     }
+     });
    }
    if (!request.signal.aborted && !disconnected) send({ type: "done", processed, updated, total: works.length });
   } catch (error) {
