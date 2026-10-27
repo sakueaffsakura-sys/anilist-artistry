@@ -12,6 +12,7 @@ import { coverUrl } from "@/lib/media";
 import { Pager } from "@/components/Pager";
 import { Button } from "@/components/ui/button";
 import { GENRES, genreAliases, normalizeGenres } from "@/lib/work-genres";
+import { allowedAgeRatings } from "@/lib/active-profile";
 
 const searchSchema = z.object({
   q: fallback(z.string(), "").default(""),
@@ -81,6 +82,8 @@ function Pesquisar() {
         .from("series")
         .select("id, slug, title, cover_url, kind, rating, chapters(count)", { count: "exact" })
         .eq("published", true);
+      const kidsAges = allowedAgeRatings();
+      if (kidsAges) q = q.in("age_rating", kidsAges);
       if (s.q) q = q.ilike("title", `%${s.q}%`);
       if (s.kind !== "Todos") q = q.eq("kind", s.kind);
       if (s.status) q = q.in("status", STATUS_DB[s.status] ?? [s.status]);

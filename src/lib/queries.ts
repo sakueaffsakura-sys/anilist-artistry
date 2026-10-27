@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { SERIES_SUMMARY_SELECT } from "@/lib/series-summary";
+import { activeProfileId, allowedAgeRatings } from "@/lib/active-profile";
 
 export { KINDS } from "@/lib/work-categories";
 
@@ -50,6 +51,8 @@ export async function fetchSeries(options: {
   inSlider?: boolean;
 }) {
   let query = supabase.from("series").select(SERIES_SELECT).eq("published", true);
+  const kidsAges = allowedAgeRatings();
+  if (kidsAges) query = query.in("age_rating", kidsAges);
 
   if (options.kind && options.kind !== "Todos") query = query.eq("kind", options.kind);
   if (options.search) query = query.ilike("title", `%${options.search}%`);
@@ -88,6 +91,7 @@ export async function fetchFavorites(userId: string) {
     .from("favorites")
     .select(`series_id, created_at, series!inner(${SERIES_SELECT})`)
     .eq("user_id", userId)
+    .eq("profile_id", activeProfileId())
     .order("created_at", { ascending: false })
     .eq("series.recent_chapters.published", true)
     .eq("series.chapter_total.published", true)
@@ -107,6 +111,7 @@ export async function fetchHistory(userId: string) {
       `progress, updated_at, chapter_id, chapters(id, number), series!inner(id, slug, title, cover_url, chapters(count))`,
     )
     .eq("user_id", userId)
+    .eq("profile_id", activeProfileId())
     .order("updated_at", { ascending: false })
     .limit(24);
   if (error) throw error;

@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { HOME_SECTIONS, orderManualWorks, type HomeSectionKey, type SectionConfig, type ShelfWork } from "@/lib/home-sections";
+import { allowedAgeRatings } from "@/lib/active-profile";
 
 const SHELF_SELECT = "id, slug, title, cover_url, rating, kind, age_rating";
 
@@ -15,6 +16,8 @@ export async function fetchHomeSections(): Promise<Record<HomeSectionKey, ShelfW
     const config = configs.find((row) => row.section === key);
     if (config?.mode === "manual" && !config.series_ids.length) return [key, []] as const;
     let query = supabase.from("series").select(SHELF_SELECT).eq("published", true);
+    const kidsAges = allowedAgeRatings();
+    if (kidsAges) query = query.in("age_rating", kidsAges);
     if (key === "manhwa") query = query.eq("kind", "Manhwa");
     if (config?.mode === "manual") {
       query = query.in("id", config.series_ids.slice(0, 12));
