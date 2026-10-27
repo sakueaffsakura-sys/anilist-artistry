@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { coverUrl, formatChapter } from "@/lib/media";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { activeProfileId } from "@/lib/active-profile";
 
 export type ContinueRow = {
   progress: number;
@@ -28,7 +29,7 @@ export function ContinueReading({ rows, userId }: { rows: ContinueRow[]; userId:
     const { error } = await supabase
       .from("reading_history")
       .delete()
-      .eq("user_id", userId)
+      .eq("user_id", userId).eq("profile_id", activeProfileId())
       .eq("series_id", seriesId);
     setHiding(null);
     if (error) {

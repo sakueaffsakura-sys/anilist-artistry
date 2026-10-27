@@ -6,6 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { MobileNav } from "@/components/MobileNav";
 import { openSupportChat } from "@/components/SupportChat";
 import { useProfile, useRoles, useSession } from "@/hooks/useAuth";
+import { useActiveProfile } from "@/lib/active-profile";
+import { ProfileAvatar } from "@/components/ProfilePicker";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -28,6 +30,7 @@ export function SiteHeader() {
   const { user } = useSession();
   const { data: profile } = useProfile(user?.id);
   const { isStaff } = useRoles(user?.id);
+  const activeProfile = useActiveProfile();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -120,7 +123,14 @@ export function SiteHeader() {
                   </span>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem asChild>
+                  <Link to="/perfis" className="flex items-center gap-2">
+                    <ProfileAvatar profile={activeProfile} size="sm" /> <span className="truncate">{activeProfile.name}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">Trocar</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link to="/u/$username" params={{ username: profile?.username ?? "" }} className="flex items-center gap-2">
                     <User2 className="h-4 w-4" /> Meu perfil

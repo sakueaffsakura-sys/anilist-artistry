@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_profiles: {
+        Row: {
+          color: string
+          created_at: string
+          has_pin: boolean | null
+          id: string
+          kids_max_age: string | null
+          name: string
+          pin_hash: string | null
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          has_pin?: boolean | null
+          id?: string
+          kids_max_age?: string | null
+          name: string
+          pin_hash?: string | null
+          user_id?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          has_pin?: boolean | null
+          id?: string
+          kids_max_age?: string | null
+          name?: string
+          pin_hash?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       ad_counter: {
         Row: {
           last_ad_at_reads: number
@@ -389,16 +422,19 @@ export type Database = {
       favorites: {
         Row: {
           created_at: string
+          profile_id: string
           series_id: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          profile_id?: string
           series_id: string
           user_id: string
         }
         Update: {
           created_at?: string
+          profile_id?: string
           series_id?: string
           user_id?: string
         }
@@ -518,6 +554,21 @@ export type Database = {
           id?: string
           is_public?: boolean
           title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      main_profile_pins: {
+        Row: {
+          pin_hash: string
+          user_id: string
+        }
+        Insert: {
+          pin_hash: string
+          user_id: string
+        }
+        Update: {
+          pin_hash?: string
           user_id?: string
         }
         Relationships: []
@@ -742,6 +793,7 @@ export type Database = {
       reading_history: {
         Row: {
           chapter_id: string | null
+          profile_id: string
           progress: number
           scroll_pos: number
           series_id: string
@@ -750,6 +802,7 @@ export type Database = {
         }
         Insert: {
           chapter_id?: string | null
+          profile_id?: string
           progress?: number
           scroll_pos?: number
           series_id: string
@@ -758,6 +811,7 @@ export type Database = {
         }
         Update: {
           chapter_id?: string | null
+          profile_id?: string
           progress?: number
           scroll_pos?: number
           series_id?: string
@@ -1146,6 +1200,7 @@ export type Database = {
         Args: { _series_id: string }
         Returns: undefined
       }
+      main_profile_has_pin: { Args: never; Returns: boolean }
       maintenance_access_allowed: { Args: never; Returns: boolean }
       maintenance_media_upload_valid: {
         Args: { object_metadata: Json; object_name: string }
@@ -1165,6 +1220,14 @@ export type Database = {
       resolve_work_request: {
         Args: { _note?: string; _request: string; _series?: string }
         Returns: undefined
+      }
+      set_profile_pin: {
+        Args: { _pin: string; _profile: string }
+        Returns: undefined
+      }
+      verify_profile_pin: {
+        Args: { _pin: string; _profile: string }
+        Returns: boolean
       }
       work_title_key: { Args: { value: string }; Returns: string }
       work_title_keys: {

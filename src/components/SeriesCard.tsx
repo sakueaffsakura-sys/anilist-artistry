@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
 import { useSession } from "@/hooks/useAuth";
 import { AgeRatingBadge } from "@/components/AgeRatingBadge";
+import { activeProfileId } from "@/lib/active-profile";
 type ChapterRef = { id: string; number: number | string; created_at?: string };
 
 type Props = {
@@ -47,13 +48,13 @@ export function SeriesCard({
         const { error } = await supabase
           .from("favorites")
           .delete()
-          .eq("user_id", user.id)
+          .eq("user_id", user.id).eq("profile_id", activeProfileId())
           .eq("series_id", seriesId);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("favorites")
-          .insert({ user_id: user.id, series_id: seriesId });
+          .insert({ user_id: user.id, profile_id: activeProfileId(), series_id: seriesId });
         if (error) throw error;
       }
     },

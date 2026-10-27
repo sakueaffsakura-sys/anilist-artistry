@@ -14,6 +14,8 @@ import { uploadCommentImage } from "@/lib/comments";
 import { parseNovelContent } from "@/lib/novel-content";
 import { NovelNarrator } from "@/components/NovelNarrator";
 import { chapterQueryOptions } from "@/lib/chapter-query";
+import { activeProfileId, isWorkAllowed, useActiveProfile } from "@/lib/active-profile";
+import { KidsBlocked } from "@/components/KidsBlocked";
 
 export const Route = createFileRoute("/obra/$slug/$chapter")({
   staticData: { sitemap: false },
@@ -70,6 +72,7 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
   const { slug, chapter } = Route.useParams();
   const navigate = useNavigate();
   const { user } = useSession();
+  const activeProfile = useActiveProfile();
 
   const series = useSuspenseQuery({
     queryKey: ["series", slug],
@@ -165,13 +168,14 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
       void supabase.from("reading_history").upsert(
         {
           user_id: user.id,
+          profile_id: activeProfileId(),
           series_id: obra.id,
           chapter_id: current.id,
           progress,
           scroll_pos: pos,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "user_id,series_id" },
+        { onConflict: "user_id,profile_id,series_id" },
       );
       if (pos > 0.9) {
         void supabase
@@ -192,7 +196,7 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
       const { data } = await supabase
         .from("reading_history")
         .select("chapter_id, scroll_pos")
-        .eq("user_id", user.id)
+        .eq("user_id", user.id).eq("profile_id", activeProfileId())
         .eq("series_id", obra.id)
         .maybeSingle();
       if (cancelled) return;
@@ -238,6 +242,7 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [obra?.id, chapter]);
 
+  if (obra && !isWorkAllowed(obra.age_rating, activeProfile)) return <KidsBlocked />;
   if (!obra || !current) {
     return (
       <div className="grid min-h-screen place-items-center px-4 text-center">

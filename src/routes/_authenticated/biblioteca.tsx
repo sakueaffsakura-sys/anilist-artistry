@@ -8,6 +8,7 @@ import { Chips, CollectionCard, PageTitle, STATUSES, TabButton } from "@/compone
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useAuth";
 import { Pager } from "@/components/Pager";
+import { activeProfileId } from "@/lib/active-profile";
 
 export const Route = createFileRoute("/_authenticated/biblioteca")({
   staticData: { sitemap: false },
@@ -53,7 +54,7 @@ function Colecao() {
       const { data, error } = await supabase
         .from("favorites")
         .select(`created_at, series!inner(${SERIES_FIELDS})`)
-        .eq("user_id", user!.id)
+        .eq("user_id", user!.id).eq("profile_id", activeProfileId())
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as unknown as { created_at: string; series: S }[];
@@ -81,7 +82,7 @@ function Colecao() {
       const { data, error } = await supabase
         .from("reading_history")
         .select(`updated_at, series_id, chapters(number), series!inner(${SERIES_FIELDS})`)
-        .eq("user_id", user!.id)
+        .eq("user_id", user!.id).eq("profile_id", activeProfileId())
         .order("updated_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as unknown as {
@@ -134,9 +135,9 @@ function Colecao() {
   const remove = useMutation({
     mutationFn: async (seriesId: string) => {
       if (tab === "favoritos") {
-        { const { error: dbErr } = await supabase.from("favorites").delete().eq("user_id", user!.id).eq("series_id", seriesId); if (dbErr) throw dbErr; }
+        { const { error: dbErr } = await supabase.from("favorites").delete().eq("user_id", user!.id).eq("profile_id", activeProfileId()).eq("series_id", seriesId); if (dbErr) throw dbErr; }
       } else if (tab === "continuando") {
-        { const { error: dbErr } = await supabase.from("reading_history").delete().eq("user_id", user!.id).eq("series_id", seriesId); if (dbErr) throw dbErr; }
+        { const { error: dbErr } = await supabase.from("reading_history").delete().eq("user_id", user!.id).eq("profile_id", activeProfileId()).eq("series_id", seriesId); if (dbErr) throw dbErr; }
       } else {
         { const { error: dbErr } = await supabase.from("reading_status").delete().eq("user_id", user!.id).eq("series_id", seriesId); if (dbErr) throw dbErr; }
       }

@@ -20,6 +20,8 @@ import { verifyMaintenanceAdmin } from "@/lib/maintenance.functions";
 import { fetchMaintenanceStatus, maintenanceUnavailable } from "@/lib/maintenance-status";
 import { maintenanceExemptPath } from "@/lib/maintenance-policy";
 import { SessionProvider } from "@/hooks/useAuth";
+import { ProfilesProvider } from "@/hooks/use-profiles";
+import { ProfileGate } from "@/components/ProfilePicker";
 import { ClickSound } from "@/components/ClickSound";
 
 function NotFoundComponent() {
@@ -173,10 +175,13 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
+      <ProfilesProvider>
       <ClickSound />
       <Outlet />
+      {maintenancePage ? null : <ProfileGate />}
       <Toaster position="top-center" />
       {maintenancePage ? null : <SupportChat />}
+      </ProfilesProvider>
       </SessionProvider>
     </QueryClientProvider>
   );

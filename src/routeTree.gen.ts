@@ -22,6 +22,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthenticatedBibliotecaRouteImport } from './routes/_authenticated/biblioteca'
 import { Route as AuthenticatedHistoricoRouteImport } from './routes/_authenticated/historico'
 import { Route as AuthenticatedPedidosRouteImport } from './routes/_authenticated/pedidos'
+import { Route as AuthenticatedPerfisRouteImport } from './routes/_authenticated/perfis'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiVersionRouteImport } from './routes/api/version'
 import { Route as ListasIndexRouteImport } from './routes/listas/index'
@@ -110,6 +111,11 @@ const AuthenticatedHistoricoRoute = AuthenticatedHistoricoRouteImport.update({
 const AuthenticatedPedidosRoute = AuthenticatedPedidosRouteImport.update({
   id: '/pedidos',
   path: '/pedidos',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPerfisRoute = AuthenticatedPerfisRouteImport.update({
+  id: '/perfis',
+  path: '/perfis',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const ApiTtsRoute = ApiTtsRouteImport.update({
@@ -260,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/biblioteca': typeof AuthenticatedBibliotecaRoute
   '/historico': typeof AuthenticatedHistoricoRoute
   '/pedidos': typeof AuthenticatedPedidosRoute
+  '/perfis': typeof AuthenticatedPerfisRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/version': typeof ApiVersionRoute
   '/listas/$id': typeof ListasIdRoute
@@ -299,6 +306,7 @@ export interface FileRoutesByTo {
   '/biblioteca': typeof AuthenticatedBibliotecaRoute
   '/historico': typeof AuthenticatedHistoricoRoute
   '/pedidos': typeof AuthenticatedPedidosRoute
+  '/perfis': typeof AuthenticatedPerfisRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/version': typeof ApiVersionRoute
   '/listas/$id': typeof ListasIdRoute
@@ -340,6 +348,7 @@ export interface FileRoutesById {
   '/_authenticated/biblioteca': typeof AuthenticatedBibliotecaRoute
   '/_authenticated/historico': typeof AuthenticatedHistoricoRoute
   '/_authenticated/pedidos': typeof AuthenticatedPedidosRoute
+  '/_authenticated/perfis': typeof AuthenticatedPerfisRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/version': typeof ApiVersionRoute
   '/listas/$id': typeof ListasIdRoute
@@ -381,6 +390,7 @@ export interface FileRouteTypes {
     | '/biblioteca'
     | '/historico'
     | '/pedidos'
+    | '/perfis'
     | '/api/tts'
     | '/api/version'
     | '/listas/$id'
@@ -420,6 +430,7 @@ export interface FileRouteTypes {
     | '/biblioteca'
     | '/historico'
     | '/pedidos'
+    | '/perfis'
     | '/api/tts'
     | '/api/version'
     | '/listas/$id'
@@ -460,6 +471,7 @@ export interface FileRouteTypes {
     | '/_authenticated/biblioteca'
     | '/_authenticated/historico'
     | '/_authenticated/pedidos'
+    | '/_authenticated/perfis'
     | '/api/tts'
     | '/api/version'
     | '/listas/$id'
@@ -601,6 +613,13 @@ declare module '@tanstack/react-router' {
       path: '/pedidos'
       fullPath: '/pedidos'
       preLoaderRoute: typeof AuthenticatedPedidosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/perfis': {
+      id: '/_authenticated/perfis'
+      path: '/perfis'
+      fullPath: '/perfis'
+      preLoaderRoute: typeof AuthenticatedPerfisRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/api/tts': {
@@ -785,6 +804,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedBibliotecaRoute: typeof AuthenticatedBibliotecaRoute
   AuthenticatedHistoricoRoute: typeof AuthenticatedHistoricoRoute
   AuthenticatedPedidosRoute: typeof AuthenticatedPedidosRoute
+  AuthenticatedPerfisRoute: typeof AuthenticatedPerfisRoute
   AuthenticatedAdminIdRoute: typeof AuthenticatedAdminIdRoute
   AuthenticatedAdminAppRoute: typeof AuthenticatedAdminAppRoute
   AuthenticatedAdminContasRoute: typeof AuthenticatedAdminContasRoute
@@ -806,6 +826,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBibliotecaRoute: AuthenticatedBibliotecaRoute,
   AuthenticatedHistoricoRoute: AuthenticatedHistoricoRoute,
   AuthenticatedPedidosRoute: AuthenticatedPedidosRoute,
+  AuthenticatedPerfisRoute: AuthenticatedPerfisRoute,
   AuthenticatedAdminIdRoute: AuthenticatedAdminIdRoute,
   AuthenticatedAdminAppRoute: AuthenticatedAdminAppRoute,
   AuthenticatedAdminContasRoute: AuthenticatedAdminContasRoute,
