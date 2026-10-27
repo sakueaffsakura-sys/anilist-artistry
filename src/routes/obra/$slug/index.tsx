@@ -36,7 +36,7 @@ import { uploadCommentImage } from "@/lib/comments";
 import { normalizeGenres } from "@/lib/work-genres";
 import { ageRatingLabel } from "@/lib/age-ratings";
 import { AgeRatingBadge } from "@/components/AgeRatingBadge";
-import { activeProfileId } from "@/lib/active-profile";
+import { activeProfileId, allowedAgeRatings, isWorkAllowed, useActiveProfile } from "@/lib/active-profile";
 export const Route = createFileRoute("/obra/$slug/")({
   staticData: { sitemap: true },
   loader: ({ params, context }) =>
@@ -167,6 +167,7 @@ function SeriesPage() {
         .eq("published", true)
         .overlaps("genres", series.data!.genres)
         .neq("id", series.data!.id)
+        .in("age_rating", allowedAgeRatings() ?? ["L", "10", "12", "14", "16", "18"])
         .order("views", { ascending: false })
         .limit(6);
       return data ?? [];
