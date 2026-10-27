@@ -1,5 +1,6 @@
 # Tarefas
-- [ ] Melhorar automação da classificação de obras com IA e reduzir travamentos; preservar revisão e aprovação, verificar fluxo e desempenho.
+- [x] Melhorar entrega das sugestões sem esperar grupo mais lento, limitar revisão visível a 10 itens e adiar pesquisa manual; manter aprovação explícita. Painel real e revisão de 25 sugestões simuladas conferidos, 108 testes passaram, build OK; sem publicar ou gravar obras.
+- [ ] Validar classificação com Claude real e medir ganho em produção — não executado para evitar consumir créditos; gargalos de consultas agregadas e fila persistente ainda exigem revisão específica.
 - [x] Refinar layout global: navegação compacta, capas, seções, catálogo, detalhes e painel; leitor conferido no celular sem overflow, navegação com conta/perfil e painel reais verificados; 106 testes passaram e build OK, sem publicar ou alterar dados. Nem todas as páginas individuais foram conferidas.
 - [ ] Otimizar carregamento do painel: consultas menores, paginação e configurações sob demanda; verificar navegação sem alterar dados.
 - [ ] Adicionar pesquisa manual no AniList à classificação, independente de créditos, com escolha do resultado e aprovação explícita.
