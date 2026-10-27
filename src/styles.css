@@ -104,26 +104,26 @@
 }
 
 :root {
-  --radius: 0.75rem;
-  --background: oklch(0.18 0.035 285);
-  --foreground: oklch(0.97 0.005 285);
-  --surface: oklch(0.16 0.028 285);
-  --surface-2: oklch(0.24 0.028 285);
-  --card: oklch(0.16 0.028 285);
+  --radius: 0.9rem;
+  --background: oklch(0.155 0.03 262);
+  --foreground: oklch(0.97 0.005 262);
+  --surface: oklch(0.19 0.032 262);
+  --surface-2: oklch(0.24 0.028 262);
+  --card: oklch(0.195 0.032 262);
   --card-foreground: var(--foreground);
-  --popover: oklch(0.21 0.03 285);
+  --popover: oklch(0.21 0.03 262);
   --popover-foreground: var(--foreground);
   --primary: oklch(0.7 0.2 48);
-  --primary-foreground: oklch(0.08 0.01 285);
-  --secondary: oklch(0.24 0.028 285);
+  --primary-foreground: oklch(0.08 0.01 262);
+  --secondary: oklch(0.24 0.028 262);
   --secondary-foreground: var(--foreground);
-  --muted: oklch(0.24 0.028 285);
-  --muted-foreground: oklch(0.69 0.014 285);
-  --accent: oklch(0.27 0.03 285);
+  --muted: oklch(0.24 0.028 262);
+  --muted-foreground: oklch(0.69 0.014 262);
+  --accent: oklch(0.27 0.03 262);
   --accent-foreground: var(--foreground);
   --destructive: oklch(0.6 0.22 20);
   --destructive-foreground: oklch(0.98 0.005 80);
-  --border: oklch(0.29 0.027 285);
+  --border: oklch(0.29 0.027 262);
   --input: var(--border);
   --ring: var(--primary);
   --gold: oklch(0.78 0.16 70);
@@ -133,7 +133,7 @@
   --age-14: oklch(0.72 0.19 28);
   --age-16: oklch(0.63 0.22 12);
   --age-18: oklch(0.54 0.23 20);
-  --age-ink: oklch(0.17 0.03 285);
+  --age-ink: oklch(0.17 0.03 262);
   --gradient-primary: linear-gradient(135deg, var(--primary), var(--gold));
   --gradient-maintenance: linear-gradient(180deg, color-mix(in oklab, var(--background) 86%, transparent), color-mix(in oklab, var(--background) 45%, transparent) 25%, color-mix(in oklab, var(--background) 68%, transparent) 65%, color-mix(in oklab, var(--background) 96%, transparent));
   --maintenance-border: color-mix(in oklab, var(--foreground) 16%, transparent);
@@ -247,3 +247,31 @@
 }
 
 .cv-auto { content-visibility: auto; contain-intrinsic-size: auto 600px; }
+
+/* Visual refresh: ambient glow, glass surfaces, richer cards */
+:root {
+  --glow-ambient: radial-gradient(60rem 40rem at 85% -10%, color-mix(in oklab, var(--primary) 14%, transparent), transparent 60%), radial-gradient(50rem 36rem at -10% 30%, color-mix(in oklab, oklch(0.55 0.15 262) 22%, transparent), transparent 65%);
+  --glass: color-mix(in oklab, var(--surface) 72%, transparent);
+  --edge-light: inset 0 1px 0 color-mix(in oklab, var(--foreground) 7%, transparent);
+}
+@layer base {
+  body { background-image: var(--glow-ambient); background-attachment: fixed; -webkit-font-smoothing: antialiased; }
+  ::selection { background: color-mix(in oklab, var(--primary) 40%, transparent); }
+  * { scrollbar-color: color-mix(in oklab, var(--primary) 45%, var(--surface-2)) transparent; }
+  header { backdrop-filter: blur(14px) saturate(1.3); }
+  button, a { transition: color 160ms ease, background-color 160ms ease, box-shadow 200ms ease, transform 160ms ease; }
+  [data-slot="button"]:active { transform: scale(0.97); }
+  [data-slot="card"], [data-slot="dialog-content"], [data-slot="popover-content"] { background: var(--glass); backdrop-filter: blur(12px); box-shadow: var(--edge-light), var(--shadow-card); }
+  [data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"] { background: color-mix(in oklab, var(--surface-2) 60%, transparent); }
+  [data-slot="input"]:focus-visible, [data-slot="textarea"]:focus-visible { box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 30%, transparent); }
+}
+@utility section-title {
+  border-bottom: 0;
+  padding-bottom: 0;
+  &::before { content: ""; width: 6px; height: 1.3em; border-radius: 999px; background: var(--gradient-primary); box-shadow: 0 0 14px color-mix(in oklab, var(--primary) 60%, transparent); }
+}
+@utility card-hover {
+  &:hover { transform: translateY(-6px) scale(1.015); }
+  & img { transition: transform 400ms ease, filter 400ms ease; }
+  &:hover img { transform: scale(1.05); filter: saturate(1.15); }
+}
