@@ -77,9 +77,9 @@ export function AdminShell({
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <div className="mx-auto flex max-w-7xl gap-6 px-4 py-8">
-        <aside className="sticky top-20 hidden h-fit w-60 shrink-0 rounded-2xl border border-border bg-surface p-3 lg:block">
-          <div className="mb-3 flex items-center gap-2.5 rounded-xl bg-gradient-to-br from-primary/25 to-transparent p-3">
+      <div className="site-content admin-layout mx-auto flex max-w-7xl gap-8 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <aside className="admin-sidebar sticky top-20 hidden h-fit w-56 shrink-0 border-r border-border pr-5 lg:block">
+          <div className="mb-4 flex items-center gap-2.5 border-b border-border px-3 pb-5 pt-1">
             <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
               <Shield className="h-4 w-4" />
             </div>
@@ -107,23 +107,23 @@ export function AdminShell({
           </Link>
         </aside>
 
-        <main className="min-w-0 flex-1">
-          <nav className="mb-5 flex gap-2 overflow-x-auto lg:hidden">
+        <main className="admin-content min-w-0 flex-1">
+          <nav aria-label="Navegação do painel" className="admin-mobile-tabs no-scrollbar mb-6 flex gap-1 overflow-x-auto border-b border-border pb-2 lg:hidden">
             {NAV.filter((n) => !("adminOnly" in n) || isAdmin).map((n) => (
               <Link
                 key={n.to}
                 to={n.to}
                 activeOptions={{ exact: n.exact }}
-                className="flex shrink-0 items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground"
-                activeProps={{ className: "!border-primary !text-primary" }}
+                className="flex shrink-0 items-center gap-2 rounded-md px-3 py-2.5 text-xs font-semibold text-muted-foreground"
+                activeProps={{ className: "!bg-primary/10 !text-primary" }}
               >
                 <n.icon className="h-3.5 w-3.5" /> {n.label}
               </Link>
             ))}
           </nav>
-          <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div className="admin-page-heading mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-border/60 pb-6">
             <div>
-              <h1 className="font-display text-3xl font-extrabold">{title}</h1>
+              <h1 className="font-display text-2xl font-extrabold sm:text-3xl">{title}</h1>
               {subtitle ? <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p> : null}
             </div>
             {actions}
@@ -137,10 +137,9 @@ export function AdminShell({
 
 export function StatCard({ label, value, icon }: { label: string; value: ReactNode; icon: ReactNode }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border bg-surface p-5">
-      <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-primary/10 blur-xl" />
+    <div className="admin-stat relative overflow-hidden rounded-lg border border-border bg-surface p-5">
       <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/15 text-primary">{icon}</div>
-      <p className="mt-4 font-display text-3xl font-extrabold">{value}</p>
+      <p className="mt-4 font-display text-2xl font-extrabold sm:text-3xl">{value}</p>
       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
     </div>
   );
