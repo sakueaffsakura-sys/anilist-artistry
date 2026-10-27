@@ -40,7 +40,7 @@ export function ProfilePicker({ onDone }: { onDone?: () => void }) {
   const remove = async (profile: AccountProfile) => {
     if (!confirm(`Apagar o perfil ${profile.name}? O histórico e os favoritos dele serão apagados.`)) return;
     const { error } = await supabase.from("account_profiles").delete().eq("id", profile.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     if (active.id === profile.id) await switchTo(profiles[0]!);
     void refresh();
   };
@@ -48,7 +48,7 @@ export function ProfilePicker({ onDone }: { onDone?: () => void }) {
     const value = prompt(profile.hasPin ? "Novo PIN de 4 números (deixe vazio para remover):" : "PIN de 4 números:");
     if (value === null) return;
     const { error } = await supabase.rpc("set_profile_pin", { _profile: profile.id === MAIN_PROFILE_ID ? null : profile.id, _pin: value.trim() || null } as never);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(value.trim() ? "PIN salvo." : "PIN removido."); void refresh();
   };
 
