@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
-import { Route as CatalogoRouteImport } from './routes/catalogo'
 import { Route as ExcluirContaRouteImport } from './routes/excluir-conta'
 import { Route as ManutencaoRouteImport } from './routes/manutencao'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
@@ -20,6 +19,7 @@ import { Route as RankingRouteImport } from './routes/ranking'
 import { Route as RankingLeitoresRouteImport } from './routes/ranking-leitores'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthenticatedBibliotecaRouteImport } from './routes/_authenticated/biblioteca'
+import { Route as AuthenticatedCatalogoRouteImport } from './routes/_authenticated/catalogo'
 import { Route as AuthenticatedHistoricoRouteImport } from './routes/_authenticated/historico'
 import { Route as AuthenticatedPedidosRouteImport } from './routes/_authenticated/pedidos'
 import { Route as AuthenticatedPerfisRouteImport } from './routes/_authenticated/perfis'
@@ -46,8 +46,8 @@ import { Route as AuthenticatedAdminSuporteRouteImport } from './routes/_authent
 import { Route as ApiAdminClassificarObrasRouteImport } from './routes/api/admin/classificar-obras'
 import { Route as ApiPublicMaintenanceRouteImport } from './routes/api/public/maintenance'
 import { Route as ApiPublicVersionRouteImport } from './routes/api/public/version'
-import { Route as ObraSlugIndexRouteImport } from './routes/obra/$slug/index'
-import { Route as ObraSlugChapterRouteImport } from './routes/obra/$slug/$chapter'
+import { Route as AuthenticatedObraSlugIndexRouteImport } from './routes/_authenticated/obra/$slug/index'
+import { Route as AuthenticatedObraSlugChapterRouteImport } from './routes/_authenticated/obra/$slug/$chapter'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -61,11 +61,6 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CatalogoRoute = CatalogoRouteImport.update({
-  id: '/catalogo',
-  path: '/catalogo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ExcluirContaRoute = ExcluirContaRouteImport.update({
@@ -101,6 +96,11 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 const AuthenticatedBibliotecaRoute = AuthenticatedBibliotecaRouteImport.update({
   id: '/biblioteca',
   path: '/biblioteca',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedCatalogoRoute = AuthenticatedCatalogoRouteImport.update({
+  id: '/catalogo',
+  path: '/catalogo',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedHistoricoRoute = AuthenticatedHistoricoRouteImport.update({
@@ -242,21 +242,22 @@ const ApiPublicVersionRoute = ApiPublicVersionRouteImport.update({
   path: '/api/public/version',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ObraSlugIndexRoute = ObraSlugIndexRouteImport.update({
-  id: '/obra/$slug/',
-  path: '/obra/$slug/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ObraSlugChapterRoute = ObraSlugChapterRouteImport.update({
-  id: '/obra/$slug/$chapter',
-  path: '/obra/$slug/$chapter',
-  getParentRoute: () => rootRouteImport,
-} as any)
+const AuthenticatedObraSlugIndexRoute =
+  AuthenticatedObraSlugIndexRouteImport.update({
+    id: '/obra/$slug/',
+    path: '/obra/$slug/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedObraSlugChapterRoute =
+  AuthenticatedObraSlugChapterRouteImport.update({
+    id: '/obra/$slug/$chapter',
+    path: '/obra/$slug/$chapter',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/catalogo': typeof CatalogoRoute
   '/excluir-conta': typeof ExcluirContaRoute
   '/manutencao': typeof ManutencaoRoute
   '/privacidade': typeof PrivacidadeRoute
@@ -264,6 +265,7 @@ export interface FileRoutesByFullPath {
   '/ranking-leitores': typeof RankingLeitoresRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/biblioteca': typeof AuthenticatedBibliotecaRoute
+  '/catalogo': typeof AuthenticatedCatalogoRoute
   '/historico': typeof AuthenticatedHistoricoRoute
   '/pedidos': typeof AuthenticatedPedidosRoute
   '/perfis': typeof AuthenticatedPerfisRoute
@@ -289,14 +291,13 @@ export interface FileRoutesByFullPath {
   '/api/admin/classificar-obras': typeof ApiAdminClassificarObrasRoute
   '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
   '/api/public/version': typeof ApiPublicVersionRoute
-  '/obra/$slug/$chapter': typeof ObraSlugChapterRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
-  '/obra/$slug/': typeof ObraSlugIndexRoute
+  '/obra/$slug/$chapter': typeof AuthenticatedObraSlugChapterRoute
+  '/obra/$slug/': typeof AuthenticatedObraSlugIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/catalogo': typeof CatalogoRoute
   '/excluir-conta': typeof ExcluirContaRoute
   '/manutencao': typeof ManutencaoRoute
   '/privacidade': typeof PrivacidadeRoute
@@ -304,6 +305,7 @@ export interface FileRoutesByTo {
   '/ranking-leitores': typeof RankingLeitoresRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/biblioteca': typeof AuthenticatedBibliotecaRoute
+  '/catalogo': typeof AuthenticatedCatalogoRoute
   '/historico': typeof AuthenticatedHistoricoRoute
   '/pedidos': typeof AuthenticatedPedidosRoute
   '/perfis': typeof AuthenticatedPerfisRoute
@@ -329,16 +331,15 @@ export interface FileRoutesByTo {
   '/api/admin/classificar-obras': typeof ApiAdminClassificarObrasRoute
   '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
   '/api/public/version': typeof ApiPublicVersionRoute
-  '/obra/$slug/$chapter': typeof ObraSlugChapterRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
-  '/obra/$slug': typeof ObraSlugIndexRoute
+  '/obra/$slug/$chapter': typeof AuthenticatedObraSlugChapterRoute
+  '/obra/$slug': typeof AuthenticatedObraSlugIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
-  '/catalogo': typeof CatalogoRoute
   '/excluir-conta': typeof ExcluirContaRoute
   '/manutencao': typeof ManutencaoRoute
   '/privacidade': typeof PrivacidadeRoute
@@ -346,6 +347,7 @@ export interface FileRoutesById {
   '/ranking-leitores': typeof RankingLeitoresRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/biblioteca': typeof AuthenticatedBibliotecaRoute
+  '/_authenticated/catalogo': typeof AuthenticatedCatalogoRoute
   '/_authenticated/historico': typeof AuthenticatedHistoricoRoute
   '/_authenticated/pedidos': typeof AuthenticatedPedidosRoute
   '/_authenticated/perfis': typeof AuthenticatedPerfisRoute
@@ -371,16 +373,15 @@ export interface FileRoutesById {
   '/api/admin/classificar-obras': typeof ApiAdminClassificarObrasRoute
   '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
   '/api/public/version': typeof ApiPublicVersionRoute
-  '/obra/$slug/$chapter': typeof ObraSlugChapterRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
-  '/obra/$slug/': typeof ObraSlugIndexRoute
+  '/_authenticated/obra/$slug/$chapter': typeof AuthenticatedObraSlugChapterRoute
+  '/_authenticated/obra/$slug/': typeof AuthenticatedObraSlugIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/auth'
-    | '/catalogo'
     | '/excluir-conta'
     | '/manutencao'
     | '/privacidade'
@@ -388,6 +389,7 @@ export interface FileRouteTypes {
     | '/ranking-leitores'
     | '/sitemap.xml'
     | '/biblioteca'
+    | '/catalogo'
     | '/historico'
     | '/pedidos'
     | '/perfis'
@@ -413,14 +415,13 @@ export interface FileRouteTypes {
     | '/api/admin/classificar-obras'
     | '/api/public/maintenance'
     | '/api/public/version'
-    | '/obra/$slug/$chapter'
     | '/admin/'
+    | '/obra/$slug/$chapter'
     | '/obra/$slug/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
-    | '/catalogo'
     | '/excluir-conta'
     | '/manutencao'
     | '/privacidade'
@@ -428,6 +429,7 @@ export interface FileRouteTypes {
     | '/ranking-leitores'
     | '/sitemap.xml'
     | '/biblioteca'
+    | '/catalogo'
     | '/historico'
     | '/pedidos'
     | '/perfis'
@@ -453,15 +455,14 @@ export interface FileRouteTypes {
     | '/api/admin/classificar-obras'
     | '/api/public/maintenance'
     | '/api/public/version'
-    | '/obra/$slug/$chapter'
     | '/admin'
+    | '/obra/$slug/$chapter'
     | '/obra/$slug'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
-    | '/catalogo'
     | '/excluir-conta'
     | '/manutencao'
     | '/privacidade'
@@ -469,6 +470,7 @@ export interface FileRouteTypes {
     | '/ranking-leitores'
     | '/sitemap.xml'
     | '/_authenticated/biblioteca'
+    | '/_authenticated/catalogo'
     | '/_authenticated/historico'
     | '/_authenticated/pedidos'
     | '/_authenticated/perfis'
@@ -494,16 +496,15 @@ export interface FileRouteTypes {
     | '/api/admin/classificar-obras'
     | '/api/public/maintenance'
     | '/api/public/version'
-    | '/obra/$slug/$chapter'
     | '/_authenticated/admin/'
-    | '/obra/$slug/'
+    | '/_authenticated/obra/$slug/$chapter'
+    | '/_authenticated/obra/$slug/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
-  CatalogoRoute: typeof CatalogoRoute
   ExcluirContaRoute: typeof ExcluirContaRoute
   ManutencaoRoute: typeof ManutencaoRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
@@ -518,8 +519,6 @@ export interface RootRouteChildren {
   ApiAdminClassificarObrasRoute: typeof ApiAdminClassificarObrasRoute
   ApiPublicMaintenanceRoute: typeof ApiPublicMaintenanceRoute
   ApiPublicVersionRoute: typeof ApiPublicVersionRoute
-  ObraSlugChapterRoute: typeof ObraSlugChapterRoute
-  ObraSlugIndexRoute: typeof ObraSlugIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -543,13 +542,6 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/catalogo': {
-      id: '/catalogo'
-      path: '/catalogo'
-      fullPath: '/catalogo'
-      preLoaderRoute: typeof CatalogoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/excluir-conta': {
@@ -599,6 +591,13 @@ declare module '@tanstack/react-router' {
       path: '/biblioteca'
       fullPath: '/biblioteca'
       preLoaderRoute: typeof AuthenticatedBibliotecaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/catalogo': {
+      id: '/_authenticated/catalogo'
+      path: '/catalogo'
+      fullPath: '/catalogo'
+      preLoaderRoute: typeof AuthenticatedCatalogoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/historico': {
@@ -783,25 +782,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicVersionRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/obra/$slug/': {
-      id: '/obra/$slug/'
+    '/_authenticated/obra/$slug/': {
+      id: '/_authenticated/obra/$slug/'
       path: '/obra/$slug'
       fullPath: '/obra/$slug/'
-      preLoaderRoute: typeof ObraSlugIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthenticatedObraSlugIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/obra/$slug/$chapter': {
-      id: '/obra/$slug/$chapter'
+    '/_authenticated/obra/$slug/$chapter': {
+      id: '/_authenticated/obra/$slug/$chapter'
       path: '/obra/$slug/$chapter'
       fullPath: '/obra/$slug/$chapter'
-      preLoaderRoute: typeof ObraSlugChapterRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthenticatedObraSlugChapterRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedBibliotecaRoute: typeof AuthenticatedBibliotecaRoute
+  AuthenticatedCatalogoRoute: typeof AuthenticatedCatalogoRoute
   AuthenticatedHistoricoRoute: typeof AuthenticatedHistoricoRoute
   AuthenticatedPedidosRoute: typeof AuthenticatedPedidosRoute
   AuthenticatedPerfisRoute: typeof AuthenticatedPerfisRoute
@@ -820,10 +820,13 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminSelosRoute: typeof AuthenticatedAdminSelosRoute
   AuthenticatedAdminSuporteRoute: typeof AuthenticatedAdminSuporteRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+  AuthenticatedObraSlugChapterRoute: typeof AuthenticatedObraSlugChapterRoute
+  AuthenticatedObraSlugIndexRoute: typeof AuthenticatedObraSlugIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBibliotecaRoute: AuthenticatedBibliotecaRoute,
+  AuthenticatedCatalogoRoute: AuthenticatedCatalogoRoute,
   AuthenticatedHistoricoRoute: AuthenticatedHistoricoRoute,
   AuthenticatedPedidosRoute: AuthenticatedPedidosRoute,
   AuthenticatedPerfisRoute: AuthenticatedPerfisRoute,
@@ -842,6 +845,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminSelosRoute: AuthenticatedAdminSelosRoute,
   AuthenticatedAdminSuporteRoute: AuthenticatedAdminSuporteRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+  AuthenticatedObraSlugChapterRoute: AuthenticatedObraSlugChapterRoute,
+  AuthenticatedObraSlugIndexRoute: AuthenticatedObraSlugIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -851,7 +856,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
-  CatalogoRoute: CatalogoRoute,
   ExcluirContaRoute: ExcluirContaRoute,
   ManutencaoRoute: ManutencaoRoute,
   PrivacidadeRoute: PrivacidadeRoute,
@@ -866,8 +870,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminClassificarObrasRoute: ApiAdminClassificarObrasRoute,
   ApiPublicMaintenanceRoute: ApiPublicMaintenanceRoute,
   ApiPublicVersionRoute: ApiPublicVersionRoute,
-  ObraSlugChapterRoute: ObraSlugChapterRoute,
-  ObraSlugIndexRoute: ObraSlugIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

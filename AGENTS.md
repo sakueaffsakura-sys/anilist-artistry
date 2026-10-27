@@ -10,7 +10,8 @@
 <!-- LOVABLE:END -->
 
 - Load database-backed SEO metadata in route loaders for shareable initial HTML.
-- Sitemap: only public static pages, published works and public community lists; exclude private/authenticated areas.
+- Sitemap: only public static pages and public community lists; work pages require an account and a chosen profile, so they are excluded.
+- Work pages (`/catalogo`, `/obra/*`) live under `_authenticated` and require both sign-in and a chosen profile (`hasProfileChosen` in `src/lib/active-profile.ts`, set by `switchTo`); gates redirect to `/perfis` and the fullscreen picker blocks the app until a profile is picked.
 - Keep work rankings at `/ranking` and reader XP rankings at `/ranking-leitores` to separate audiences.
 - Use Sora headings and Manrope body; profiles contain dense achievements in a scannable bento layout.
 - Keep novels on the shared work details route, but give them a dedicated text reader while manga/comics retain the image reader, so both formats share catalog data without compromising reading ergonomics.

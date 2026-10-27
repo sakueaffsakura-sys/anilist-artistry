@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useAuth";
 import {
-  MAIN_PROFILE_ID, setActiveProfile, storedProfileId, useActiveProfile,
+  MAIN_PROFILE_ID, hasProfileChosen, markProfileChosen, setActiveProfile, storedProfileId, useActiveProfile,
   type ActiveProfile, type KidsMaxAge,
 } from "@/lib/active-profile";
 
@@ -58,7 +58,7 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
     if (!query.data) return;
     const stored = storedProfileId(user.id);
     const found = stored ? query.data.find((p) => p.id === stored) : undefined;
-    if (found) { setPicked(true); if (found.id !== active.id || found.kidsMaxAge !== active.kidsMaxAge) void apply(found); }
+    if (found) { setPicked(true); markProfileChosen(user.id); if (found.id !== active.id || found.kidsMaxAge !== active.kidsMaxAge) void apply(found); }
     else if (active.id !== MAIN_PROFILE_ID) void apply(null);
   }, [user, query.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -68,11 +68,12 @@ export function ProfilesProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
       if (!data) throw new Error("PIN incorreto.");
     }
+    if (user) markProfileChosen(user.id);
     setPicked(true);
     if (profile.id !== active.id || profile.kidsMaxAge !== active.kidsMaxAge) await apply(profile);
-  }, [active, apply]);
+  }, [active, apply, user]);
 
-  const needsPick = !!user && !picked && profiles.length > 1 && !storedProfileId(user.id);
+  const needsPick = !!user && !picked && !hasProfileChosen(user.id);
   return (
     <Ctx.Provider value={{ profiles, active, loading: query.isLoading, needsPick, switchTo, refresh: query.refetch }}>
       {children}

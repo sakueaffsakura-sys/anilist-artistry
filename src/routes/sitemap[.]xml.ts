@@ -27,20 +27,7 @@ export const Route = createFileRoute("/sitemap.xml")({
         });
         const router = await getRouterInstance();
         const entries: SitemapEntry[] = sitemapStaticPaths(router).map((path) => ({ path }));
-        const seriesRoute = router.routesById["/obra/$slug/"];
-        if (seriesRoute) {
-          for (let offset = 0; ; ) {
-            const { data, error } = await supabase.from("series").select("slug, updated_at").eq("published", true).order("id").range(offset, offset + 999);
-            if (error) throw error;
-            if (!data.length) break;
-            for (const row of data) {
-              const location = router.buildLocation({ to: "/obra/$slug", params: { slug: row.slug } });
-              const path = sitemapPathForLocation(router, location, seriesRoute.id);
-              if (path) entries.push({ path, lastmod: row.updated_at });
-            }
-            offset += data.length;
-          }
-        }
+        // Work pages require an account and a chosen profile, so /obra/* stays out of the sitemap.
         const listRoute = router.routesById["/listas/$id"];
         if (listRoute) {
           for (let offset = 0; ; ) {

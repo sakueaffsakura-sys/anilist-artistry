@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { AlignJustify, BookOpen, ChevronDown, ChevronLeft, ChevronRight, ChevronsDown, Home, Infinity, List, Maximize2, MessageCircle, Minus, Moon, Palette, Plus, Settings2, SunMedium } from "lucide-react";
 import { toast } from "sonner";
@@ -14,11 +14,14 @@ import { uploadCommentImage } from "@/lib/comments";
 import { parseNovelContent } from "@/lib/novel-content";
 import { NovelNarrator } from "@/components/NovelNarrator";
 import { chapterQueryOptions } from "@/lib/chapter-query";
-import { activeProfileId, isWorkAllowed, useActiveProfile } from "@/lib/active-profile";
+import { activeProfileId, hasProfileChosen, isWorkAllowed, useActiveProfile } from "@/lib/active-profile";
 import { KidsBlocked } from "@/components/KidsBlocked";
 
-export const Route = createFileRoute("/obra/$slug/$chapter")({
+export const Route = createFileRoute("/_authenticated/obra/$slug/$chapter")({
   staticData: { sitemap: false },
+  beforeLoad: ({ context }) => {
+    if (!context.user || !hasProfileChosen(context.user.id)) throw redirect({ to: "/perfis" });
+  },
   loader: async ({ params, context }) => {
     const series = await context.queryClient.ensureQueryData({
       queryKey: ["series", params.slug],
