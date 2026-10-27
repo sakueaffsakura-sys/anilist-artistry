@@ -64,6 +64,7 @@ function Pesquisar() {
   const navigate = useNavigate({ from: Route.fullPath });
   const [term, setTerm] = useState(s.q);
   const [genreSearch, setGenreSearch] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const profile = useActiveProfile();
   useEffect(() => setTerm(s.q), [s.q]);
   useEffect(() => {
@@ -168,8 +169,10 @@ function Pesquisar() {
             {users.data?.length === 0 ? <p className="text-sm text-muted-foreground">Nenhum utilizador encontrado.</p> : null}
           </div>
         ) : (
-          <div className="mt-8 grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-            <aside className="catalog-filters h-fit border-b border-border pb-6 lg:sticky lg:top-20 lg:border-b-0 lg:border-r lg:pr-6">
+          <div className="mt-8 grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+            <aside className="catalog-filters min-w-0 h-fit border-b border-border pb-6 lg:sticky lg:top-20 lg:border-b-0 lg:border-r lg:pr-6">
+              <Button variant="outline" className="mb-3 w-full lg:hidden" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)}><SlidersHorizontal className="h-4 w-4" /> {filtersOpen ? "Fechar filtros" : "Abrir filtros"}</Button>
+              <div className={filtersOpen ? "block" : "hidden lg:block"}>
               <div className="flex items-center justify-between"><h2 className="flex items-center gap-2 font-display text-lg font-bold"><SlidersHorizontal className="h-4 w-4 text-primary" /> Filtros</h2><Button variant="ghost" size="sm" onClick={() => { setTerm(""); set({ q: "", kind: "Todos", sort: "recent", status: "", tag: "" }); }}>Limpar</Button></div>
               <p className="mb-2 mt-4 text-sm font-semibold text-muted-foreground">Ordenar</p>
               <div className="space-y-2">
@@ -213,6 +216,7 @@ function Pesquisar() {
                     {t}
                   </Button>
                 ))}
+              </div>
               </div>
             </aside>
 
