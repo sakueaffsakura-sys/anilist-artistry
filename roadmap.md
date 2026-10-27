@@ -1,5 +1,7 @@
 # Tarefas
-- [ ] Refinar layout global: navegação compacta, capas, seções, catálogo e painel; conferir telas reais sem publicar ou alterar dados.
+- [x] Melhorar entrega das sugestões sem esperar grupo mais lento, limitar revisão visível a 10 itens e adiar pesquisa manual; manter aprovação explícita. Painel real e revisão de 25 sugestões simuladas conferidos, 108 testes passaram, build OK; sem publicar ou gravar obras.
+- [ ] Validar classificação com Claude real e medir ganho em produção — não executado para evitar consumir créditos; gargalos de consultas agregadas e fila persistente ainda exigem revisão específica.
+- [x] Refinar layout global: navegação compacta, capas, seções, catálogo, detalhes e painel; leitor conferido no celular sem overflow, navegação com conta/perfil e painel reais verificados; 106 testes passaram e build OK, sem publicar ou alterar dados. Nem todas as páginas individuais foram conferidas.
 - [ ] Otimizar carregamento do painel: consultas menores, paginação e configurações sob demanda; verificar navegação sem alterar dados.
 - [ ] Adicionar pesquisa manual no AniList à classificação, independente de créditos, com escolha do resultado e aprovação explícita.
 - [x] Otimização fase 1: home ~644 KB → ~61 KB de respostas de dados, mesmos 133 links; capítulos resumidos com totais reais no catálogo, favoritos, histórico e perfis; seções fora da tela adiam renderização. 92 testes passaram, build OK; conta real, catálogo, perfil e detalhes conferidos sem escrita nem publicação. Tempo em produção e revisão completa de todas as páginas não medidos.

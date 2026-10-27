@@ -285,7 +285,7 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
   return (
     <div className={`min-h-screen ${isNovel && novelTheme === "soft" ? "bg-surface" : "bg-background"}`}>
       {isNovel ? (
-        <header className="sticky top-0 z-40 border-b border-border/70 bg-background/95 backdrop-blur-xl">
+        <header className="reader-toolbar sticky top-0 z-40 border-b border-border/70 bg-background/95 backdrop-blur-xl">
           <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-3 sm:px-6">
             <Button asChild variant="ghost" size="icon" aria-label="Voltar para a obra" title="Voltar para a obra">
               <Link to="/obra/$slug" params={{ slug }}>
@@ -407,16 +407,16 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
           ) : null}
         </header>
       ) : (
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 sm:px-8">
+      <header className="reader-toolbar sticky top-0 z-40 border-b border-border/70 bg-background/95 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-1 px-2 sm:gap-2 sm:px-8">
           <Button variant="ghost" size="icon" type="button" onClick={() => history.back()} className={iconBtn} aria-label="Voltar">
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <Link to="/obra/$slug" params={{ slug }} className="ml-2 flex items-center gap-1.5 text-sm font-bold hover:text-primary">
             <BookOpen className="h-4 w-4" /> Obra
           </Link>
-          <h1 className="ml-3 flex min-w-0 items-center gap-2 text-sm">
-            <span className="truncate text-muted-foreground">{obra.title}</span>
+          <h1 className="ml-1 flex min-w-0 items-center gap-2 text-xs sm:ml-3 sm:text-sm">
+            <span className="hidden truncate text-muted-foreground sm:block">{obra.title}</span>
             <span className="shrink-0 font-bold text-primary">Cap. {formatChapter(current.number)}</span>
           </h1>
           <div className="ml-auto flex items-center gap-1">

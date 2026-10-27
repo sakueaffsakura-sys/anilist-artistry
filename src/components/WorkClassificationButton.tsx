@@ -5,7 +5,8 @@ import { Loader2, Sparkles, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClassificationReviewItem, type ReviewRow } from "@/components/ClassificationReviewItem";
+import { type ReviewRow } from "@/components/ClassificationReviewItem";
+import { ClassificationReviewList } from "@/components/ClassificationReviewList";
 import { ManualClassificationPanel } from "@/components/ManualClassificationPanel";
 import { useSession } from "@/hooks/useAuth";
 import { approveWorkClassification } from "@/lib/work-classification.functions";
@@ -32,7 +33,7 @@ export function WorkClassificationButton() {
   setElapsed(0);
   const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
   return () => window.clearInterval(timer);
- }, [running, batch]);
+ }, [running]);
  const busy = running || savingId !== null;
  const run = async () => {
   if (!session?.access_token || busy) return;
@@ -76,7 +77,7 @@ export function WorkClassificationButton() {
   try {
    const result = await approve({ data: { work: row.work, suggestion: row.suggestion, mode } });
    setRows((previous) => previous.map((item) => item.work.id === row.work.id ? { ...item, status: result.saved ? "saved" : "conflict", message: result.message } : item));
-   if (result.saved) { await qc.invalidateQueries({ queryKey: ["admin-series"] }); await qc.invalidateQueries({ queryKey: ["series"] }); await qc.invalidateQueries({ queryKey: ["all-genres"] }); }
+   if (result.saved) { await Promise.all([qc.invalidateQueries({ queryKey: ["admin-series"] }), qc.invalidateQueries({ queryKey: ["series"] }), qc.invalidateQueries({ queryKey: ["all-genres"] })]); }
   } catch (error) { setRows((previous) => previous.map((item) => item.work.id === row.work.id ? { ...item, message: error instanceof Error ? error.message : "Não foi possível salvar." } : item)); }
   finally { saving.current = false; setSavingId(null); }
  };
@@ -86,7 +87,7 @@ export function WorkClassificationButton() {
    <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-3xl" onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }} onInteractOutside={(event) => { if (busy) event.preventDefault(); }}>
     <DialogHeader><DialogTitle>Classificar obras</DialogTitle><DialogDescription>{source === "ai" ? "Claude · Lovable AI" : "AniList · pesquisa manual · sem créditos de IA"}</DialogDescription></DialogHeader>
     <Tabs value={source} onValueChange={setSource}><TabsList className="grid h-auto w-full grid-cols-2"><TabsTrigger value="ai" disabled={busy}>Claude IA</TabsTrigger><TabsTrigger value="manual" disabled={busy}>Pesquisa manual</TabsTrigger></TabsList></Tabs>
-    <div hidden={source !== "manual"}><ManualClassificationPanel /></div>
+    {source === "manual" ? <ManualClassificationPanel /> : null}
     <div hidden={source !== "ai"} className="space-y-4">
     <Tabs value={mode} onValueChange={(value) => { if (!busy && !rows.length && (value === "missing" || value === "review")) setMode(value); }}>
      <TabsList className="grid h-auto w-full grid-cols-2"><TabsTrigger className="whitespace-normal" value="missing" disabled={busy || rows.length > 0}>Preencher ausentes</TabsTrigger><TabsTrigger className="whitespace-normal" value="review" disabled={busy || rows.length > 0}>Revisar todas as obras</TabsTrigger></TabsList>
@@ -95,7 +96,7 @@ export function WorkClassificationButton() {
      <p role="status" className="text-sm">{progress.processed} de {progress.total} analisadas · {progress.suggested} sugestões · {rows.filter((row) => row.status === "saved").length} salvas</p>
      <progress aria-label="Progresso da análise" className="h-2 w-full accent-primary" value={progress.processed} max={Math.max(1, progress.total)} />
      {running ? <div role="status" className="space-y-1 text-sm text-muted-foreground"><p className="flex items-center gap-2"><Loader2 className="h-4 w-4 shrink-0 animate-spin" />{batch ? `Analisando obras ${batch.first}–${batch.last} · ${elapsed}s` : "Carregando obras…"}</p>{batch ? <p className="break-words">{batch.titles.join(" · ")}</p> : null}</div> : null}
-     <ul className="max-h-[45dvh] overflow-y-auto divide-y divide-border pr-1">{rows.map((row) => <ClassificationReviewItem key={row.work.id} row={row} busy={savingId !== null} saving={savingId === row.work.id} onApprove={() => void save(row)} onDismiss={() => setRows((previous) => previous.map((item) => item.work.id === row.work.id ? { ...item, status: "dismissed" } : item))} />)}</ul>
+     <ClassificationReviewList rows={rows} savingId={savingId} onApprove={(row) => void save(row)} onDismiss={(id) => setRows((previous) => previous.map((item) => item.work.id === id ? { ...item, status: "dismissed" } : item))} />
     </div> : null}
     {message ? <p role="status" className="break-words text-sm text-muted-foreground">{message}</p> : null}
     <div className="flex flex-wrap justify-end gap-2">

@@ -387,7 +387,7 @@ function SeriesPage() {
           <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/80 to-background" />
         </div>
 
-        <main className="relative z-10 mx-auto max-w-7xl px-4 pb-10 pt-6 md:px-8 md:pt-14">
+        <main className="work-overview relative z-10 mx-auto max-w-7xl px-4 pb-8 pt-6 sm:px-6 lg:px-8 md:pt-10">
           <button
             type="button"
             onClick={() => window.history.back()}
@@ -406,12 +406,12 @@ function SeriesPage() {
               <img
                 src={coverUrl(obra.cover_url)}
                 alt={obra.title}
-                className="aspect-[2/3] w-[240px] rounded-2xl border border-border object-cover shadow-2xl md:w-full md:rounded-xl"
+                className="aspect-[2/3] w-[200px] rounded-lg border border-border object-cover shadow-[var(--shadow-card)] md:w-full"
               />
             </div>
 
             {/* Info */}
-            <div className="w-full flex-1 text-center md:text-left">
+            <div className="min-w-0 w-full flex-1 text-center md:text-left">
               <div className="mb-3 hidden flex-wrap items-center gap-3 md:flex">
                 <span className="rounded border border-border px-2 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">{obra.kind}</span>
                 <span className="rounded border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-400">{obra.status}</span>
@@ -509,12 +509,12 @@ function SeriesPage() {
           </div>
         </main>
 
-        <div className="relative z-10 mx-auto max-w-7xl px-4 pb-10 pt-4 md:px-8 md:pt-8">
+        <div className="site-content work-sections relative z-10 mx-auto max-w-7xl px-4 pb-10 pt-4 sm:px-6 lg:px-8 md:pt-8">
           <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-12">
             {/* Chapters */}
             <section className="min-w-0">
               <Tabs defaultValue="chapters">
-                <div className="overflow-hidden rounded-2xl border border-border bg-surface/60">
+                <div className="overflow-hidden border-y border-border">
                 <TabsList className="h-12 w-full justify-start gap-6 rounded-none border-b border-border bg-transparent px-4 md:px-5">
                   <TabsTrigger value="chapters" className="h-full gap-2 rounded-none border-b-2 border-transparent px-1 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"><BookOpen className="h-4 w-4" />Capítulos</TabsTrigger>
                   <TabsTrigger value="information" className="h-full gap-2 rounded-none border-b-2 border-transparent px-1 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"><Eye className="h-4 w-4" />Informações</TabsTrigger>
@@ -575,7 +575,7 @@ function SeriesPage() {
                   const isRead = readIds.has(chapter.id);
                   const commentCount = chapterCommentCounts.data?.get(chapter.id) ?? 0;
                   return (
-                    <li key={chapter.id} className={`group relative flex items-center gap-4 px-4 py-3.5 transition hover:bg-foreground/[0.04] ${isRead ? "opacity-60 hover:opacity-90" : ""}`}>
+                    <li key={chapter.id} className={`group relative flex items-center gap-2 px-3 py-3.5 sm:gap-4 sm:px-4 transition hover:bg-foreground/[0.04] ${isRead ? "opacity-60 hover:opacity-90" : ""}`}>
                       <Link
                         to="/obra/$slug/$chapter"
                         params={{ slug: obra.slug, chapter: formatChapter(chapter.number) }}
@@ -598,7 +598,7 @@ function SeriesPage() {
                             <span className="mt-1 inline-block rounded border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-400">Lido</span>
                           ) : null}
                         </span>
-                        <span className="shrink-0 text-xs font-medium text-muted-foreground/70 transition-colors group-hover:text-primary">
+                        <span className="hidden shrink-0 text-xs font-medium text-muted-foreground/70 transition-colors group-hover:text-primary sm:block">
                           {new Date(chapter.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
                         </span>
                       </Link>
@@ -699,7 +699,7 @@ function SeriesPage() {
           </div>
 
           {/* Comments */}
-          <section className="mx-auto mt-14 max-w-4xl rounded-2xl border border-border bg-surface/60 p-5 md:p-8">
+          <section className="mx-auto mt-12 max-w-4xl border-t border-border pt-6 md:pt-8">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><MessageCircle className="h-4 w-4" /></span>

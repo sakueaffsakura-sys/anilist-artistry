@@ -42,7 +42,7 @@
 - Use RLS reads and server APK signing; minimum-only edits preserve files and publication.
 - Follow docs/MIGRATIONS.md; never auto-run unjournaled SQL containing pending changes.
 
-- Classification uses admin RLS/CAS approval. AI streams review/progress with lease/pause; manual AniList search requires identity selection, no AI credits or inferred age.
+- Classification uses admin RLS/CAS approval, independently delivered parallel groups and paged review rendering. AI streams with lease/pause; manual AniList search loads on selection and requires identity choice, no AI credits or inferred age.
 
 - DB title claims guard writes; duplicate scans mirror normalization, paginate published works and confirm individual RLS deletes.
 - Account sub-profiles: the main profile is an implicit sentinel UUID (`MAIN_PROFILE_ID`), extra profiles live in `account_profiles`; reading_history/favorites are keyed by profile_id, and the active profile is a client store (`src/lib/active-profile.ts`) read by query helpers so existing rows stay on the main profile without backfill.
