@@ -37,6 +37,14 @@ export function storedProfileId(userId: string) {
   return typeof window === "undefined" ? null : localStorage.getItem(storageKey(userId));
 }
 
+/** Marks that the account already picked (or created) a reading profile; work pages require it. */
+export function markProfileChosen(userId: string) {
+  if (typeof window !== "undefined" && userId) localStorage.setItem(`bm-profile-chosen:${userId}`, "1");
+}
+export function hasProfileChosen(userId: string | null | undefined) {
+  return typeof window !== "undefined" && !!userId && localStorage.getItem(`bm-profile-chosen:${userId}`) === "1";
+}
+
 export function useActiveProfile() {
   return useSyncExternalStore((cb) => { listeners.add(cb); return () => listeners.delete(cb); }, () => current, () => MAIN);
 }
