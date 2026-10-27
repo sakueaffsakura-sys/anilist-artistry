@@ -23,6 +23,7 @@ import { AgeRatingBadge } from "@/components/AgeRatingBadge";
 import { useRoles, useSession } from "@/hooks/useAuth";
 import { signCloudinaryUpload } from "@/lib/media.functions";
 import { TxtChapterImport } from "@/components/TxtChapterImport";
+import { MediocreJsonImport } from "@/components/MediocreJsonImport";
 
 const TEN_YEARS = 60 * 60 * 24 * 365 * 10;
 const STATUSES = ["Em andamento", "Completo", "Hiato", "Cancelado"];
@@ -228,7 +229,7 @@ function SeriesEditor() {
             ))}
           </div>
 
-          {tab === "info" ? <InfoForm obra={obra} onSaved={refresh} /> : <><TxtChapterImport key={id} seriesId={id} onChange={refresh} /><ChaptersPanel seriesId={id} chapters={chapters} onChange={refresh} isAdmin={isAdmin} /></>}
+          {tab === "info" ? <InfoForm obra={obra} onSaved={refresh} /> : <><MediocreJsonImport key={`json-${id}`} seriesId={id} onChange={refresh} /><TxtChapterImport key={id} seriesId={id} onChange={refresh} /><ChaptersPanel seriesId={id} chapters={chapters} onChange={refresh} isAdmin={isAdmin} /></>}
         </>
       ) : null}
     </AdminShell>
