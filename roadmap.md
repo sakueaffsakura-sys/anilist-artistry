@@ -1,4 +1,5 @@
 # Tarefas
+- [ ] Melhorar automação da classificação de obras com IA e reduzir travamentos; preservar revisão e aprovação, verificar fluxo e desempenho.
 - [x] Refinar layout global: navegação compacta, capas, seções, catálogo, detalhes e painel; leitor conferido no celular sem overflow, navegação com conta/perfil e painel reais verificados; 106 testes passaram e build OK, sem publicar ou alterar dados. Nem todas as páginas individuais foram conferidas.
 - [ ] Otimizar carregamento do painel: consultas menores, paginação e configurações sob demanda; verificar navegação sem alterar dados.
 - [ ] Adicionar pesquisa manual no AniList à classificação, independente de créditos, com escolha do resultado e aprovação explícita.
