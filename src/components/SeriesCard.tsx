@@ -10,7 +10,6 @@ import { activeProfileId } from "@/lib/active-profile";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SeriesChapterLinks, type ChapterRef } from "@/components/SeriesChapterLinks";
-
 type Props = {
   slug: string;
   title: string;
@@ -25,7 +24,6 @@ type Props = {
   favorite?: boolean;
   seriesId?: string;
 };
-
 export function SeriesCard({
   slug,
   title,
@@ -42,7 +40,6 @@ export function SeriesCard({
 }: Props) {
   const { user } = useSession();
   const queryClient = useQueryClient();
-
   const toggleFav = useMutation({
     mutationFn: async () => {
       if (!user || !seriesId) throw new Error("Entre para favoritar");
@@ -66,7 +63,6 @@ export function SeriesCard({
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao favoritar"),
   });
-
   const onHeart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -76,7 +72,6 @@ export function SeriesCard({
     }
     toggleFav.mutate();
   };
-
   return (
     <div className="group flex h-full w-full min-w-0 flex-col rounded-lg">
       <Link
@@ -99,7 +94,6 @@ export function SeriesCard({
           className={cn("absolute right-1.5 top-1.5 z-30 h-7 w-7 rounded-full border border-cover-foreground/20 bg-cover-overlay text-cover-foreground hover:bg-cover-overlay hover:text-favorite", favorite && "border-favorite/50 text-favorite")}>
           <Heart className={cn("h-3.5 w-3.5", favorite && "fill-current")} />
         </Button>
-
         <div className="pointer-events-none absolute left-2 top-2 z-[3] flex flex-col items-start gap-1.5 antialiased">
           {rating || chapters ? (
             <span
@@ -137,13 +131,11 @@ export function SeriesCard({
             </span>
           ) : null}
         </div>
-
         {badge ? (
           <span className="absolute bottom-1.5 right-1.5 z-[3] rounded-md bg-primary px-1.5 py-0.5 text-[11px] font-bold text-primary-foreground">
             {badge}
           </span>
         ) : null}
-
         {typeof progress === "number" ? (
           <div className="absolute inset-x-0 bottom-0 z-[3] series-cover-shade p-2 pt-6">
             <div className="h-1 w-full overflow-hidden rounded-full bg-cover-foreground/15">
@@ -151,10 +143,8 @@ export function SeriesCard({
             </div>
           </div>
         ) : null}
-
         <div className="series-cover-shade pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover/cover:opacity-100" />
       </Link>
-
       {showTitle ? (
         <div className="flex min-h-0 flex-1 flex-col px-0.5 pt-2">
           <div className="min-h-10 shrink-0">
