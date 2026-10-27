@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import {
   ArrowDownWideNarrow,
@@ -38,7 +38,7 @@ import { ageRatingLabel } from "@/lib/age-ratings";
 import { AgeRatingBadge } from "@/components/AgeRatingBadge";
 import { KidsBlocked } from "@/components/KidsBlocked";
 import { activeProfileId, isWorkAllowed, useActiveProfile } from "@/lib/active-profile";
-export const Route = createFileRoute("/obra/$slug/")({
+export const Route = createFileRoute("/_authenticated/obra/$slug/")({
   staticData: { sitemap: true },
   loader: ({ params, context }) =>
     context.queryClient.ensureQueryData({

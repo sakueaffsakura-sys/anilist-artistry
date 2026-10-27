@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useGenres } from "@/hooks/use-genres";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -12,7 +12,7 @@ import { coverUrl } from "@/lib/media";
 import { Pager } from "@/components/Pager";
 import { Button } from "@/components/ui/button";
 import { GENRES, genreAliases, normalizeGenres } from "@/lib/work-genres";
-import { allowedAgeRatings } from "@/lib/active-profile";
+import { allowedAgeRatings, hasProfileChosen } from "@/lib/active-profile";
 
 const searchSchema = z.object({
   q: fallback(z.string(), "").default(""),
@@ -23,7 +23,7 @@ const searchSchema = z.object({
   page: fallback(z.number(), 1).default(1),
 });
 
-export const Route = createFileRoute("/catalogo")({
+export const Route = createFileRoute("/_authenticated/catalogo")({
   staticData: { sitemap: true },
   validateSearch: zodValidator(searchSchema),
   head: () => ({
