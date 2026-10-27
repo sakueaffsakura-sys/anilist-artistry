@@ -3,7 +3,7 @@ import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { BookOpen, Download, Eye, Layers, Search, Users, ArrowRight } from "lucide-react";
+import { BookOpen, Download, Eye, Layers, Search, Users, ArrowRight, Plus, BookText, ArrowUpRight, CircleDot } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell, StatCard } from "@/components/AdminShell";
 import { Button } from "@/components/ui/button";
@@ -113,30 +113,32 @@ function AdminPage() {
   const fmt = (n: number) => n.toLocaleString("pt-BR");
 
   return (
-    <AdminShell title="Visão geral" subtitle="Acompanhe o site e importe novas obras do AniList.">
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+    <AdminShell title="Visão geral" subtitle="Seu catálogo, em um só lugar." actions={<Button asChild><Link to="/admin/nova"><Plus className="h-4 w-4" /> Nova obra</Link></Button>}>
+      <div className="admin-metrics grid grid-cols-2 border-y border-border bg-surface/40 xl:grid-cols-4">
         <StatCard label="Obras" value={d ? fmt(d.series) : "—"} icon={<BookOpen className="h-5 w-5" />} />
         <StatCard label="Capítulos" value={d ? fmt(d.chapters) : "—"} icon={<Layers className="h-5 w-5" />} />
         <StatCard label="Visualizações" value={d ? fmt(d.views) : "—"} icon={<Eye className="h-5 w-5" />} />
         <StatCard label="Contas" value={d ? fmt(d.users) : "—"} icon={<Users className="h-5 w-5" />} />
       </div>
 
-      <section className="mt-6 rounded-2xl border border-border bg-surface p-5">
+      {stats.isError ? <div role="alert" className="mt-5 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">Não foi possível carregar os totais.<Button variant="outline" size="sm" onClick={() => void stats.refetch()}>Tentar novamente</Button></div> : null}
+      <div className="mt-9 grid min-w-0 grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_260px]">
+      <section className="min-w-0">
         <h2 className="flex items-center gap-2 font-display text-lg font-extrabold">
-          <Download className="h-5 w-5 text-primary" /> Importar do AniList
+          <Download className="h-5 w-5 text-primary" /> Importação AniList
         </h2>
         <form
           onSubmit={(e) => {
             e.preventDefault();
             if (term.trim()) search.mutate();
           }}
-          className="mt-4 flex flex-wrap gap-3"
+          className="mt-5 flex flex-wrap gap-3 border-y border-border py-5"
         >
-          <div className="relative min-w-56 flex-1">
+          <div className="relative min-w-0 basis-full sm:basis-auto sm:flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Nome da obra ou link do AniList (anilist.co/manga/...)" className="h-11 bg-background pl-9" />
+            <Input value={term} onChange={(e) => setTerm(e.target.value)} aria-label="Buscar no AniList" placeholder="Nome ou link do AniList…" className="h-11 bg-background pl-9" />
           </div>
-          <select value={kind} onChange={(e) => setKind(e.target.value)} className="h-11 rounded-md border border-border bg-background px-3 text-sm font-semibold">
+          <select aria-label="Tipo da importação" value={kind} onChange={(e) => setKind(e.target.value)} className="h-11 rounded-md border border-border bg-background px-3 text-sm font-semibold">
             <option value="automatic">Tipo automático (AniList)</option>
             {KINDS.map((k) => (
               <option key={k} value={k}>{k}</option>
@@ -149,7 +151,7 @@ function AdminPage() {
         {results.length > 0 ? (
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {results.map((item) => (
-              <div key={item.anilistId} className="flex gap-3 rounded-xl border border-border bg-background p-3">
+              <div key={item.anilistId} className="flex gap-3 rounded-lg border border-border bg-surface p-3">
                 <img src={coverUrl(item.coverUrl)} alt={item.title} loading="lazy" decoding="async" className="h-32 w-22 shrink-0 rounded-lg object-cover" />
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-2 text-sm font-bold">{item.title}</p>
@@ -165,27 +167,12 @@ function AdminPage() {
         ) : null}
       </section>
 
-      <section className="mt-6 rounded-2xl border border-border bg-surface p-5">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-extrabold">Atualizadas recentemente</h2>
-          <Link to="/admin/obras" className="flex items-center gap-1 text-sm font-semibold text-primary">
-            Todas as obras <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-        <div className="mt-4 grid grid-cols-3 gap-4 sm:grid-cols-6">
-          {(d?.recent ?? []).map((r) => (
-            <Link key={r.id} to="/admin/$id" params={{ id: r.id }} className="group">
-              <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-border">
-                <img src={coverUrl(r.cover_url)} alt={r.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
-                {!r.published ? (
-                  <span className="absolute left-1.5 top-1.5 rounded bg-background/90 px-1.5 text-[10px] font-bold text-muted-foreground">Rascunho</span>
-                ) : null}
-              </div>
-              <p className="mt-2 line-clamp-1 text-xs font-bold group-hover:text-primary">{r.title}</p>
-              <p className="text-[11px] text-muted-foreground">{timeAgo(r.updated_at)}</p>
-            </Link>
-          ))}
-        </div>
+      <aside className="border-l-0 border-border xl:border-l xl:pl-7"><h2 className="mb-5 flex items-center gap-2 font-display text-sm font-bold"><CircleDot className="h-4 w-4 text-primary" /> Acesso rápido</h2><div className="grid grid-cols-1 gap-1 sm:grid-cols-3 xl:grid-cols-1">{([{ to: "/admin/obras", label: "Gerenciar catálogo", icon: BookOpen }, { to: "/admin/novels", label: "Publicar novels", icon: BookText }, { to: "/admin/nova", label: "Cadastrar obra", icon: Plus }] as const).map((item) => <Button asChild key={item.to} variant="ghost" className="h-12 w-full justify-start gap-3 border-b border-border rounded-none text-xs"><Link to={item.to}><item.icon className="h-4 w-4 text-muted-foreground" /><span className="flex-1 text-left">{item.label}</span><ArrowUpRight className="h-3 w-3 text-primary" /></Link></Button>)}</div></aside>
+      </div>
+      <section className="mt-10 border-t border-border pt-7">
+        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-display text-lg font-extrabold">Últimas movimentações</h2><Button asChild variant="ghost" size="sm"><Link to="/admin/obras">Ver catálogo <ArrowRight className="h-4 w-4" /></Link></Button></div>
+        <div className="mt-5 grid grid-cols-1 gap-x-8 lg:grid-cols-2">{(d?.recent ?? []).map((r) => <Link key={r.id} to="/admin/$id" params={{ id: r.id }} className="group flex min-w-0 items-center gap-4 border-b border-border py-4"><img src={coverUrl(r.cover_url)} alt={r.title} loading="lazy" decoding="async" className="h-16 w-11 shrink-0 rounded-md object-cover" /><div className="min-w-0 flex-1"><p className="line-clamp-2 text-sm font-bold group-hover:text-primary">{r.title}</p><p className="mt-1 text-xs text-muted-foreground">{r.kind} · {timeAgo(r.updated_at)}</p></div><span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-bold ${r.published ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>{r.published ? "Publicada" : "Rascunho"}</span><ArrowUpRight className="hidden h-4 w-4 text-muted-foreground sm:block" /></Link>)}</div>
+        {stats.isPending ? <p role="status" className="py-8 text-sm text-muted-foreground">Carregando catálogo…</p> : null}
       </section>
     </AdminShell>
   );

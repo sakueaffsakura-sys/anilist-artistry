@@ -47,4 +47,4 @@
 - DB title claims guard writes; duplicate scans mirror normalization, paginate published works and confirm individual RLS deletes.
 - Account sub-profiles: the main profile is an implicit sentinel UUID (`MAIN_PROFILE_ID`), extra profiles live in `account_profiles`; reading_history/favorites are keyed by profile_id, and the active profile is a client store (`src/lib/active-profile.ts`) read by query helpers so existing rows stay on the main profile without backfill.
 
-- Discovery/collection reuse LibraryBits and URL-backed catalog filters; publication utilities mount on expansion to keep listings lightweight.
+- Discovery/collection reuse LibraryBits and URL filters; publishing utilities mount on expansion. AdminShell owns dedicated studio navigation; public headers/readers stay independent.
