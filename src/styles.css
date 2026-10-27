@@ -275,3 +275,20 @@
   & img { transition: transform 400ms ease, filter 400ms ease; }
   &:hover img { transform: scale(1.05); filter: saturate(1.15); }
 }
+
+:root {
+  --profile-orange: oklch(0.7 0.2 48);
+  --profile-blue: oklch(0.65 0.17 250);
+  --profile-green: oklch(0.72 0.17 155);
+  --profile-pink: oklch(0.7 0.2 350);
+  --profile-purple: oklch(0.62 0.2 300);
+  --profile-yellow: oklch(0.83 0.16 90);
+}
+@theme inline {
+  --color-profile-orange: var(--profile-orange);
+  --color-profile-blue: var(--profile-blue);
+  --color-profile-green: var(--profile-green);
+  --color-profile-pink: var(--profile-pink);
+  --color-profile-purple: var(--profile-purple);
+  --color-profile-yellow: var(--profile-yellow);
+}
