@@ -36,6 +36,7 @@ import { uploadCommentImage } from "@/lib/comments";
 import { normalizeGenres } from "@/lib/work-genres";
 import { ageRatingLabel } from "@/lib/age-ratings";
 import { AgeRatingBadge } from "@/components/AgeRatingBadge";
+import { activeProfileId } from "@/lib/active-profile";
 export const Route = createFileRoute("/obra/$slug/")({
   staticData: { sitemap: true },
   loader: ({ params, context }) =>
@@ -96,7 +97,7 @@ function SeriesPage() {
       const { data } = await supabase
         .from("favorites")
         .select("series_id")
-        .eq("user_id", user!.id)
+        .eq("user_id", user!.id).eq("profile_id", activeProfileId())
         .eq("series_id", series.data!.id)
         .maybeSingle();
       return Boolean(data);
@@ -110,7 +111,7 @@ function SeriesPage() {
       const { data } = await supabase
         .from("reading_history")
         .select("chapter_id, progress, chapters(number)")
-        .eq("user_id", user!.id)
+        .eq("user_id", user!.id).eq("profile_id", activeProfileId())
         .eq("series_id", series.data!.id);
       return (data ?? []) as unknown as Array<{
         chapter_id: string | null;
@@ -212,13 +213,13 @@ function SeriesPage() {
         const { error } = await supabase
           .from("favorites")
           .delete()
-          .eq("user_id", user.id)
+          .eq("user_id", user.id).eq("profile_id", activeProfileId())
           .eq("series_id", series.data.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("favorites")
-          .insert({ user_id: user.id, series_id: series.data.id });
+          .insert({ user_id: user.id, profile_id: activeProfileId(), series_id: series.data.id });
         if (error) throw error;
       }
     },

@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { selectHeroItems } from "@/lib/hero-policy";
 import { normalizeGenres } from "@/lib/work-genres";
 import { chapterCount } from "@/lib/series-summary";
+import { activeProfileId } from "@/lib/active-profile";
 
 const INTERVAL = 6000;
 
@@ -21,8 +22,8 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
     mutationFn: async ({ id, saved }: { id: string; saved: boolean }) => {
       if (!user) throw new Error("Entre na sua conta para favoritar.");
       const { error } = saved
-        ? await supabase.from("favorites").delete().eq("user_id", user.id).eq("series_id", id)
-        : await supabase.from("favorites").insert({ user_id: user.id, series_id: id });
+        ? await supabase.from("favorites").delete().eq("user_id", user.id).eq("profile_id", activeProfileId()).eq("series_id", id)
+        : await supabase.from("favorites").insert({ user_id: user.id, profile_id: activeProfileId(), series_id: id });
       if (error) throw error;
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["favorites"] }); },

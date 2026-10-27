@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useAuth";
 import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
+import { activeProfileId } from "@/lib/active-profile";
 
 export const Route = createFileRoute("/_authenticated/historico")({
   staticData: { sitemap: false },
@@ -45,7 +46,7 @@ function Historico() {
       const { data, error } = await supabase
         .from("reading_history")
         .select("updated_at, series_id, chapters(number), series!inner(id, slug, title, cover_url, kind)")
-        .eq("user_id", user!.id)
+        .eq("user_id", user!.id).eq("profile_id", activeProfileId())
         .order("updated_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as unknown as Row[];
@@ -68,13 +69,13 @@ function Historico() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ["hist-page"] });
   const removeOne = useMutation({
     mutationFn: async (id: string) => {
-      { const { error: dbErr } = await supabase.from("reading_history").delete().eq("user_id", user!.id).eq("series_id", id); if (dbErr) throw dbErr; }
+      { const { error: dbErr } = await supabase.from("reading_history").delete().eq("user_id", user!.id).eq("profile_id", activeProfileId()).eq("series_id", id); if (dbErr) throw dbErr; }
     },
     onSuccess: invalidate,
   });
   const clearAll = useMutation({
     mutationFn: async () => {
-      { const { error: dbErr } = await supabase.from("reading_history").delete().eq("user_id", user!.id); if (dbErr) throw dbErr; }
+      { const { error: dbErr } = await supabase.from("reading_history").delete().eq("user_id", user!.id).eq("profile_id", activeProfileId()); if (dbErr) throw dbErr; }
     },
     onSuccess: () => {
       invalidate();
