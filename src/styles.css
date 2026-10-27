@@ -326,3 +326,10 @@
   --color-profile-purple: var(--profile-purple);
   --color-profile-yellow: var(--profile-yellow);
 }
+
+.page-heading { border-left: 3px solid var(--primary); padding-left: 20px; }
+.catalog-filters button { max-width: 100%; white-space: normal; height: auto; min-height: 36px; }
+.collection-layout .group > div.border-t { min-height: 66px; }
+.admin-work-info { flex-basis: calc(100% - 84px); }
+@media (min-width: 1280px) { .admin-work-info { flex-basis: 240px; } }
+@media (max-width: 639px) { .collection-layout h1 { font-size: 23px; } .collection-layout .admin-page-heading { align-items: start; } .admin-work-row > [data-slot="button"] { flex-shrink: 0; } }

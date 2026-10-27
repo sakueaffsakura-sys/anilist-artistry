@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Award, BookOpen, BookText, BookPlus, LayoutDashboard, PlusCircle, Shield, Users, ExternalLink, Frame, Headset, Wrench, Smartphone } from "lucide-react";
+import { Award, BookOpen, BookText, BookPlus, LayoutDashboard, PlusCircle, Shield, Users, ExternalLink, Frame, Headset, Wrench, Smartphone, Tags, Images } from "lucide-react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ const NAV = [
   { to: "/admin/obras", label: "Obras", icon: BookOpen, exact: false },
   { to: "/admin/nova", label: "Nova obra", icon: PlusCircle, exact: true },
   { to: "/admin/novels", label: "Novels", icon: BookText, exact: false },
+  { to: "/admin/generos", label: "Gêneros", icon: Tags, exact: true, adminOnly: true },
+  { to: "/admin/imagens", label: "Imagens", icon: Images, exact: true },
   { to: "/admin/contas", label: "Contas", icon: Users, exact: true, adminOnly: true },
   { to: "/admin/molduras", label: "Molduras", icon: Frame, exact: true, adminOnly: true },
   { to: "/admin/selos", label: "Selos", icon: Award, exact: true, adminOnly: true },
@@ -88,7 +90,7 @@ export function AdminShell({
               <p className="text-[11px] text-muted-foreground">{isAdmin ? "Administrador" : "Uploader"}</p>
             </div>
           </div>
-          <nav className="space-y-1">
+          <nav aria-label="Áreas do painel" className="space-y-1">
             {NAV.filter((n) => !("adminOnly" in n) || isAdmin).map((n) => (
               <Link
                 key={n.to}
