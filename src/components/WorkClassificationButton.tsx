@@ -33,7 +33,7 @@ export function WorkClassificationButton() {
   setElapsed(0);
   const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
   return () => window.clearInterval(timer);
- }, [running, batch]);
+ }, [running]);
  const busy = running || savingId !== null;
  const run = async () => {
   if (!session?.access_token || busy) return;
@@ -77,7 +77,7 @@ export function WorkClassificationButton() {
   try {
    const result = await approve({ data: { work: row.work, suggestion: row.suggestion, mode } });
    setRows((previous) => previous.map((item) => item.work.id === row.work.id ? { ...item, status: result.saved ? "saved" : "conflict", message: result.message } : item));
-   if (result.saved) { await qc.invalidateQueries({ queryKey: ["admin-series"] }); await qc.invalidateQueries({ queryKey: ["series"] }); await qc.invalidateQueries({ queryKey: ["all-genres"] }); }
+   if (result.saved) { await Promise.all([qc.invalidateQueries({ queryKey: ["admin-series"] }), qc.invalidateQueries({ queryKey: ["series"] }), qc.invalidateQueries({ queryKey: ["all-genres"] })]); }
   } catch (error) { setRows((previous) => previous.map((item) => item.work.id === row.work.id ? { ...item, message: error instanceof Error ? error.message : "Não foi possível salvar." } : item)); }
   finally { saving.current = false; setSavingId(null); }
  };
