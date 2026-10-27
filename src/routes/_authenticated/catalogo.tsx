@@ -123,28 +123,22 @@ function Pesquisar() {
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <main className="mx-auto max-w-7xl px-4 py-10">
-        <h1 className="flex items-center gap-3 font-display text-3xl font-extrabold">
+      <main className="site-content catalog-layout mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <h1 className="flex items-center gap-3 font-display text-2xl font-extrabold sm:text-3xl">
           <Search className="h-7 w-7 text-primary" /> Pesquisar
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Descobre obras por nome, gênero e filtros — ou encontra utilizadores com{" "}
-          <span className="font-bold text-primary">@nick</span>.
-        </p>
 
-        <div className="mt-6 max-w-3xl rounded-xl border border-border bg-surface p-5">
+        <div className="mt-6 border-b border-border pb-6">
           <div className="relative">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               value={term}
               onChange={(e) => setTerm(e.target.value)}
-              placeholder="Buscar obras ou @utilizador..."
-              className="h-14 w-full rounded-lg border border-border bg-background pl-11 pr-4 text-sm outline-none focus:border-primary"
+              aria-label="Buscar obras ou leitores"
+              placeholder="Buscar obras ou @leitor..."
+              className="h-12 w-full rounded-md border border-border bg-surface pl-11 pr-4 text-sm outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
             />
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">
-            Dica: começa com <span className="text-primary">@</span> para pesquisar perfis.
-          </p>
         </div>
 
         {isUser ? (
@@ -168,8 +162,8 @@ function Pesquisar() {
             {users.data?.length === 0 ? <p className="text-sm text-muted-foreground">Nenhum utilizador encontrado.</p> : null}
           </div>
         ) : (
-          <div className="mt-8 grid gap-6 lg:grid-cols-[280px_1fr]">
-            <aside className="h-fit rounded-xl border border-border bg-surface p-5">
+          <div className="mt-8 grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+            <aside className="catalog-filters h-fit border-b border-border pb-6 lg:sticky lg:top-20 lg:border-b-0 lg:border-r lg:pr-6">
               <h2 className="font-display text-lg font-bold">Filtros</h2>
               <p className="mb-2 mt-4 text-sm font-semibold text-muted-foreground">Ordenar</p>
               <div className="space-y-2">
@@ -215,8 +209,8 @@ function Pesquisar() {
               </div>
             </aside>
 
-            <section>
-              <div className="rounded-xl border border-border bg-surface p-5">
+            <section className="min-w-0">
+              <div className="border-b border-border pb-5">
                 <p className="mb-2 text-xs font-bold uppercase text-muted-foreground">Formato</p>
                 <Chips value={s.kind} onChange={(v) => set({ kind: v })} options={FORMATS} />
               </div>
@@ -227,7 +221,7 @@ function Pesquisar() {
               <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
                 {(results.data?.rows ?? []).map((r) => (
                   <Link key={r.id} to="/obra/$slug" params={{ slug: r.slug }} className="group">
-                    <div className="relative overflow-hidden rounded-xl border border-border">
+                    <div className="relative overflow-hidden rounded-lg border border-border">
                       <img src={coverUrl(r.cover_url)} alt={r.title} className="aspect-[2/3] w-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
                       <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
                         <span className="flex items-center gap-1 rounded-md bg-background/85 px-2 py-0.5 text-[11px] font-bold">

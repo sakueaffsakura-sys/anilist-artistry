@@ -14,6 +14,7 @@
 - Work pages (`/catalogo`, `/obra/*`) live under `_authenticated` and require both sign-in and a chosen profile (`hasProfileChosen` in `src/lib/active-profile.ts`, set by `switchTo`); gates redirect to `/perfis` and the fullscreen picker blocks the app until a profile is picked.
 - Keep work rankings at `/ranking` and reader XP rankings at `/ranking-leitores` to separate audiences.
 - Use Sora headings and Manrope body; profiles contain dense achievements in a scannable bento layout.
+- Shared presentation uses semantic CSS tokens and scoped site-content/site-header/admin classes; reader dimensions and user-selected reading preferences remain independent.
 - Keep novels on the shared work details route, but give them a dedicated text reader while manga/comics retain the image reader, so both formats share catalog data without compromising reading ergonomics.
 - Novel narration uses Lovable AI TTS via the signed-in /api/tts route with device speech as fallback, because AI voices sound natural while fallback keeps reading working.
 - Remote novel imports enforce an exact server host allowlist, deadline and byte budget; revalidate every redirect.

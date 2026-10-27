@@ -115,7 +115,7 @@ function Home() {
           </div>
         </section>
       ) : <HeroCarousel items={heroItems} favoriteIds={favoriteIds} />}
-      <main className="mx-auto min-h-[60vh] max-w-7xl px-4 py-8">
+      <main className="site-content mx-auto min-h-[60vh] max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <h1 className="sr-only">Better Mangá — ler mangás, manhwas e comics online</h1>
         {catalogFailed ? (
           <div role="alert" className="mb-8 flex flex-wrap items-center justify-between gap-4 border-y border-border py-5">

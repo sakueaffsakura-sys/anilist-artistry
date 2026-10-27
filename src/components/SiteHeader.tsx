@@ -44,27 +44,27 @@ export function SiteHeader() {
   return (
     <>
       <header
-        className="sticky top-0 z-40 border-b border-foreground/5 bg-background/75 backdrop-blur-sm"
+        className="site-header sticky top-0 z-40 border-b border-border/60 bg-background/85"
       >
-        <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-3 sm:h-20 sm:gap-3 sm:px-4 md:px-8">
+        <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-8">
           <Link to="/" className="flex shrink-0 items-center" aria-label="Better Mangá — início">
             <img
               src="https://cdn.mediocrescan.com/usuarios/156358/056c603c2288529c82b19ad4906b02c7f5a67be8.webp"
               alt="Better Mangá"
-              className="h-16 w-auto object-contain drop-shadow-[0_0_14px_color-mix(in_oklab,var(--primary)_45%,transparent)] sm:h-20"
+              className="h-14 w-auto max-w-36 object-contain sm:max-w-40"
             />
           </Link>
 
           <div className="min-w-0 flex-1 lg:hidden" />
 
-          <nav className="hidden items-center gap-1 text-sm font-medium lg:order-none lg:flex lg:w-auto lg:min-w-0 lg:flex-1">
+          <nav aria-label="Navegação principal" className="hidden items-center gap-0.5 text-xs font-semibold lg:flex xl:text-sm">
             {NAV.map((item) => (
               <Link
                 key={item.to}
                 to={item.to}
                 activeOptions={{ exact: false }}
-                className="group relative flex items-center gap-2 whitespace-nowrap rounded-md px-2 py-2 transition-all"
-                activeProps={{ className: "text-foreground" }}
+                className="site-nav-link group relative flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-2"
+                activeProps={{ className: "bg-primary/10 text-primary" }}
                 inactiveProps={{ className: "text-muted-foreground hover:bg-foreground/5 hover:text-foreground" }}
               >
                 {({ isActive }) => (
@@ -81,20 +81,16 @@ export function SiteHeader() {
             ))}
           </nav>
 
-          <div className="hidden flex-1 lg:block" />
+          <div className="hidden min-w-0 flex-1 lg:block" />
 
           <Button
             asChild
             variant="ghost"
-            className="group hidden h-9 w-40 shrink-0 items-center gap-2.5 rounded-full border border-foreground/10 bg-foreground/[0.03] px-4 text-muted-foreground transition-all hover:border-foreground/15 hover:bg-foreground/[0.06] hover:text-foreground lg:flex xl:w-52"
+            className="hidden h-9 w-32 shrink-0 gap-2 rounded-md border border-border bg-surface px-3 text-muted-foreground lg:flex xl:w-44"
           >
             <Link to="/catalogo" search={{ q: "", kind: "Todos" }}>
               <Search className="h-3.5 w-3.5 shrink-0" />
               <span className="flex-1 text-left text-[13px]">Buscar...</span>
-              <span className="flex shrink-0 items-center gap-0.5 opacity-70 transition-opacity group-hover:opacity-100">
-                <kbd className="rounded border border-foreground/10 bg-background/60 px-1.5 py-0.5 font-mono text-[9px] leading-none text-muted-foreground">Ctrl</kbd>
-                <kbd className="rounded border border-foreground/10 bg-background/60 px-1.5 py-0.5 font-mono text-[9px] leading-none text-muted-foreground">K</kbd>
-              </span>
             </Link>
           </Button>
 
@@ -105,7 +101,7 @@ export function SiteHeader() {
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex min-w-0 items-center gap-2" aria-label="Conta">
+                <Button variant="ghost" size="icon" className="shrink-0" aria-label="Conta">
                   <span className="relative shrink-0 pb-2">
                     <span className="relative z-10 flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-foreground/10 bg-surface-2">
                       {profile?.avatar_url ? (
@@ -121,7 +117,7 @@ export function SiteHeader() {
                       </span>
                     </span>
                   </span>
-                </button>
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
                 <DropdownMenuItem asChild>
@@ -156,7 +152,7 @@ export function SiteHeader() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button asChild size="sm" className="rounded-full font-semibold">
+            <Button asChild size="sm" className="font-semibold">
               <Link to="/auth">Entrar</Link>
             </Button>
           )}
@@ -173,7 +169,7 @@ export const SITE_LOGO =
 export function SiteFooter() {
   const year = new Date().getFullYear();
   return (
-    <footer className="hidden border-t border-border/70 bg-background lg:block">
+    <footer className="site-footer hidden border-t border-border/70 bg-surface lg:block">
       <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 md:px-8">
         <div className="mb-8 grid grid-cols-1 gap-8 md:grid-cols-4">
           <div className="space-y-4">
@@ -262,14 +258,15 @@ export function SiteFooter() {
               Redes Sociais
             </h3>
             <div className="flex flex-wrap gap-3">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={openSupportChat}
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition-colors hover:bg-emerald-500"
+                className="border border-border"
               >
                 <Headset className="h-4 w-4" />
                 Suporte
-              </button>
+              </Button>
             </div>
             <nav className="flex flex-col gap-2.5 pt-2">
               <Link
@@ -293,7 +290,7 @@ export function SiteFooter() {
             <p className="text-xs font-bold text-muted-foreground">
               © {year} Better Mangá. Todos os direitos reservados.
             </p>
-            <div className="flex items-center gap-5 text-xs font-bold text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-end gap-4 text-xs font-semibold text-muted-foreground">
               <Link
                 to="/catalogo"
                 search={{ q: "", kind: "Todos" }}

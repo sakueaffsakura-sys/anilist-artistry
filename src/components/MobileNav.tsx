@@ -12,6 +12,8 @@ import {
   Layers,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile, useRoles, useSession } from "@/hooks/useAuth";
 import {
@@ -48,7 +50,7 @@ export function MobileNav() {
   return (
     <nav
       aria-label="Navegação do celular"
-      className="fixed inset-x-0 bottom-0 z-[100] border-t border-border/70 bg-background/80 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
+      className="mobile-site-nav fixed inset-x-0 bottom-0 z-[100] border-t border-border/70 bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
     >
       <div className="flex h-16 w-full items-stretch overflow-hidden px-1">
         <div className="flex w-full items-stretch gap-1">
@@ -62,7 +64,7 @@ export function MobileNav() {
                 key={item.to}
                 to={item.to}
                 activeOptions={{ exact: item.exact }}
-                className="relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 pb-1 transition-colors"
+                className={cn("relative my-1 flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-md transition-colors", active && "bg-primary/10")}
                 aria-current={active ? "page" : undefined}
               >
                 <Icon
@@ -75,7 +77,7 @@ export function MobileNav() {
                 />
                 <span
                   className={
-                    "text-[9px] font-extrabold uppercase tracking-wider transition-colors duration-200 " +
+                    "text-[9px] font-extrabold  transition-colors duration-200 " +
                     (active ? "text-foreground" : "text-muted-foreground")
                   }
                 >
@@ -95,16 +97,17 @@ export function MobileNav() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
+              <Button
+                variant="ghost"
                 type="button"
-                className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 pb-1 transition-colors"
+                className="my-1 h-auto min-w-0 flex-1 flex-col gap-1 px-0"
                 aria-label="Menu"
               >
                 <MenuIcon className="h-[18px] w-[18px] text-muted-foreground transition-all duration-300" />
-                <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground transition-colors duration-200">
+                <span className="text-[9px] font-extrabold  text-muted-foreground transition-colors duration-200">
                   Menu
                 </span>
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="end" className="w-48">
               <DropdownMenuItem asChild>

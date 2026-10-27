@@ -14,9 +14,9 @@ export function SectionRow({
   children: ReactNode;
 }) {
   return (
-    <section className="cv-auto mb-12">
-      <div className="mb-4 flex items-end justify-between gap-4">
-        <div>
+    <section className="cv-auto discovery-section mb-10 sm:mb-12">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-4">
+        <div className="min-w-0">
           <h2 className="section-title">
             <span className="text-primary">{icon}</span>
             {title}
@@ -32,6 +32,6 @@ export function SectionRow({
 
 export function HScroll({ children }: { children: ReactNode }) {
   return (
-    <div className="no-scrollbar -mx-1 flex gap-3 overflow-x-auto px-1 pb-2">{children}</div>
+    <div className="no-scrollbar -mx-1 flex snap-x snap-proximity gap-4 overflow-x-auto px-1 pb-3 [&>div]:snap-start">{children}</div>
   );
 }
