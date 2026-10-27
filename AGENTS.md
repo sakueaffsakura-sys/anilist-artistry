@@ -43,3 +43,4 @@
 - Classification uses admin RLS/CAS approval. AI streams review/progress with lease/pause; manual AniList search requires identity selection, no AI credits or inferred age.
 
 - DB title claims guard writes; duplicate scans mirror normalization, paginate published works and confirm individual RLS deletes.
+- Account sub-profiles: the main profile is an implicit sentinel UUID (`MAIN_PROFILE_ID`), extra profiles live in `account_profiles`; reading_history/favorites are keyed by profile_id, and the active profile is a client store (`src/lib/active-profile.ts`) read by query helpers so existing rows stay on the main profile without backfill.
