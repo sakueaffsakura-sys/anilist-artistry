@@ -44,6 +44,8 @@ function AdminPage() {
   const stats = useQuery({
     queryKey: ["admin-stats"],
     enabled: isStaff,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const [s, c, p, recent] = await Promise.all([
         supabase.from("series").select("views"),
@@ -51,6 +53,8 @@ function AdminPage() {
         supabase.from("profiles").select("id", { count: "exact", head: true }),
         supabase.from("series").select("id, title, cover_url, kind, updated_at, published").order("updated_at", { ascending: false }).limit(6),
       ]);
+      const failure = [s, c, p, recent].find((result) => result.error);
+      if (failure?.error) throw failure.error;
       return {
         series: s.data?.length ?? 0,
         views: (s.data ?? []).reduce((a, r) => a + (r.views ?? 0), 0),
@@ -146,7 +150,7 @@ function AdminPage() {
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {results.map((item) => (
               <div key={item.anilistId} className="flex gap-3 rounded-xl border border-border bg-background p-3">
-                <img src={coverUrl(item.coverUrl)} alt={item.title} className="h-32 w-22 shrink-0 rounded-lg object-cover" />
+                <img src={coverUrl(item.coverUrl)} alt={item.title} loading="lazy" decoding="async" className="h-32 w-22 shrink-0 rounded-lg object-cover" />
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-2 text-sm font-bold">{item.title}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{item.status} · nota {item.averageScore || "—"}</p>
@@ -172,7 +176,7 @@ function AdminPage() {
           {(d?.recent ?? []).map((r) => (
             <Link key={r.id} to="/admin/$id" params={{ id: r.id }} className="group">
               <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-border">
-                <img src={coverUrl(r.cover_url)} alt={r.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                <img src={coverUrl(r.cover_url)} alt={r.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
                 {!r.published ? (
                   <span className="absolute left-1.5 top-1.5 rounded bg-background/90 px-1.5 text-[10px] font-bold text-muted-foreground">Rascunho</span>
                 ) : null}
