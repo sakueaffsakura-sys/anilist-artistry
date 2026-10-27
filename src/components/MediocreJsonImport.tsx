@@ -19,6 +19,7 @@ export function MediocreJsonImport({ seriesId, onChange }: { seriesId: string; o
     if (!lines.length || busy) return;
     setBusy(true); setResults([]);
     let saved = 0;
+    const published = new Set<string>();
     try {
       const { data, error } = await supabase.from("chapters").select("number").eq("series_id", seriesId);
       if (error) throw error;
@@ -32,12 +33,13 @@ export function MediocreJsonImport({ seriesId, onChange }: { seriesId: string; o
           const pages = parseMediocrePages(await response.json());
           const { error: insertError } = await supabase.from("chapters").insert({ series_id: seriesId, number, title: null, pages, published: true });
           if (insertError) throw insertError;
-          taken.add(number); saved++;
+          taken.add(number); saved++; published.add(line);
           setResults((r) => [...r, { line, ok: true, message: `Capítulo ${number}: ${pages.length} páginas` }]);
         } catch (e) {
           setResults((r) => [...r, { line, ok: false, message: e instanceof Error ? e.message : "Falha." }]);
         }
       }
+      setText(lines.filter((line) => !published.has(line)).join("\n"));
       if (saved) {
         await supabase.from("series").update({ updated_at: new Date().toISOString() }).eq("id", seriesId);
         toast.success(`${saved} capítulo(s) publicado(s).`);
