@@ -36,6 +36,7 @@ import { uploadCommentImage } from "@/lib/comments";
 import { normalizeGenres } from "@/lib/work-genres";
 import { ageRatingLabel } from "@/lib/age-ratings";
 import { AgeRatingBadge } from "@/components/AgeRatingBadge";
+import { KidsBlocked } from "@/components/KidsBlocked";
 import { activeProfileId, isWorkAllowed, useActiveProfile } from "@/lib/active-profile";
 export const Route = createFileRoute("/obra/$slug/")({
   staticData: { sitemap: true },
@@ -78,6 +79,7 @@ export const Route = createFileRoute("/obra/$slug/")({
 function SeriesPage() {
   const { slug } = Route.useParams();
   const { user } = useSession();
+  const activeProfile = useActiveProfile();
   const queryClient = useQueryClient();
   const [order, setOrder] = useState<"asc" | "desc">("desc");
   const [expanded, setExpanded] = useState(false);
@@ -343,6 +345,8 @@ function SeriesPage() {
       </div>
     );
   }
+
+  if (!isWorkAllowed(obra.age_rating, activeProfile)) return <div className="min-h-screen"><SiteHeader /><KidsBlocked /></div>;
 
   const chapters = order === "asc" ? obra.chapters : [...obra.chapters].reverse();
   const readIds = chapterReads.data ?? new Set<string>();

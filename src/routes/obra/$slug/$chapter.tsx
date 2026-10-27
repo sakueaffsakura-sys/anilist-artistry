@@ -14,7 +14,8 @@ import { uploadCommentImage } from "@/lib/comments";
 import { parseNovelContent } from "@/lib/novel-content";
 import { NovelNarrator } from "@/components/NovelNarrator";
 import { chapterQueryOptions } from "@/lib/chapter-query";
-import { activeProfileId } from "@/lib/active-profile";
+import { activeProfileId, isWorkAllowed, useActiveProfile } from "@/lib/active-profile";
+import { KidsBlocked } from "@/components/KidsBlocked";
 
 export const Route = createFileRoute("/obra/$slug/$chapter")({
   staticData: { sitemap: false },
@@ -71,6 +72,7 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
   const { slug, chapter } = Route.useParams();
   const navigate = useNavigate();
   const { user } = useSession();
+  const activeProfile = useActiveProfile();
 
   const series = useSuspenseQuery({
     queryKey: ["series", slug],
@@ -240,6 +242,7 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [obra?.id, chapter]);
 
+  if (obra && !isWorkAllowed(obra.age_rating, activeProfile)) return <KidsBlocked />;
   if (!obra || !current) {
     return (
       <div className="grid min-h-screen place-items-center px-4 text-center">
