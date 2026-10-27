@@ -46,3 +46,5 @@
 
 - DB title claims guard writes; duplicate scans mirror normalization, paginate published works and confirm individual RLS deletes.
 - Account sub-profiles: the main profile is an implicit sentinel UUID (`MAIN_PROFILE_ID`), extra profiles live in `account_profiles`; reading_history/favorites are keyed by profile_id, and the active profile is a client store (`src/lib/active-profile.ts`) read by query helpers so existing rows stay on the main profile without backfill.
+
+- Discovery and collection controls reuse LibraryBits and URL-backed catalog filters; publication utilities mount on explicit expansion to keep work listings focused and lightweight.

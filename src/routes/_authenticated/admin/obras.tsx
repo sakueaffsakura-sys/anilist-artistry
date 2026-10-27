@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, Eye, EyeOff, GalleryHorizontal, KeyRound, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ChevronDown, Eye, EyeOff, GalleryHorizontal, KeyRound, Pencil, Plus, Search, Trash2, Wrench, BookText, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/AdminShell";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
@@ -55,7 +55,8 @@ function CloudinaryKeys() {
 
   return (
     <div className="mb-5 rounded-2xl border border-border bg-surface">
-      <button
+      <Button variant="ghost"
+        aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center justify-between gap-3 p-4 text-left"
       >
@@ -66,7 +67,7 @@ function CloudinaryKeys() {
           ) : null}
         </span>
         <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
+      </Button>
       {open ? (
         <div className="grid gap-2 border-t border-border p-4 sm:grid-cols-2">
           <Input placeholder="Cloud name" value={cfg.cloud_name} onChange={(e) => setCfg({ ...cfg, cloud_name: e.target.value })} />
@@ -112,6 +113,7 @@ function ObrasAdmin() {
   const { isStaff, isAdmin } = useRoles(user?.id);
   const qc = useQueryClient();
   const [q, setQ] = useState("");
+  const [tools, setTools] = useState(false);
   const [filter, setFilter] = useState<"all" | "pub" | "draft" | "slide">("all");
 
   const [page, setPage] = useState(1);
@@ -177,40 +179,44 @@ function ObrasAdmin() {
         </div>
       }
     >
-      {isAdmin ? <CloudinaryKeys /> : null}
-      {isAdmin ? <DuplicateWorksPanel /> : null}
+      <div className="mb-6 flex flex-wrap items-center gap-2 border-b border-border pb-5">
+        <Button asChild variant="outline" size="sm"><Link to="/admin/novels"><BookText className="h-4 w-4" /> Novels <ArrowUpRight className="h-3 w-3" /></Link></Button>
+        {isAdmin ? <Button variant="ghost" size="sm" onClick={() => setTools((v) => !v)} aria-expanded={tools}><Wrench className="h-4 w-4" /> Ferramentas <ChevronDown className={`h-3 w-3 ${tools ? "rotate-180" : ""}`} /></Button> : null}
+      </div>
+      {isAdmin && tools ? <><CloudinaryKeys /><DuplicateWorksPanel /></> : null}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-56 flex-1">
+        <div className="relative min-w-0 basis-full sm:basis-auto sm:flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Buscar obra…" className="h-11 bg-surface pl-9" />
+          <Input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} aria-label="Buscar obra no painel" placeholder="Buscar obra…" className="h-11 bg-surface pl-9" />
         </div>
-        <div className="flex rounded-xl border border-border bg-surface p-1">
+        <div className="flex max-w-full flex-wrap gap-1 rounded-lg border border-border bg-surface p-1">
           {([
             ["all", "Todas"],
             ["pub", "Publicadas"],
             ["draft", "Rascunhos"],
             ["slide", "No slide"],
           ] as const).map(([k, l]) => (
-            <button
+            <Button variant="ghost" size="sm"
+              aria-pressed={filter === k}
               key={k}
               onClick={() => { setFilter(k); setPage(1); }}
               className={`rounded-lg px-4 py-1.5 text-sm font-semibold ${filter === k ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
             >
               {l}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
 
       {series.isFetching ? <p role="status" className="mt-4 text-sm text-muted-foreground">Carregando obras…</p> : null}
       {series.isError ? <div role="alert" className="mt-4 text-sm text-destructive">Não foi possível carregar as obras. <Button variant="outline" onClick={() => void series.refetch()}>Tentar novamente</Button></div> : null}
-      <div aria-busy={series.isFetching} className="mt-5 overflow-hidden rounded-2xl border border-border bg-surface">
+      <div aria-busy={series.isFetching} className="admin-work-list mt-5 overflow-hidden rounded-lg border border-border bg-surface">
         {rows.map((r) => (
-          <div key={r.id} className="flex items-center gap-4 border-b border-border p-3 last:border-0 hover:bg-surface-2/50">
+          <div key={r.id} className="admin-work-row flex flex-wrap items-center gap-3 border-b border-border p-4 last:border-0 hover:bg-surface-2/50">
             <img src={coverUrl(r.cover_url)} alt={r.title} loading="lazy" decoding="async" className="h-20 w-14 shrink-0 rounded-lg object-cover" />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="truncate font-bold">{r.title}</p>
+            <div className="admin-work-info min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Link to="/admin/$id" params={{ id: r.id }} className="line-clamp-2 basis-full font-bold hover:text-primary">{r.title}</Link>
                 <span
                   className={`shrink-0 rounded-full px-2 py-px text-[10px] font-bold ${
                     r.published ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
@@ -238,7 +244,7 @@ function ObrasAdmin() {
               <GalleryHorizontal className="h-3.5 w-3.5 sm:mr-1.5" />
               <span className="hidden sm:inline">{r.in_slider ? "Tirar do slide" : "Pôr no slide"}</span>
             </Button>
-            <Button variant="ghost" size="icon" title={r.published ? "Despublicar" : "Publicar"} onClick={() => toggle.mutate(r)}>
+            <Button variant="ghost" size="icon" title={r.published ? "Despublicar" : "Publicar"} aria-label={r.published ? "Despublicar" : "Publicar"} disabled={toggle.isPending} onClick={() => toggle.mutate(r)}>
               {r.published ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
             </Button>
             <Button asChild variant="outline" size="sm" className="border-primary/50 font-semibold text-primary hover:bg-primary/10">
