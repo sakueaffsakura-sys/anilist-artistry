@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Baby, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -159,9 +160,10 @@ function CreateProfile({ onClose, onCreated }: { onClose: () => void; onCreated:
   );
 }
 
-/** Full-screen chooser shown once after sign-in when the account has several profiles. */
+/** Full-screen chooser shown until the account picks a profile; work pages require it. */
 export function ProfileGate() {
+  const navigate = useNavigate();
   const { needsPick } = useProfiles();
   if (!needsPick) return null;
-  return <div className="fixed inset-0 z-[60] overflow-y-auto bg-background"><ProfilePicker /></div>;
+  return <div className="fixed inset-0 z-[60] overflow-y-auto bg-background"><ProfilePicker onDone={() => void navigate({ to: "/" })} /></div>;
 }
