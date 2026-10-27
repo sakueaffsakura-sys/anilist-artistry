@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Ban, BookmarkPlus, BookOpen, CheckCircle2, Sparkles, Star, Trash2 } from "lucide-react";
 import { coverUrl } from "@/lib/media";
 import { KINDS } from "@/lib/queries";
+import { Button } from "@/components/ui/button";
 
 export const FORMATS = ["Todos", ...KINDS];
 
@@ -43,8 +44,9 @@ export function Chips({
   return (
     <div className="flex flex-wrap gap-2">
       {options.map((opt) => (
-        <button
+        <Button variant="ghost" size="sm"
           key={opt}
+          aria-pressed={value === opt}
           onClick={() => onChange(opt)}
           className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
             value === opt
@@ -53,7 +55,7 @@ export function Chips({
           }`}
         >
           {opt}
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -73,7 +75,8 @@ export function TabButton({
   count?: number | undefined;
 }) {
   return (
-    <button
+    <Button variant="ghost"
+      aria-pressed={active}
       onClick={onClick}
       className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
         active
@@ -92,7 +95,7 @@ export function TabButton({
           {count > 99 ? "99+" : count}
         </span>
       ) : null}
-    </button>
+    </Button>
   );
 }
 
@@ -105,6 +108,7 @@ export function CollectionCard({
   kind,
   progress,
   onRemove,
+  resumeChapter,
 }: {
   slug: string;
   title: string;
@@ -114,9 +118,10 @@ export function CollectionCard({
   kind: string;
   progress: number;
   onRemove?: () => void;
+  resumeChapter?: number | undefined;
 }) {
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-border bg-surface">
+    <div className="group relative overflow-hidden rounded-lg border border-border bg-surface">
       <Link to="/obra/$slug" params={{ slug }} className="block">
         <div className="relative aspect-[2/3]">
           <img src={coverUrl(cover)} alt={title} className="h-full w-full object-cover" loading="lazy" />
@@ -144,14 +149,19 @@ export function CollectionCard({
           </div>
         </div>
       </Link>
+      <div className="border-t border-border p-3">
+        <Link to="/obra/$slug" params={{ slug }} className="line-clamp-2 min-h-10 text-sm font-bold leading-5 hover:text-primary">{title}</Link>
+        {resumeChapter !== undefined ? <Button asChild variant="secondary" size="sm" className="mt-3 w-full text-xs"><Link to="/obra/$slug/$chapter" params={{ slug, chapter: String(resumeChapter) }}><BookOpen className="h-3.5 w-3.5" /> Cap. {resumeChapter}</Link></Button> : null}
+      </div>
       {onRemove ? (
-        <button
+        <Button variant="ghost" size="icon"
           onClick={onRemove}
-          aria-label="Remover"
+          aria-label={`Remover ${title}`}
+          title={`Remover ${title}`}
           className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-background/80 text-muted-foreground backdrop-blur hover:text-destructive"
         >
           <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        </Button>
       ) : null}
     </div>
   );

@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useGenres } from "@/hooks/use-genres";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { BookOpen, Search, Star, User2 } from "lucide-react";
+import { BookOpen, Compass, Search, SlidersHorizontal, Star, User2, X } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
 import { Chips, FORMATS } from "@/components/LibraryBits";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +12,8 @@ import { coverUrl } from "@/lib/media";
 import { Pager } from "@/components/Pager";
 import { Button } from "@/components/ui/button";
 import { GENRES, genreAliases, normalizeGenres } from "@/lib/work-genres";
-import { allowedAgeRatings, hasProfileChosen } from "@/lib/active-profile";
+import { allowedAgeRatings, hasProfileChosen, useActiveProfile } from "@/lib/active-profile";
+import { AgeRatingBadge } from "@/components/AgeRatingBadge";
 
 const searchSchema = z.object({
   q: fallback(z.string(), "").default(""),
@@ -62,6 +63,8 @@ function Pesquisar() {
   const s = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const [term, setTerm] = useState(s.q);
+  const [genreSearch, setGenreSearch] = useState("");
+  const profile = useActiveProfile();
   useEffect(() => setTerm(s.q), [s.q]);
   useEffect(() => {
     const t = setTimeout(() => {
@@ -78,12 +81,14 @@ function Pesquisar() {
   const tags = useGenres();
 
   const results = useQuery({
-    queryKey: ["search", s],
+    queryKey: ["search", profile.id, profile.kidsMaxAge, s],
     enabled: !isUser,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       let q = supabase
         .from("series")
-        .select("id, slug, title, cover_url, kind, rating, chapters(count)", { count: "exact" })
+        .select("id, slug, title, cover_url, kind, rating, age_rating, chapters(count)", { count: "exact" })
         .eq("published", true);
       const kidsAges = allowedAgeRatings();
       if (kidsAges) q = q.in("age_rating", kidsAges);
@@ -124,9 +129,10 @@ function Pesquisar() {
     <div className="min-h-screen">
       <SiteHeader />
       <main className="site-content catalog-layout mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <h1 className="flex items-center gap-3 font-display text-2xl font-extrabold sm:text-3xl">
-          <Search className="h-7 w-7 text-primary" /> Pesquisar
-        </h1>
+        <div className="page-heading flex flex-wrap items-end justify-between gap-4 border-b border-border pb-6">
+          <div><p className="mb-2 text-xs font-bold uppercase text-primary">Better Mangá / Descoberta</p><h1 className="flex items-center gap-3 font-display text-2xl font-extrabold sm:text-3xl"><Compass className="h-7 w-7 text-primary" /> Explorar obras</h1></div>
+          <Button asChild variant="outline"><Link to="/biblioteca"><BookOpen className="h-4 w-4" /> Minha coleção</Link></Button>
+        </div>
 
         <div className="mt-6 border-b border-border pb-6">
           <div className="relative">
@@ -164,7 +170,7 @@ function Pesquisar() {
         ) : (
           <div className="mt-8 grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
             <aside className="catalog-filters h-fit border-b border-border pb-6 lg:sticky lg:top-20 lg:border-b-0 lg:border-r lg:pr-6">
-              <h2 className="font-display text-lg font-bold">Filtros</h2>
+              <div className="flex items-center justify-between"><h2 className="flex items-center gap-2 font-display text-lg font-bold"><SlidersHorizontal className="h-4 w-4 text-primary" /> Filtros</h2><Button variant="ghost" size="sm" onClick={() => { setTerm(""); set({ q: "", kind: "Todos", sort: "recent", status: "", tag: "" }); }}>Limpar</Button></div>
               <p className="mb-2 mt-4 text-sm font-semibold text-muted-foreground">Ordenar</p>
               <div className="space-y-2">
                 {SORTS.map((o) => (
@@ -193,9 +199,10 @@ function Pesquisar() {
                   </Button>
                 ))}
               </div>
-              <p className="mb-2 mt-5 text-sm font-semibold text-muted-foreground">Tags</p>
+              <p className="mb-2 mt-5 text-sm font-semibold text-muted-foreground">Gêneros</p>
+              <input aria-label="Buscar gênero" placeholder="Buscar gênero…" value={genreSearch} onChange={(e) => setGenreSearch(e.target.value)} className="mb-3 h-9 w-full rounded-md border border-border bg-surface px-3 text-sm focus-visible:outline-primary" />
               <div className="flex max-h-64 flex-wrap gap-2 overflow-y-auto pr-1">
-                {(tags.data ?? GENRES).map((t) => (
+                {(tags.data ?? GENRES).filter((t) => t.toLocaleLowerCase().includes(genreSearch.toLocaleLowerCase())).map((t) => (
                   <Button type="button" variant="ghost"
                     key={t}
                     onClick={() => set({ tag: s.tag === t ? "" : t })}
@@ -218,6 +225,7 @@ function Pesquisar() {
                 <span>{total} resultados</span>
                 <span className="text-xs">Ordenado por {SORTS.find((o) => o.key === s.sort)?.label.toLowerCase()}</span>
               </div>
+              {(s.tag || s.status || s.kind !== "Todos" || s.q) ? <div className="mt-4 flex flex-wrap gap-2">{([{ value: s.q, patch: { q: "" } }, { value: s.kind === "Todos" ? "" : s.kind, patch: { kind: "Todos" } }, { value: s.status, patch: { status: "" } }, { value: s.tag, patch: { tag: "" } }]).filter((f) => f.value).map((f, i) => <Button key={i} variant="secondary" size="sm" onClick={() => { if ("q" in f.patch) setTerm(""); set(f.patch); }} aria-label={`Remover filtro ${f.value}`}>{f.value}<X className="h-3 w-3" /></Button>)}</div> : null}
               <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
                 {(results.data?.rows ?? []).map((r) => (
                   <Link key={r.id} to="/obra/$slug" params={{ slug: r.slug }} className="group">
@@ -230,6 +238,7 @@ function Pesquisar() {
                         <span className="rounded-md border border-primary/60 bg-background/85 px-1.5 py-0.5 text-[11px] font-bold text-primary">
                           {r.kind}
                         </span>
+                        <AgeRatingBadge value={r.age_rating} size="sm" />
                       </div>
                       <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-md bg-background/85 px-1.5 py-0.5 text-[11px] font-bold text-gold">
                         <Star className="h-3 w-3 fill-gold" /> {Number(r.rating).toFixed(1).replace(".", ",")}
@@ -239,9 +248,10 @@ function Pesquisar() {
                   </Link>
                 ))}
               </div>
-              {results.isLoading ? <p className="mt-6 text-sm text-muted-foreground">Carregando…</p> : null}
-              {!results.isLoading && total === 0 ? (
-                <p className="mt-6 text-sm text-muted-foreground">Nenhuma obra encontrada.</p>
+              {results.isLoading ? <div role="status" className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">{Array.from({ length: 8 }, (_, i) => <div key={i} className="aspect-[2/3] animate-pulse rounded-lg bg-surface-2" />)}<span className="sr-only">Carregando obras</span></div> : null}
+              {results.isError ? <div role="alert" className="py-10 text-center"><p className="mb-3 text-muted-foreground">Não foi possível carregar o catálogo.</p><Button variant="outline" onClick={() => void results.refetch()}>Tentar novamente</Button></div> : null}
+              {!results.isLoading && !results.isError && total === 0 ? (
+                <div className="py-12 text-center"><Compass className="mx-auto mb-4 h-9 w-9 text-primary" /><p className="font-display font-bold">Nenhuma obra encontrada</p><Button className="mt-4" variant="outline" onClick={() => { setTerm(""); set({ q: "", kind: "Todos", status: "", tag: "" }); }}>Limpar filtros</Button></div>
               ) : null}
               <Pager page={s.page} pages={pages} onChange={(p) => navigate({ to: ".", search: (prev) => ({ ...prev, page: p }) })} />
             </section>
