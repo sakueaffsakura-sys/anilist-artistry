@@ -63,10 +63,10 @@ export function MediocreJsonImport({ seriesId, onChange }: { seriesId: string; o
       });
       for (let i = 0; i < items.length; i++) {
         for (let j = i; j < Math.min(items.length, i + FETCH_CONCURRENCY); j++) {
-          if (!fetched.has(j)) { const p = fetchPages(items[j]); p.catch(() => {}); fetched.set(j, p); }
+          if (!fetched.has(j)) { const p = fetchPages(items[j]!); p.catch(() => {}); fetched.set(j, p); }
         }
         if (cancel.current) break;
-        const item = items[i];
+        const item = items[i]!;
         try {
           const pages = await fetched.get(i)!;
           const { error: insertError } = await supabase.from("chapters").insert({ series_id: seriesId, number: item.number, title: null, pages, published: true });
