@@ -35,11 +35,18 @@ export function ManualClassificationPanel() {
     finally { setBusy(false); }
   }
   async function findResults() {
-    if (!query.trim()) return;
+    const names = [query, ...(work?.alt_titles ?? "").split(/[,;\n|]/)]
+      .map((n) => n.trim()).filter((n, i, all) => n.length > 1 && all.findIndex((x) => x.toLowerCase() === n.toLowerCase()) === i).slice(0, 5);
+    if (!names.length) return;
     setBusy(true); setMessage(""); setResults([]);
     try {
-      const found = await searchAnilistSmart(query.trim(), search);
-      setResults(found); if (!found.length) setMessage("Nenhum resultado no AniList. Tente um título alternativo.");
+      const merged = new Map<number, AnilistResult>();
+      for (const name of names) {
+        try { for (const item of await searchAnilistSmart(name, search)) if (!merged.has(item.anilistId)) merged.set(item.anilistId, item); } catch { /* tenta o próximo nome */ }
+        if (merged.size >= 12) break;
+      }
+      const found = [...merged.values()];
+      setResults(found); setMessage(found.length ? `Pesquisado por ${names.length} nome(s): principal e alternativos.` : "Nenhum resultado no AniList pelo nome nem pelos títulos alternativos.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Não foi possível pesquisar no AniList."); }
     finally { setBusy(false); }
   }
