@@ -56,7 +56,7 @@ export function MediocreJsonImport({ seriesId, onChange }: { seriesId: string; o
       items.sort((a, b) => a.number - b.number);
       setTotal(items.length);
       // Fetch JSONs in parallel (bounded), publish in chapter order.
-      const fetched = new Map<number, Promise<unknown[]>>();
+      const fetched = new Map<number, Promise<string[]>>();
       const fetchPages = (item: (typeof items)[number]) => fetch(item.url, { redirect: "error" }).then(async (res) => {
         if (!res.ok) throw new Error(`Erro ${res.status} ao ler o JSON.`);
         return parseMediocrePages(await res.json());
@@ -68,7 +68,7 @@ export function MediocreJsonImport({ seriesId, onChange }: { seriesId: string; o
         if (cancel.current) break;
         const item = items[i];
         try {
-          const pages = (await fetched.get(i)!) as Parameters<typeof parseMediocrePages>[0] & string[];
+          const pages = await fetched.get(i)!;
           const { error: insertError } = await supabase.from("chapters").insert({ series_id: seriesId, number: item.number, title: null, pages, published: true });
           if (insertError) throw insertError;
           saved++; published.add(item.line);
