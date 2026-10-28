@@ -56,19 +56,19 @@ export function MediocreJsonImport({ seriesId, onChange }: { seriesId: string; o
       items.sort((a, b) => a.number - b.number);
       setTotal(items.length);
       // Fetch JSONs in parallel (bounded), publish in chapter order.
-      const fetched = new Map<number, Promise<unknown[]>>();
+      const fetched = new Map<number, Promise<string[]>>();
       const fetchPages = (item: (typeof items)[number]) => fetch(item.url, { redirect: "error" }).then(async (res) => {
         if (!res.ok) throw new Error(`Erro ${res.status} ao ler o JSON.`);
         return parseMediocrePages(await res.json());
       });
       for (let i = 0; i < items.length; i++) {
         for (let j = i; j < Math.min(items.length, i + FETCH_CONCURRENCY); j++) {
-          if (!fetched.has(j)) { const p = fetchPages(items[j]); p.catch(() => {}); fetched.set(j, p); }
+          if (!fetched.has(j)) { const p = fetchPages(items[j]!); p.catch(() => {}); fetched.set(j, p); }
         }
         if (cancel.current) break;
-        const item = items[i];
+        const item = items[i]!;
         try {
-          const pages = (await fetched.get(i)!) as Parameters<typeof parseMediocrePages>[0] & string[];
+          const pages = await fetched.get(i)!;
           const { error: insertError } = await supabase.from("chapters").insert({ series_id: seriesId, number: item.number, title: null, pages, published: true });
           if (insertError) throw insertError;
           saved++; published.add(item.line);
