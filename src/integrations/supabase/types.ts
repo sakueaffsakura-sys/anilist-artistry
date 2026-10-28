@@ -864,6 +864,113 @@ export type Database = {
           },
         ]
       }
+      reel_likes: {
+        Row: {
+          created_at: string
+          reel_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          reel_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          reel_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reel_likes_reel_id_fkey"
+            columns: ["reel_id"]
+            isOneToOne: false
+            referencedRelation: "reels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reel_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reel_reports: {
+        Row: {
+          created_at: string
+          reason: string
+          reel_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          reason: string
+          reel_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          reason?: string
+          reel_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reel_reports_reel_id_fkey"
+            columns: ["reel_id"]
+            isOneToOne: false
+            referencedRelation: "reels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reel_reports_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reels: {
+        Row: {
+          caption: string
+          created_at: string
+          duration_seconds: number
+          id: string
+          status: string
+          user_id: string
+          video_path: string
+        }
+        Insert: {
+          caption?: string
+          created_at?: string
+          duration_seconds: number
+          id?: string
+          status?: string
+          user_id: string
+          video_path: string
+        }
+        Update: {
+          caption?: string
+          created_at?: string
+          duration_seconds?: number
+          id?: string
+          status?: string
+          user_id?: string
+          video_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reels_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       series: {
         Row: {
           age_rating: string | null
