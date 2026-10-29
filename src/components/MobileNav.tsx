@@ -9,7 +9,7 @@ import {
   Shield,
   Trophy,
   User2,
-  Layers,
+  Clapperboard,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ const ITEMS = [
   { to: "/", label: "Início", icon: House, exact: true },
   { to: "/catalogo", label: "Pesquisar", icon: Search, exact: false },
   { to: "/biblioteca", label: "Coleção", icon: BookOpen, exact: false },
-  { to: "/listas", label: "Listas", icon: Layers, exact: false },
+  { to: "/reels", label: "Reels", icon: Clapperboard, exact: false },
   { to: "/ranking", label: "Obras", icon: Trophy, exact: true },
 ] as const;
 

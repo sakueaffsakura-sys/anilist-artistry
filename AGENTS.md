@@ -9,10 +9,10 @@
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
 
-- Load database-backed SEO metadata in route loaders for shareable initial HTML.
+- Load DB-backed SEO metadata in loaders.
 - Sitemap: only public static pages and public community lists; work pages require an account and a chosen profile, so they are excluded.
 - Work pages (`/catalogo`, `/obra/*`) live under `_authenticated` and require both sign-in and a chosen profile (`hasProfileChosen` in `src/lib/active-profile.ts`, set by `switchTo`); gates redirect to `/perfis` and the fullscreen picker blocks the app until a profile is picked.
-- Keep work rankings at `/ranking` and reader XP rankings at `/ranking-leitores` to separate audiences.
+- Work rankings: `/ranking`; reader XP: `/ranking-leitores`.
 - Use Sora headings and Manrope body; profiles contain dense achievements in a scannable bento layout.
 - Shared presentation uses semantic CSS tokens and scoped site-content/site-header/admin classes; reader dimensions and user-selected reading preferences remain independent.
 - Keep novels on the shared work details route, but give them a dedicated text reader while manga/comics retain the image reader, so both formats share catalog data without compromising reading ergonomics.
@@ -48,3 +48,4 @@
 - Account sub-profiles: the main profile is an implicit sentinel UUID (`MAIN_PROFILE_ID`), extra profiles live in `account_profiles`; reading_history/favorites are keyed by profile_id, and the active profile is a client store (`src/lib/active-profile.ts`) read by query helpers so existing rows stay on the main profile without backfill.
 
 - Discovery/collection reuse LibraryBits and URL filters; tools mount on expansion. AdminShell owns studio navigation, independent of public headers/readers.
+- Reels: private bucket, owner folders, admin review, signed URLs; hidden for kids.

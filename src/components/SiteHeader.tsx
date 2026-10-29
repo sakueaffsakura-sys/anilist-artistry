@@ -19,6 +19,7 @@ import {
 
 const NAV = [
   { to: "/catalogo", label: "Catálogo" },
+  { to: "/reels", label: "Reels" },
   { to: "/ranking", label: "Ranking" },
   { to: "/biblioteca", label: "Coleções" },
   { to: "/listas", label: "Listas" },

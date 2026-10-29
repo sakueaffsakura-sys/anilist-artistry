@@ -23,6 +23,7 @@ import { Route as AuthenticatedCatalogoRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedHistoricoRouteImport } from './routes/_authenticated/historico'
 import { Route as AuthenticatedPedidosRouteImport } from './routes/_authenticated/pedidos'
 import { Route as AuthenticatedPerfisRouteImport } from './routes/_authenticated/perfis'
+import { Route as AuthenticatedReelsRouteImport } from './routes/_authenticated/reels'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiVersionRouteImport } from './routes/api/version'
 import { Route as ListasIndexRouteImport } from './routes/listas/index'
@@ -116,6 +117,11 @@ const AuthenticatedPedidosRoute = AuthenticatedPedidosRouteImport.update({
 const AuthenticatedPerfisRoute = AuthenticatedPerfisRouteImport.update({
   id: '/perfis',
   path: '/perfis',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedReelsRoute = AuthenticatedReelsRouteImport.update({
+  id: '/reels',
+  path: '/reels',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const ApiTtsRoute = ApiTtsRouteImport.update({
@@ -269,6 +275,7 @@ export interface FileRoutesByFullPath {
   '/historico': typeof AuthenticatedHistoricoRoute
   '/pedidos': typeof AuthenticatedPedidosRoute
   '/perfis': typeof AuthenticatedPerfisRoute
+  '/reels': typeof AuthenticatedReelsRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/version': typeof ApiVersionRoute
   '/listas/$id': typeof ListasIdRoute
@@ -309,6 +316,7 @@ export interface FileRoutesByTo {
   '/historico': typeof AuthenticatedHistoricoRoute
   '/pedidos': typeof AuthenticatedPedidosRoute
   '/perfis': typeof AuthenticatedPerfisRoute
+  '/reels': typeof AuthenticatedReelsRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/version': typeof ApiVersionRoute
   '/listas/$id': typeof ListasIdRoute
@@ -351,6 +359,7 @@ export interface FileRoutesById {
   '/_authenticated/historico': typeof AuthenticatedHistoricoRoute
   '/_authenticated/pedidos': typeof AuthenticatedPedidosRoute
   '/_authenticated/perfis': typeof AuthenticatedPerfisRoute
+  '/_authenticated/reels': typeof AuthenticatedReelsRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/version': typeof ApiVersionRoute
   '/listas/$id': typeof ListasIdRoute
@@ -393,6 +402,7 @@ export interface FileRouteTypes {
     | '/historico'
     | '/pedidos'
     | '/perfis'
+    | '/reels'
     | '/api/tts'
     | '/api/version'
     | '/listas/$id'
@@ -433,6 +443,7 @@ export interface FileRouteTypes {
     | '/historico'
     | '/pedidos'
     | '/perfis'
+    | '/reels'
     | '/api/tts'
     | '/api/version'
     | '/listas/$id'
@@ -474,6 +485,7 @@ export interface FileRouteTypes {
     | '/_authenticated/historico'
     | '/_authenticated/pedidos'
     | '/_authenticated/perfis'
+    | '/_authenticated/reels'
     | '/api/tts'
     | '/api/version'
     | '/listas/$id'
@@ -619,6 +631,13 @@ declare module '@tanstack/react-router' {
       path: '/perfis'
       fullPath: '/perfis'
       preLoaderRoute: typeof AuthenticatedPerfisRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/reels': {
+      id: '/_authenticated/reels'
+      path: '/reels'
+      fullPath: '/reels'
+      preLoaderRoute: typeof AuthenticatedReelsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/api/tts': {
@@ -805,6 +824,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedHistoricoRoute: typeof AuthenticatedHistoricoRoute
   AuthenticatedPedidosRoute: typeof AuthenticatedPedidosRoute
   AuthenticatedPerfisRoute: typeof AuthenticatedPerfisRoute
+  AuthenticatedReelsRoute: typeof AuthenticatedReelsRoute
   AuthenticatedAdminIdRoute: typeof AuthenticatedAdminIdRoute
   AuthenticatedAdminAppRoute: typeof AuthenticatedAdminAppRoute
   AuthenticatedAdminContasRoute: typeof AuthenticatedAdminContasRoute
@@ -830,6 +850,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedHistoricoRoute: AuthenticatedHistoricoRoute,
   AuthenticatedPedidosRoute: AuthenticatedPedidosRoute,
   AuthenticatedPerfisRoute: AuthenticatedPerfisRoute,
+  AuthenticatedReelsRoute: AuthenticatedReelsRoute,
   AuthenticatedAdminIdRoute: AuthenticatedAdminIdRoute,
   AuthenticatedAdminAppRoute: AuthenticatedAdminAppRoute,
   AuthenticatedAdminContasRoute: AuthenticatedAdminContasRoute,
