@@ -115,50 +115,77 @@ function ReelsPage() {
     return <div className="min-h-screen bg-background"><SiteHeader /><main className="mx-auto max-w-lg px-4 py-20 text-center"><h1 className="text-2xl font-bold">Reels indisponíveis</h1><p className="mt-2 text-muted-foreground">Vídeos da comunidade não aparecem em perfis infantis.</p></main></div>;
   }
 
+  const tabs = ["feed", "mine", ...(isAdmin ? ["review"] : [])] as const;
+  const action = "flex flex-col items-center gap-1 text-[11px] font-bold text-foreground drop-shadow";
+  const iconBtn = "grid h-12 w-12 place-items-center rounded-full bg-background/35 backdrop-blur-md transition hover:bg-primary/25 active:scale-90";
+
   return (
-    <div className="min-h-screen bg-background">
-      <SiteHeader />
-      <main className="mx-auto max-w-xl px-3 pb-24 pt-4">
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <h1 className="mr-auto text-2xl font-bold">Reels</h1>
-          {(["feed", "mine", ...(isAdmin ? ["review"] : [])] as const).map((v) => (
-            <Button key={v} size="sm" variant={view === v ? "default" : "secondary"} onClick={() => setView(v as typeof view)}>
-              {v === "feed" ? "Para você" : v === "mine" ? "Meus" : "Revisar"}
-            </Button>
-          ))}
-          <Button size="sm" onClick={() => setComposer(true)}><Plus className="h-4 w-4" /> Publicar</Button>
+    <div className="reels-page min-h-screen bg-background">
+      <div className="hidden lg:block"><SiteHeader /></div>
+      <div className="lg:hidden"><MobileNav /></div>
+      <main className="relative mx-auto h-[calc(100dvh-4rem-env(safe-area-inset-bottom))] max-w-[480px] lg:h-[calc(100dvh-4rem)] lg:py-4">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 bg-gradient-to-b from-background/80 to-transparent px-4 pb-8 pt-4 lg:top-4 lg:rounded-t-2xl">
+          <div className="pointer-events-auto flex min-w-0 gap-4 font-display text-sm font-bold">
+            {tabs.map((v) => (
+              <button key={v} type="button" onClick={() => setView(v as typeof view)} className={`relative pb-1 transition ${view === v ? "text-foreground" : "text-foreground/55"}`}>
+                {v === "feed" ? "Para você" : v === "mine" ? "Meus" : "Revisar"}
+                {view === v ? <span className="absolute inset-x-1 -bottom-0.5 h-0.5 rounded-full bg-primary shadow-[var(--shadow-glow)]" /> : null}
+              </button>
+            ))}
+          </div>
+          <Button size="sm" className="pointer-events-auto shrink-0 rounded-full" onClick={() => setComposer(true)}><Plus className="h-4 w-4" /> Publicar</Button>
         </div>
-        {composer ? <Composer userId={user!.id} onClose={() => setComposer(false)} onDone={() => { setComposer(false); setView("mine"); refresh(); }} /> : null}
-        {reels.isLoading ? <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div> : null}
-        {reels.isError ? <p className="py-20 text-center text-muted-foreground">Não foi possível carregar os vídeos.</p> : null}
-        {reels.data?.length === 0 ? <p className="py-20 text-center text-muted-foreground">Nenhum vídeo por aqui ainda.</p> : null}
-        <div className="h-[calc(100dvh-10rem)] snap-y snap-mandatory space-y-4 overflow-y-auto rounded-xl">
+        {composer ? <div className="absolute inset-x-3 top-16 z-30"><Composer userId={user!.id} onClose={() => setComposer(false)} onDone={() => { setComposer(false); setView("mine"); refresh(); }} /></div> : null}
+        <div className="h-full snap-y snap-mandatory overflow-y-auto overscroll-contain [scrollbar-width:none] lg:rounded-2xl lg:border lg:border-border">
+          {reels.isLoading ? <div className="flex h-full items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div> : null}
+          {reels.isError ? <p className="flex h-full items-center justify-center text-muted-foreground">Não foi possível carregar os vídeos.</p> : null}
+          {reels.data?.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
+              <Clapperboard className="h-10 w-10 text-primary" />
+              <p className="font-display text-lg font-bold">Nenhum vídeo por aqui ainda</p>
+              <Button className="rounded-full" onClick={() => setComposer(true)}><Plus className="h-4 w-4" /> Publicar o primeiro</Button>
+            </div>
+          ) : null}
           {reels.data?.map((r) => (
-            <article key={r.id} className="relative h-full snap-start overflow-hidden rounded-xl border border-border bg-surface">
+            <article key={r.id} className="relative h-full snap-start snap-always overflow-hidden bg-surface">
               {r.url ? <AutoVideo src={r.url} muted={muted} /> : <div className="flex h-full items-center justify-center text-muted-foreground">Vídeo indisponível</div>}
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-background via-background/70 to-transparent p-4 pr-16">
-                <p className="font-semibold">@{r.profiles?.username ?? "leitor"}</p>
-                {r.caption ? <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{r.caption}</p> : null}
-                {r.status !== "approved" ? <span className="mt-2 inline-block rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary">{r.status === "pending" ? "Em revisão" : "Recusado"}</span> : null}
-              </div>
-              <div className="absolute bottom-4 right-3 flex flex-col items-center gap-3">
-                <Button size="icon" variant="secondary" aria-label={muted ? "Ativar som" : "Silenciar"} onClick={() => setMuted(!muted)}>{muted ? <VolumeX /> : <Volume2 />}</Button>
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-background via-background/50 to-transparent" />
+              <div className="absolute bottom-6 right-2 z-10 flex flex-col items-center gap-4">
                 {r.status === "approved" ? (
                   <>
-                    <Button size="icon" variant="secondary" aria-label="Curtir" onClick={() => like.mutate(r)}><Heart className={likes.data?.has(r.id) ? "fill-primary text-primary" : ""} /></Button>
-                    <span className="text-xs font-bold">{r.reel_likes?.[0]?.count ?? 0}</span>
-                    {r.user_id !== user?.id ? <Button size="icon" variant="secondary" aria-label="Denunciar" onClick={() => report(r)}><Flag /></Button> : null}
+                    <button type="button" className={action} aria-label="Curtir" onClick={() => like.mutate(r)}>
+                      <span className={iconBtn}><Heart className={`h-6 w-6 ${likes.data?.has(r.id) ? "fill-primary text-primary" : ""}`} /></span>
+                      {r.reel_likes?.[0]?.count ?? 0}
+                    </button>
+                    <button type="button" className={action} aria-label="Compartilhar" onClick={() => { void navigator.clipboard?.writeText(`${window.location.origin}/reels`); toast.success("Link copiado."); }}>
+                      <span className={iconBtn}><Send className="h-6 w-6" /></span>Enviar
+                    </button>
+                    {r.user_id !== user?.id ? (
+                      <button type="button" className={action} aria-label="Denunciar" onClick={() => report(r)}><span className={iconBtn}><Flag className="h-5 w-5" /></span>Denunciar</button>
+                    ) : null}
                   </>
                 ) : null}
                 {view === "review" ? (
                   <>
-                    <Button size="icon" aria-label="Aprovar" onClick={() => moderate.mutate({ id: r.id, status: "approved" })}><Check /></Button>
-                    <Button size="icon" variant="destructive" aria-label="Recusar" onClick={() => moderate.mutate({ id: r.id, status: "rejected" })}><X /></Button>
+                    <button type="button" className={action} aria-label="Aprovar" onClick={() => moderate.mutate({ id: r.id, status: "approved" })}><span className={`${iconBtn} bg-primary text-primary-foreground`}><Check /></span>Aprovar</button>
+                    <button type="button" className={action} aria-label="Recusar" onClick={() => moderate.mutate({ id: r.id, status: "rejected" })}><span className={`${iconBtn} bg-destructive text-destructive-foreground`}><X /></span>Recusar</button>
                   </>
                 ) : null}
                 {r.user_id === user?.id || isAdmin ? (
-                  <Button size="icon" variant="secondary" aria-label="Apagar" onClick={() => window.confirm("Apagar este vídeo?") && remove.mutate(r)}><Trash2 /></Button>
+                  <button type="button" className={action} aria-label="Apagar" onClick={() => window.confirm("Apagar este vídeo?") && remove.mutate(r)}><span className={iconBtn}><Trash2 className="h-5 w-5" /></span>Apagar</button>
                 ) : null}
+                <button type="button" className={action} aria-label={muted ? "Ativar som" : "Silenciar"} onClick={() => setMuted(!muted)}><span className={iconBtn}>{muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}</span></button>
+              </div>
+              <div className="absolute inset-x-0 bottom-0 z-10 p-4 pb-6 pr-20">
+                <Link to="/u/$username" params={{ username: r.profiles?.username ?? "" }} className="flex min-w-0 items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-primary bg-surface-2">
+                    {r.profiles?.avatar_url ? <img src={r.profiles.avatar_url} alt="" className="h-full w-full object-cover" /> : <User2 className="h-5 w-5 text-muted-foreground" />}
+                  </span>
+                  <span className="truncate font-display font-bold">{r.profiles?.username ?? "leitor"}</span>
+                  <span className="shrink-0 rounded-lg border border-foreground/40 px-3 py-1 text-xs font-bold">Ver perfil</span>
+                </Link>
+                {r.caption ? <p className="mt-2 line-clamp-2 text-sm text-foreground/90">{r.caption}</p> : null}
+                {r.status !== "approved" ? <span className="mt-2 inline-block rounded-full bg-primary/20 px-2.5 py-0.5 text-xs font-bold text-primary">{r.status === "pending" ? "Em revisão" : "Recusado"}</span> : null}
               </div>
             </article>
           ))}
@@ -170,12 +197,18 @@ function ReelsPage() {
 
 function AutoVideo({ src, muted }: { src: string; muted: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const [progress, setProgress] = useState(0);
   useEffect(() => {
     const el = ref.current; if (!el) return;
     const obs = new IntersectionObserver((entries) => { if (entries[0]?.isIntersecting) void el.play().catch(() => undefined); else el.pause(); }, { threshold: 0.6 });
     obs.observe(el); return () => obs.disconnect();
   }, []);
-  return <video ref={ref} src={src} muted={muted} loop playsInline preload="metadata" className="h-full w-full bg-background object-contain" onClick={(e) => (e.currentTarget.paused ? e.currentTarget.play() : e.currentTarget.pause())} />;
+  return (
+    <>
+      <video ref={ref} src={src} muted={muted} loop playsInline preload="metadata" className="h-full w-full bg-background object-cover" onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime / (e.currentTarget.duration || 1))} onClick={(e) => (e.currentTarget.paused ? e.currentTarget.play() : e.currentTarget.pause())} />
+      <div className="absolute inset-x-0 bottom-0 z-20 h-0.5 bg-foreground/15"><div className="h-full bg-primary" style={{ width: `${progress * 100}%` }} /></div>
+    </>
+  );
 }
 
 function Composer({ userId, onClose, onDone }: { userId: string; onClose: () => void; onDone: () => void }) {
