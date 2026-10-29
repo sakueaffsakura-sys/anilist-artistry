@@ -225,17 +225,17 @@ function Composer({ userId, onClose, onDone }: { userId: string; onClose: () => 
     const path = `${userId}/${crypto.randomUUID()}.${file.type === "video/webm" ? "webm" : "mp4"}`;
     const up = await supabase.storage.from("reels").upload(path, file, { contentType: file.type });
     if (up.error) { setBusy(false); toast.error("Não foi possível enviar o vídeo."); return; }
-    const { error } = await supabase.from("reels").insert({ user_id: userId, caption: caption.trim().slice(0, 500), video_path: path, duration_seconds: Math.round(duration * 10) / 10 });
+    const { error } = await supabase.from("reels").insert({ user_id: userId, caption: caption.trim().slice(0, 500), video_path: path, duration_seconds: Math.round(duration * 10) / 10, status: "approved" });
     setBusy(false);
     if (error) { await supabase.storage.from("reels").remove([path]); toast.error("Não foi possível publicar."); return; }
-    toast.success("Vídeo enviado para revisão."); onDone();
+    toast.success("Vídeo publicado!"); onDone();
   }
   return (
     <section className="mb-4 space-y-3 rounded-xl border border-border bg-surface p-4">
       <div className="flex items-center justify-between"><h2 className="font-bold">Novo reel</h2><Button size="icon" variant="ghost" aria-label="Fechar" onClick={onClose}><X /></Button></div>
       <input type="file" accept="video/mp4,video/webm" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full text-sm" />
       <Textarea value={caption} maxLength={500} onChange={(e) => setCaption(e.target.value)} placeholder="Legenda (opcional)" />
-      <p className="text-xs text-muted-foreground">MP4 ou WebM, até 90 segundos e 50 MB. Os vídeos passam por revisão antes de aparecer para todos.</p>
+      <p className="text-xs text-muted-foreground">MP4 ou WebM, até 90 segundos e 50 MB.</p>
       <Button onClick={send} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Enviar</Button>
     </section>
   );
