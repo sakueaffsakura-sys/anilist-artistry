@@ -48,3 +48,4 @@
 - Account sub-profiles: the main profile is an implicit sentinel UUID (`MAIN_PROFILE_ID`), extra profiles live in `account_profiles`; reading_history/favorites are keyed by profile_id, and the active profile is a client store (`src/lib/active-profile.ts`) read by query helpers so existing rows stay on the main profile without backfill.
 
 - Discovery/collection reuse LibraryBits and URL filters; tools mount on expansion. AdminShell owns studio navigation, independent of public headers/readers.
+- User reels use a private bucket, owner-folder uploads, pending admin review and signed URLs; child profiles cannot view them.
