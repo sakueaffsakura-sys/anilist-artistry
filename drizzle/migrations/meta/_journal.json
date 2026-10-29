@@ -337,6 +337,13 @@
       "when": 1793228126773,
       "tag": "0047_user_reels",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1793233631521,
+      "tag": "0048_reels_auto_approve",
+      "breakpoints": true
     }
   ]
 }
