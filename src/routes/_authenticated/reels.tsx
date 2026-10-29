@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Flag, Heart, Loader2, Plus, Trash2, Volume2, VolumeX, X } from "lucide-react";
+import { Check, Clapperboard, Flag, Heart, Loader2, Plus, Send, Trash2, User2, Volume2, VolumeX, X } from "lucide-react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/SiteHeader";
+import { MobileNav } from "@/components/MobileNav";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
