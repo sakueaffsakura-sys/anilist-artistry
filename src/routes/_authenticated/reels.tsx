@@ -30,7 +30,7 @@ type Reel = {
   id: string; user_id: string; caption: string; video_path: string; status: string; created_at: string;
   profiles: { username: string; avatar_url: string | null } | null;
   reel_likes: { count: number }[];
-  url?: string;
+  url?: string | undefined;
 };
 
 function videoDuration(file: File) {
@@ -172,7 +172,7 @@ function AutoVideo({ src, muted }: { src: string; muted: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const el = ref.current; if (!el) return;
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) void el.play().catch(() => undefined); else el.pause(); }, { threshold: 0.6 });
+    const obs = new IntersectionObserver((entries) => { if (entries[0]?.isIntersecting) void el.play().catch(() => undefined); else el.pause(); }, { threshold: 0.6 });
     obs.observe(el); return () => obs.disconnect();
   }, []);
   return <video ref={ref} src={src} muted={muted} loop playsInline preload="metadata" className="h-full w-full bg-background object-contain" onClick={(e) => (e.currentTarget.paused ? e.currentTarget.play() : e.currentTarget.pause())} />;
@@ -182,18 +182,18 @@ function Composer({ userId, onClose, onDone }: { userId: string; onClose: () => 
   const [file, setFile] = useState<File | null>(null);
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
-  async function send() {
-    if (!file) return toast.error("Escolha um vídeo.");
+  async function send(): Promise<void> {
+    if (!file) { toast.error("Escolha um vídeo."); return; }
     const duration = await videoDuration(file);
     const problem = reelFileError(file, duration);
-    if (problem) return toast.error(problem);
+    if (problem) { toast.error(problem); return; }
     setBusy(true);
     const path = `${userId}/${crypto.randomUUID()}.${file.type === "video/webm" ? "webm" : "mp4"}`;
     const up = await supabase.storage.from("reels").upload(path, file, { contentType: file.type });
-    if (up.error) { setBusy(false); return toast.error("Não foi possível enviar o vídeo."); }
+    if (up.error) { setBusy(false); toast.error("Não foi possível enviar o vídeo."); return; }
     const { error } = await supabase.from("reels").insert({ user_id: userId, caption: caption.trim().slice(0, 500), video_path: path, duration_seconds: Math.round(duration * 10) / 10 });
     setBusy(false);
-    if (error) { await supabase.storage.from("reels").remove([path]); return toast.error("Não foi possível publicar."); }
+    if (error) { await supabase.storage.from("reels").remove([path]); toast.error("Não foi possível publicar."); return; }
     toast.success("Vídeo enviado para revisão."); onDone();
   }
   return (
