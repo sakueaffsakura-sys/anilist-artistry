@@ -103,10 +103,10 @@ function ReelsPage() {
     onSuccess: () => { toast.success("Reel apagado."); refresh(); },
     onError: () => toast.error("Não foi possível apagar."),
   });
-  async function report(r: Reel) {
+  async function report(r: Reel): Promise<void> {
     const reason = window.prompt("Por que você quer denunciar este vídeo?")?.trim();
     if (!reason) return;
-    if (reason.length < 3) return toast.error("Escreva um motivo um pouco maior.");
+    if (reason.length < 3) { toast.error("Escreva um motivo um pouco maior."); return; }
     const { error } = await supabase.from("reel_reports").insert({ reel_id: r.id, user_id: user!.id, reason: reason.slice(0, 500) });
     toast[error ? "error" : "success"](error ? "Denúncia já enviada ou indisponível." : "Denúncia enviada.");
   }
