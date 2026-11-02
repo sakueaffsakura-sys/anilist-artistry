@@ -80,7 +80,7 @@ export function AdminShell({
   }
 
   const groups = [
-    { label: "Workspace", paths: ["/admin", "/admin/obras", "/admin/novels", "/admin/nova"] },
+    { label: "Workspace", paths: ["/admin", "/admin/obras", "/admin/novels", "/admin/nova", "/admin/mediocre"] },
     { label: "Conteúdo & aparência", paths: ["/admin/home", "/admin/generos", "/admin/imagens", "/admin/molduras", "/admin/selos"] },
     { label: "Comunidade & sistema", paths: ["/admin/contas", "/admin/pedidos", "/admin/suporte", "/admin/app", "/admin/manutencao"] },
   ];
