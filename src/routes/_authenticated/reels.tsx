@@ -116,7 +116,7 @@ function ReelsPage() {
     const next = !muted;
     const videos = Array.from(document.querySelectorAll<HTMLVideoElement>("video[data-reel-video]"));
     for (const v of videos) { v.muted = next; v.volume = 1; }
-    const active = videos.find((v) => v.dataset.active === "1");
+    const active = videos.find((v) => v.dataset["active"] === "1");
     if (active && !next) {
       void active.play().catch(() => {
         for (const v of videos) v.muted = true;
@@ -224,10 +224,10 @@ function AutoVideo({ src, muted }: { src: string; muted: boolean }) {
     const el = ref.current; if (!el) return;
     const obs = new IntersectionObserver((entries) => {
       if (entries[0]?.isIntersecting) {
-        el.dataset.active = "1";
+        el.dataset["active"] = "1";
         el.muted = mutedRef.current;
         void el.play().catch(() => { el.muted = true; void el.play().catch(() => undefined); });
-      } else { delete el.dataset.active; el.pause(); }
+      } else { delete el.dataset["active"]; el.pause(); }
     }, { threshold: 0.6 });
     obs.observe(el); return () => obs.disconnect();
   }, []);
