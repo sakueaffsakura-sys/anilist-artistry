@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Copy, Download, Code2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { hasIaFlag, tagNames, text } from "@/lib/mediocre-api";
+import { hasIaFlag, pick, tagNames, text, workImage } from "@/lib/mediocre-api";
 
 type Row = Record<string, unknown>;
 
@@ -23,26 +23,28 @@ function Field({ label, value }: { label: string; value: unknown }) {
 }
 
 function chapterCount(row: Row): string | null {
-  const c = row["capitulos"] ?? row["total_capitulos"] ?? row["_count"];
+  const c = row["capitulos"];
   if (Array.isArray(c)) return String(c.length);
-  return text(c) ?? text(row["qtd_capitulos"]) ?? text(row["capitulos_count"]);
+  return text(pick(row, "total_capitulos", "total_capitulos_ativos", "qtd_capitulos"));
 }
 
 export function WorkCard({ row, showIa }: { row: Row; showIa?: boolean | undefined }) {
-  const img = text(row["obr_imagem"]);
+  const img = workImage(row);
+  const name = text(pick(row, "obr_nome", "nome", "cap_nome"));
   const tags = tagNames(row["tags"]).slice(0, 4);
-  const date = text(row["obr_atualizado_em"] ?? row["atualizado_em"] ?? row["updated_at"] ?? row["cap_lancado_em"]);
+  const date = text(pick(row, "data_ultimo_cap", "obr_atualizado_em", "atualizado_em", "cap_lancado_em"));
   return (
     <article className="flex gap-3 rounded-xl border border-border bg-card p-3">
-      {img ? <img src={img} alt={text(row["obr_nome"]) ?? "Capa"} loading="lazy" className="aspect-[2/3] w-20 shrink-0 rounded-lg object-cover" /> : <div className="aspect-[2/3] w-20 shrink-0 rounded-lg bg-muted" />}
+      {img ? <img src={img} alt={name ?? "Capa"} loading="lazy" className="aspect-[2/3] w-20 shrink-0 rounded-lg object-cover" /> : <div className="aspect-[2/3] w-20 shrink-0 rounded-lg bg-muted" />}
       <div className="min-w-0 space-y-1">
-        <h3 className="line-clamp-2 font-semibold">{text(row["obr_nome"]) ?? text(row["cap_nome"]) ?? "Sem título"}</h3>
+        <h3 className="line-clamp-2 font-semibold">{name ?? "Sem título"}</h3>
         {showIa && hasIaFlag(row) && <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary"><Sparkles className="h-3 w-3" />IA</span>}
-        <Field label="ID" value={row["obr_id"]} />
-        <Field label="Status" value={row["obr_status"]} />
+        <Field label="ID" value={pick(row, "obr_id", "id")} />
+        <Field label="Formato" value={typeof row["formato"] === "string" ? row["formato"] : null} />
+        <Field label="Status" value={pick(row, "obr_status", "status")} />
         <Field label="Capítulos" value={chapterCount(row)} />
-        <Field label="Comentários" value={row["obr_coment_count"]} />
-        <Field label="Reações" value={row["obr_reac_count"]} />
+        <Field label="Comentários" value={pick(row, "obr_coment_count", "coment_count")} />
+        <Field label="Reações" value={pick(row, "obr_reac_count", "reac_count")} />
         <Field label="Data" value={date} />
         {tags.length > 0 && <p className="truncate text-[11px] text-muted-foreground">{tags.join(" · ")}</p>}
       </div>
@@ -55,7 +57,7 @@ export function WorkGrid({ rows, showIa }: { rows: Row[]; showIa?: boolean }) {
   return <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{rows.map((r, i) => <WorkCard key={String(r["obr_id"] ?? r["cap_id"] ?? i)} row={r} showIa={showIa} />)}</div>;
 }
 
-const CHAPTER_FIELDS: Array<[string, string]> = [["cap_id", "ID"], ["cap_num", "Número"], ["cap_slug", "Slug"], ["cap_volume", "Volume"], ["cap_tipo", "Tipo"], ["cap_lancado_em", "Lançado"], ["cap_criado_em", "Criado"], ["cap_coment_count", "Comentários"], ["cap_reac_count", "Reações"]];
+const CHAPTER_FIELDS: Array<[string, string]> = [["cap_id", "ID"], ["cap_num", "Número"], ["cap_slug", "Slug"], ["cap_volume", "Volume"], ["cap_tipo", "Tipo"], ["cap_lancado_em", "Lançado"], ["cap_criado_em", "Criado"], ["cap_coment_count", "Comentários"], ["cap_reac_count", "Reações"], ["cap_ia", "IA"]];
 
 export function ChapterList({ chapters }: { chapters: Row[] }) {
   if (!chapters.length) return <EmptyState message="Nenhum capítulo nesta resposta." />;
@@ -75,11 +77,11 @@ export function ChapterList({ chapters }: { chapters: Row[] }) {
   );
 }
 
-const WORK_FIELDS: Array<[string, string]> = [["obr_id", "ID"], ["obr_status", "Status"], ["formato", "Formato"], ["obr_coment_count", "Comentários"], ["obr_reac_count", "Reações"], ["obr_mediocre", "Mediocre"], ["obr_oficial", "Oficial"], ["obr_oficial_site", "Site oficial"], ["obr_novel_id", "Novel ID"], ["primeiro_cap_id", "Primeiro cap."], ["ultimo_cap_id", "Último cap."], ["favoritada", "Favoritada"], ["status_leitura", "Status de leitura"]];
+const WORK_FIELDS: Array<[string, string]> = [["obr_id", "ID"], ["obr_status", "Status"], ["obr_ia", "IA"], ["obr_coment_count", "Comentários"], ["obr_reac_count", "Reações"], ["obr_mediocre", "Mediocre"], ["obr_oficial", "Oficial"], ["obr_oficial_site", "Site oficial"], ["obr_novel_id", "Novel ID"], ["primeiro_cap_id", "Primeiro cap."], ["ultimo_cap_id", "Último cap."], ["favoritada", "Favoritada"], ["status_leitura", "Status de leitura"]];
 
 export function WorkDetails({ work }: { work: Row }) {
-  const banner = text(work["obr_banner"]);
-  const img = text(work["obr_imagem"]);
+  const banner = workImage(work, "banner");
+  const img = workImage(work);
   const alts = Array.isArray(work["obr_titulos_alternativos"]) ? (work["obr_titulos_alternativos"] as unknown[]).map(text).filter(Boolean) : [];
   const chapters = Array.isArray(work["capitulos"]) ? (work["capitulos"] as unknown[]).filter((c): c is Row => Boolean(c) && typeof c === "object") : null;
   return (

@@ -6,7 +6,10 @@ describe("MediocreScan proxy rules", () => {
     expect(mediocrePath(parseMediocreRequest({ operation: "obra", obraId: 20564 }))).toBe("/obras/20564");
   });
   it("maps user chapters to user 156358", () => {
-    expect(mediocrePath({ operation: "capitulos_usuario" })).toBe("/readings/user/156358/chapters");
+    expect(mediocrePath(parseMediocreRequest({ operation: "capitulos_usuario", obraId: 20564 }))).toBe("/readings/user/156358/chapters?obr_id=20564");
+  });
+  it("home sends formato=1", () => {
+    expect(mediocrePath({ operation: "home" })).toBe("/obras/home?formato=1");
   });
   it("rejects unknown operations", () => {
     expect(() => parseMediocreRequest({ operation: "delete" })).toThrow();

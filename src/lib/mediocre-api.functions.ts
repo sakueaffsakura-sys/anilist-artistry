@@ -23,11 +23,12 @@ export const queryMediocreApi = createServerFn({ method: "POST" })
     try {
       const res = await fetch(BASE + mediocrePath(data), {
         method: "GET",
-        redirect: "error",
+        redirect: "manual", // workerd does not support "error"; 3xx is treated as failure below
         signal: AbortSignal.timeout(15_000),
         headers: { Authorization: `Bearer ${token}`, Accept: "application/json", "User-Agent": "Mozilla/5.0" },
       });
       console.log(`[mediocre] ${data.operation} ${res.status} ${Date.now() - started}ms`);
+      if (res.status >= 300 && res.status < 400) return { ok: false, status: 502, error: mediocreErrorFor(0) };
       if (!res.ok) return { ok: false, status: res.status, error: mediocreErrorFor(res.status) };
       const raw = await res.text();
       if (raw.length > 8_000_000) return { ok: false, status: 502, error: { code: "TOO_LARGE", message: "A resposta da API é grande demais." } };

@@ -33,7 +33,7 @@ function MediocrePanel() {
   const [idInput, setIdInput] = useState("20564");
   const [obraId, setObraId] = useState(20564);
   const call = useServerFn(queryMediocreApi);
-  const req: MediocreRequest = tab === "obra" ? { operation: "obra", obraId } : { operation: tab };
+  const req: MediocreRequest = tab === "obra" || tab === "capitulos_usuario" ? { operation: tab, obraId } : { operation: tab };
 
   // In-memory cache (5 min) keyed by operation; TanStack Query dedupes concurrent calls.
   const q = useQuery({
@@ -67,7 +67,7 @@ function MediocrePanel() {
           ))}
         </nav>
 
-        {tab === "obra" && (
+        {(tab === "obra" || tab === "capitulos_usuario") && (
           <form onSubmit={submit} className="flex max-w-sm gap-2">
             <Input inputMode="numeric" value={idInput} onChange={(e) => setIdInput(e.target.value.replace(/\D/g, ""))} aria-label="ID da obra" />
             <Button type="submit" disabled={q.isFetching}><Search className="mr-1 h-4 w-4" />Consultar</Button>
