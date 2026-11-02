@@ -22,20 +22,20 @@ export function parseMediocreRequest(input: unknown): MediocreRequest {
   if (typeof operation !== "string" || !(MEDIOCRE_OPERATIONS as readonly string[]).includes(operation)) {
     throw new Error("Operação não permitida.");
   }
-  if (operation !== "obra") return { operation: operation as MediocreOperation };
+  if (operation !== "obra" && operation !== "capitulos_usuario") return { operation: operation as MediocreOperation };
   const id = typeof obraId === "number" ? obraId : typeof obraId === "string" && /^\d{1,9}$/.test(obraId) ? Number(obraId) : NaN;
   if (!Number.isSafeInteger(id) || id <= 0) throw new Error("ID da obra inválido.");
-  return { operation: "obra", obraId: id };
+  return { operation, obraId: id };
 }
 
 /** Maps an operation to a fixed path on back2.mediocrescan.com. Never accepts URLs. */
 export function mediocrePath(req: MediocreRequest): string {
   switch (req.operation) {
-    case "home": return "/obras/home";
+    case "home": return "/obras/home?formato=1"; // API requires a format id; 1 is the main catalog
     case "recentes_ia": return "/obras/atualizadas-recentes-ia";
     case "recentes": return "/obras/atualizadas-recentes";
     case "obra": return `/obras/${req.obraId}`;
-    case "capitulos_usuario": return `/readings/user/${MEDIOCRE_USER_ID}/chapters`;
+    case "capitulos_usuario": return `/readings/user/${MEDIOCRE_USER_ID}/chapters?obr_id=${req.obraId}`;
   }
 }
 
@@ -55,7 +55,7 @@ export function mediocreFileName(req: MediocreRequest): string {
     case "recentes": return "obras-recentes.json";
     case "recentes_ia": return "obras-recentes-ia.json";
     case "obra": return `obra-${req.obraId}.json`;
-    case "capitulos_usuario": return `capitulos-usuario-${MEDIOCRE_USER_ID}.json`;
+    case "capitulos_usuario": return `capitulos-usuario-${MEDIOCRE_USER_ID}-obra-${req.obraId}.json`;
   }
 }
 
@@ -106,4 +106,19 @@ export function hasIaFlag(row: Row): boolean {
 export function tagNames(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
   return v.map((t) => (typeof t === "string" ? t : isRow(t) ? text(t["nome"] ?? t["tag_nome"] ?? t["name"]) : null)).filter((x): x is string => Boolean(x));
+}
+
+const MEDIA = "https://back2.mediocrescan.com/media/obras";
+/** List endpoints use short keys (id, nome, imagem as bare file name); detail uses obr_*. */
+export function pick(row: Row, ...keys: string[]): unknown {
+  for (const k of keys) if (row[k] !== undefined && row[k] !== null && row[k] !== "") return row[k];
+  return null;
+}
+export function workImage(row: Row, kind: "capa" | "banner" = "capa"): string | null {
+  const id = text(pick(row, "obr_id", "id"));
+  const v = text(kind === "capa" ? pick(row, "obr_imagem", "imagem") : pick(row, "obr_banner", "banner"));
+  if (!v) return null;
+  if (/^https:\/\//.test(v)) return v;
+  if (!id || !/^[\w.-]+$/.test(v)) return null;
+  return `${MEDIA}/${id}/${kind}?f=${encodeURIComponent(v)}`;
 }
