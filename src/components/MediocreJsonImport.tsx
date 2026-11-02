@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { parseMediocreLink, parseMediocrePages } from "@/lib/mediocre-json";
+import { parseChapterFilename } from "@/lib/chapter-filename";
 
 type Result = { line: string; message: string; ok: boolean };
 const FETCH_CONCURRENCY = 4;
@@ -22,6 +23,7 @@ export function MediocreJsonImport({ seriesId, onChange }: { seriesId: string; o
   const [done, setDone] = useState(0);
   const [total, setTotal] = useState(0);
   const [results, setResults] = useState<Result[]>([]);
+  const [localChapters, setLocalChapters] = useState<{ line: string; number: number; pages: string[] }[]>([]);
   const cancel = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -29,14 +31,25 @@ export function MediocreJsonImport({ seriesId, onChange }: { seriesId: string; o
 
   const loadFiles = async (files: FileList | null) => {
     if (!files?.length) return;
-    const parts = await Promise.all([...files].map((f) => f.text()));
-    setText((t) => [t, ...parts].filter(Boolean).join("\n"));
+    for (const file of files) {
+      try {
+        const content = await file.text();
+        if (/\.json$/i.test(file.name)) {
+          const parsed = parseChapterFilename(file.name.replace(/\.json$/i, ".txt"));
+          if (!parsed) throw new Error("Nomeie o JSON com o número do capítulo, por exemplo 1.json.");
+          const pages = parseMediocrePages(JSON.parse(content));
+          setLocalChapters((current) => [...current.filter((c) => c.line !== file.name), { line: file.name, number: parsed.number, pages }]);
+        } else {
+          setText((t) => [t, content].filter(Boolean).join("\n"));
+        }
+      } catch (error) { toast.error(`${file.name}: ${error instanceof Error ? error.message : "Arquivo inválido."}`); }
+    }
   };
 
   const run = async () => {
-    if (!links.length || busy) return;
+    if ((!links.length && !localChapters.length) || busy) return;
     cancel.current = false;
-    setBusy(true); setResults([]); setDone(0);
+    setBusy(true); setResults([]); setDone(0); setTotal(0);
     const published = new Set<string>();
     const add = (r: Result) => setResults((list) => [...list, r]);
     let saved = 0;
@@ -44,7 +57,7 @@ export function MediocreJsonImport({ seriesId, onChange }: { seriesId: string; o
       const { data, error } = await supabase.from("chapters").select("number").eq("series_id", seriesId);
       if (error) throw error;
       const taken = new Set((data ?? []).map((row) => Number(row.number)));
-      const items: { line: string; url: string; number: number }[] = [];
+      const items: { line: string; url?: string; number: number; pages?: string[] }[] = [];
       for (const line of links) {
         try {
           const parsed = parseMediocreLink(line);
@@ -53,22 +66,36 @@ export function MediocreJsonImport({ seriesId, onChange }: { seriesId: string; o
           items.push({ line, ...parsed });
         } catch (e) { add({ line, ok: false, message: e instanceof Error ? e.message : "Link inválido." }); }
       }
+      for (const chapter of localChapters) {
+        if (taken.has(chapter.number)) { add({ line: chapter.line, ok: false, message: `Capítulo ${chapter.number} já existe.` }); continue; }
+        if (items.some((item) => item.number === chapter.number)) { add({ line: chapter.line, ok: false, message: `Capítulo ${chapter.number} repetido na lista.` }); continue; }
+        items.push(chapter);
+      }
       items.sort((a, b) => a.number - b.number);
       setTotal(items.length);
       // Fetch JSONs in parallel (bounded), publish in chapter order.
       const fetched = new Map<number, Promise<string[]>>();
-      const fetchPages = (item: (typeof items)[number]) => fetch(item.url, { redirect: "error" }).then(async (res) => {
+      const fetchPages = (item: (typeof items)[number]) => {
+        if (item.pages) return Promise.resolve(item.pages);
+        if (!item.url) return Promise.reject(new Error("Link ausente."));
+        return fetch(item.url, { redirect: "error" }).then(async (res) => {
         if (!res.ok) throw new Error(`Erro ${res.status} ao ler o JSON.`);
         return parseMediocrePages(await res.json());
-      });
+        });
+      };
       for (let i = 0; i < items.length; i++) {
-        for (let j = i; j < Math.min(items.length, i + FETCH_CONCURRENCY); j++) {
-          if (!fetched.has(j)) { const p = fetchPages(items[j]!); p.catch(() => {}); fetched.set(j, p); }
-        }
         if (cancel.current) break;
-        const item = items[i]!;
+        for (let j = i; j < Math.min(items.length, i + FETCH_CONCURRENCY); j++) {
+          const next = items[j];
+          if (next && !fetched.has(j)) { const p = fetchPages(next); p.catch(() => {}); fetched.set(j, p); }
+        }
+        const item = items[i];
+        if (!item) continue;
         try {
-          const pages = await fetched.get(i)!;
+          const request = fetched.get(i);
+          if (!request) throw new Error("Capítulo não preparado.");
+          const pages = await request;
+          if (cancel.current) break;
           const { error: insertError } = await supabase.from("chapters").insert({ series_id: seriesId, number: item.number, title: null, pages, published: true });
           if (insertError) throw insertError;
           saved++; published.add(item.line);
@@ -79,6 +106,7 @@ export function MediocreJsonImport({ seriesId, onChange }: { seriesId: string; o
         setDone(i + 1);
       }
       setText(links.filter((line) => !published.has(line)).join("\n"));
+      setLocalChapters((current) => current.filter((chapter) => !published.has(chapter.line)));
       if (cancel.current) toast.info("Envio cancelado.");
       if (saved) {
         await supabase.from("series").update({ updated_at: new Date().toISOString() }).eq("id", seriesId);
@@ -97,13 +125,14 @@ export function MediocreJsonImport({ seriesId, onChange }: { seriesId: string; o
       <h3 className="flex items-center gap-2 font-display text-lg font-bold"><Link2 className="h-5 w-5 text-primary" /> Capítulos em massa por link JSON (MediocreScan)</h3>
       <Textarea rows={6} disabled={busy} value={text} onChange={(e) => setText(e.target.value)} placeholder="Cole quantos links quiser (um por linha, espaço ou vírgula) ou envie um .txt" aria-label="Links JSON dos capítulos" />
       <div className="flex flex-wrap items-center gap-2">
-        <Button disabled={busy || !links.length} onClick={() => void run()}>{busy ? "Publicando…" : `Publicar ${links.length || ""} capítulo(s)`}</Button>
-        <Button variant="outline" disabled={busy} onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /> Carregar .txt</Button>
+        <Button disabled={busy || (!links.length && !localChapters.length)} onClick={() => void run()}>{busy ? "Publicando…" : `Publicar ${links.length + localChapters.length || ""} capítulo(s)`}</Button>
+        <Button variant="outline" disabled={busy} onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /> Carregar TXT / JSON</Button>
         {busy ? <Button variant="ghost" onClick={() => { cancel.current = true; }}>Cancelar</Button> : null}
-        {!busy && text ? <Button variant="ghost" onClick={() => setText("")}>Limpar</Button> : null}
-        <input ref={fileRef} type="file" accept=".txt,text/plain" multiple hidden onChange={(e) => { void loadFiles(e.target.files); e.target.value = ""; }} />
+        {!busy && (text || localChapters.length) ? <Button variant="ghost" onClick={() => { setText(""); setLocalChapters([]); }}>Limpar</Button> : null}
+        <input ref={fileRef} type="file" accept=".txt,.json,text/plain,application/json" multiple hidden onChange={(e) => { void loadFiles(e.target.files); e.target.value = ""; }} />
         <span className="text-sm text-muted-foreground">{links.length} link(s) detectado(s)</span>
       </div>
+      {localChapters.length ? <div className="max-h-48 divide-y divide-border overflow-y-auto text-sm">{localChapters.map((chapter) => <div key={chapter.line} className="flex flex-wrap justify-between gap-2 py-2"><span className="break-all">{chapter.line}</span><span className="text-muted-foreground">Capítulo {chapter.number} · {chapter.pages.length} páginas</span></div>)}</div> : null}
       {busy || total ? <div className="space-y-1"><Progress value={total ? (done / total) * 100 : 0} /><p className="text-xs text-muted-foreground">{done}/{total} processados{results.length ? ` · ${results.length - fails} ok · ${fails} com erro` : ""}</p></div> : null}
       {results.length ? <div className="max-h-72 divide-y divide-border overflow-y-auto text-sm">{results.map((r, i) => (
         <div key={i} className="flex flex-wrap justify-between gap-2 py-1.5"><span className="min-w-0 break-all text-muted-foreground">{r.line}</span><span className={r.ok ? "text-primary" : "text-destructive"}>{r.message}</span></div>

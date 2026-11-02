@@ -13,11 +13,19 @@ export function parseMediocreLink(raw: string): { url: string; number: number } 
 }
 
 export function parseMediocrePages(data: unknown): string[] {
-  if (!Array.isArray(data)) throw new Error("Resposta não é uma lista de páginas.");
-  const items = data.map((item) => {
-    const row = item as { ordem?: unknown; url?: unknown };
-    if (typeof row?.url !== "string" || !/^[\w./-]+\.(webp|jpe?g|png|gif|avif)$/i.test(row.url) || row.url.includes("..")) throw new Error("Página inválida no JSON.");
-    return { order: Number(row.ordem) || 0, url: `https://${MEDIOCRE_CDN}/${row.url.replace(/^\/+/, "")}` };
+  const object = data && typeof data === "object" ? data as Record<string, unknown> : {};
+  const root = object['data'] && typeof object['data'] === "object" ? object['data'] as Record<string, unknown> : object;
+  const list = Array.isArray(data) ? data : Array.isArray(object['data']) ? object['data'] : root['pages'] ?? root['paginas'] ?? root['items'];
+  if (!Array.isArray(list)) throw new Error("Resposta não é uma lista de páginas.");
+  const items = list.map((item, index) => {
+    const row = item && typeof item === "object" ? item as Record<string, unknown> : {};
+    const raw = typeof item === "string" ? item : row['url'] ?? row['src'] ?? row['imagem'];
+    if (typeof raw !== "string" || raw.includes("..")) throw new Error("Página inválida no JSON.");
+    let url: URL;
+    try { url = new URL(raw.replace(/^\/+/, ""), `https://${MEDIOCRE_CDN}/`); } catch { throw new Error("Página inválida no JSON."); }
+    if (url.protocol !== "https:" || url.hostname !== MEDIOCRE_CDN || url.port || url.username || url.password || !/\.(webp|jpe?g|png|gif|avif)$/i.test(url.pathname)) throw new Error("Página inválida no JSON.");
+    const order = Number(row['ordem'] ?? row['order'] ?? index);
+    return { order: Number.isFinite(order) ? order : index, url: url.toString() };
   });
   const pages = [...new Set(items.sort((a, b) => a.order - b.order).map((item) => item.url))];
   if (!pages.length) throw new Error("Nenhuma página no JSON.");
