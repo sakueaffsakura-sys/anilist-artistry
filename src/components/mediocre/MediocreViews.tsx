@@ -28,7 +28,7 @@ function chapterCount(row: Row): string | null {
   return text(c) ?? text(row["qtd_capitulos"]) ?? text(row["capitulos_count"]);
 }
 
-export function WorkCard({ row, showIa }: { row: Row; showIa?: boolean }) {
+export function WorkCard({ row, showIa }: { row: Row; showIa?: boolean | undefined }) {
   const img = text(row["obr_imagem"]);
   const tags = tagNames(row["tags"]).slice(0, 4);
   const date = text(row["obr_atualizado_em"] ?? row["atualizado_em"] ?? row["updated_at"] ?? row["cap_lancado_em"]);
