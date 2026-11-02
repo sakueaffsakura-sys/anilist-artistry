@@ -84,12 +84,17 @@ function ErrorComponent({ error, reset }: import("@tanstack/react-router").Error
   );
 }
 
+let lastOpenCheck = 0;
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   staticData: { sitemap: false },
   beforeLoad: async ({ location }) => {
     if (typeof window === "undefined" || maintenanceExemptPath(location.pathname)) return;
+    // Reuse a recent "site open" answer so page changes don't wait on a network check each time.
+    if (Date.now() - lastOpenCheck < 30_000) return;
     const status = await fetchMaintenanceStatus().catch(() => maintenanceUnavailable);
-    if (!status.enabled) return;
+    if (!status.enabled) { lastOpenCheck = Date.now(); return; }
+    lastOpenCheck = 0;
     const access = await verifyMaintenanceAdmin().catch(() => ({ isAdmin: false }));
     if (!access.isAdmin) throw redirect({ to: "/manutencao" });
   },
