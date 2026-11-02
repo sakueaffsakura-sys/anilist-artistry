@@ -112,6 +112,21 @@ function ReelsPage() {
     toast[error ? "error" : "success"](error ? "Denúncia já enviada ou indisponível." : "Denúncia enviada.");
   }
 
+  function toggleSound(): void {
+    const next = !muted;
+    const videos = Array.from(document.querySelectorAll<HTMLVideoElement>("video[data-reel-video]"));
+    for (const v of videos) { v.muted = next; v.volume = 1; }
+    const active = videos.find((v) => v.dataset["active"] === "1");
+    if (active && !next) {
+      void active.play().catch(() => {
+        for (const v of videos) v.muted = true;
+        setMuted(true);
+        toast("Toque para ativar o som", { description: "O navegador bloqueou o áudio. Toque no botão de som de novo." });
+      });
+    }
+    setMuted(next);
+  }
+
   if (profile.kidsMaxAge) {
     return <div className="min-h-screen bg-background"><SiteHeader /><main className="mx-auto max-w-lg px-4 py-20 text-center"><h1 className="text-2xl font-bold">Reels indisponíveis</h1><p className="mt-2 text-muted-foreground">Vídeos da comunidade não aparecem em perfis infantis.</p></main></div>;
   }
@@ -175,7 +190,7 @@ function ReelsPage() {
                 {r.user_id === user?.id || isAdmin ? (
                   <button type="button" className={action} aria-label="Apagar" onClick={() => window.confirm("Apagar este vídeo?") && remove.mutate(r)}><span className={iconBtn}><Trash2 className="h-5 w-5" /></span>Apagar</button>
                 ) : null}
-                <button type="button" className={action} aria-label={muted ? "Ativar som" : "Silenciar"} onClick={() => setMuted(!muted)}><span className={iconBtn}>{muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}</span></button>
+                <button type="button" className={action} aria-label={muted ? "Ativar som" : "Silenciar"} onClick={toggleSound}><span className={iconBtn}>{muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}</span></button>
               </div>
               <div className="absolute inset-x-0 bottom-0 z-10 p-4 pb-6 pr-20">
                 <Link to="/u/$username" params={{ username: r.profiles?.username ?? "" }} className="flex min-w-0 items-center gap-3">
@@ -198,15 +213,27 @@ function ReelsPage() {
 
 function AutoVideo({ src, muted }: { src: string; muted: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const mutedRef = useRef(muted);
   const [progress, setProgress] = useState(0);
   useEffect(() => {
+    mutedRef.current = muted;
     const el = ref.current; if (!el) return;
-    const obs = new IntersectionObserver((entries) => { if (entries[0]?.isIntersecting) void el.play().catch(() => undefined); else el.pause(); }, { threshold: 0.6 });
+    el.muted = muted; el.volume = 1;
+  }, [muted]);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const obs = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) {
+        el.dataset["active"] = "1";
+        el.muted = mutedRef.current;
+        void el.play().catch(() => { el.muted = true; void el.play().catch(() => undefined); });
+      } else { delete el.dataset["active"]; el.pause(); }
+    }, { threshold: 0.6 });
     obs.observe(el); return () => obs.disconnect();
   }, []);
   return (
     <>
-      <video ref={ref} src={src} muted={muted} loop playsInline preload="metadata" className="h-full w-full bg-background object-cover" onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime / (e.currentTarget.duration || 1))} onClick={(e) => (e.currentTarget.paused ? e.currentTarget.play() : e.currentTarget.pause())} />
+      <video ref={ref} data-reel-video src={src} loop playsInline preload="metadata" className="h-full w-full bg-background object-cover" onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime / (e.currentTarget.duration || 1))} onClick={(e) => (e.currentTarget.paused ? e.currentTarget.play() : e.currentTarget.pause())} />
       <div className="absolute inset-x-0 bottom-0 z-20 h-0.5 bg-foreground/15"><div className="h-full bg-primary" style={{ width: `${progress * 100}%` }} /></div>
     </>
   );
