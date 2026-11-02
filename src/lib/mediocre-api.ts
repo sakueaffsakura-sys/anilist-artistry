@@ -12,7 +12,7 @@ export interface MediocreRequest {
 }
 
 export type MediocreResult =
-  | { ok: true; status: number; data: unknown }
+  | { ok: true; status: number; json: string }
   | { ok: false; status: number; error: { code: string; message: string } };
 
 /** Validates the body sent by the panel; rejects anything outside the allowlist. */

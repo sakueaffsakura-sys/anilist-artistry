@@ -33,7 +33,8 @@ export const queryMediocreApi = createServerFn({ method: "POST" })
       if (raw.length > 8_000_000) return { ok: false, status: 502, error: { code: "TOO_LARGE", message: "A resposta da API é grande demais." } };
       // Defensive: strip the token if the upstream ever echoed it.
       const safe = raw.split(token).join("[removido]");
-      return { ok: true, status: res.status, data: JSON.parse(safe) as unknown };
+      JSON.parse(safe); // validate it is JSON
+      return { ok: true, status: res.status, json: safe };
     } catch {
       console.log(`[mediocre] ${data.operation} falha de conexão ${Date.now() - started}ms`);
       return { ok: false, status: 0, error: mediocreErrorFor(0) };
