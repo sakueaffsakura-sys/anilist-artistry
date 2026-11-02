@@ -49,3 +49,4 @@
 
 - Discovery/collection reuse LibraryBits and URL filters; tools mount on expansion. AdminShell owns studio navigation, independent of public headers/readers.
 - Reels: private bucket, owner folders, admin review, signed URLs; hidden for kids.
+- MediocreScan API admin read proxy: createServerFn (admin-only) maps fixed operations to GET paths; token stays in MEDIOCRE_API_TOKEN server secret.
