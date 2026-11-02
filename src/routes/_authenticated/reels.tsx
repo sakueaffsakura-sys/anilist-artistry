@@ -57,7 +57,7 @@ function ReelsPage() {
     queryKey: ["reels", view, user?.id],
     enabled: Boolean(user) && !profile.kidsMaxAge,
     queryFn: async () => {
-      let q = supabase.from("reels").select("id, user_id, caption, video_path, status, created_at, let q = supabase.from("reels").select("id, user_id, caption, video_path, status, created_at, profiles!reels_user_id_fkey(username, avatar_url), reel_likes(count)").order("created_at", { ascending: false }).limit(30);, reel_likes(count)").order("created_at", { ascending: false }).limit(30);
+      let q = supabase.from("reels").select("id, user_id, caption, video_path, status, created_at, profiles!reels_user_id_fkey(username, avatar_url), reel_likes(count)").order("created_at", { ascending: false }).limit(30);
       q = view === "feed" ? q.eq("status", "approved") : view === "mine" ? q.eq("user_id", user!.id) : q.eq("status", "pending");
       const { data, error } = await q;
       if (error) throw error;
