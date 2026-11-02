@@ -31,7 +31,7 @@
 - Share work categories and age-rating display through browser-safe modules and one badge component, so filters, cards, details, shelves and the panel stay consistent.
 
 - Novel illustrations use validated standalone image markers in chapters.content and a browser-safe shared HTML parser; reader and preview consume ordered blocks, and narration receives empty image entries to preserve paragraph indexes without speaking URLs.
-- Work TXT imports parse page links and write sequentially through the authenticated client, never Storage; image and novel imports share filename parsing and numeric sorting for consistent numbering.
+- TXT/JSON chapter imports validate CDN links in browser-safe parsers and write sequentially with RLS, never storing originals or capturing external sessions; share filename numbering.
 
 - Genre selectors, import writes and public genre labels use the browser-safe work-genres module; alias-aware catalog filtering preserves old records without bulk rewrites.
 - Homepage discovery shelves use admin-only persisted selection settings and lightweight published-work queries; automatic ordering uses saved AniList metrics so home visits never call AniList, while manual selection preserves its order without fallback.
