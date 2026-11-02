@@ -51,7 +51,7 @@ function MediocrePanel() {
   };
 
   return (
-    <AdminShell>
+    <AdminShell title="MediocreScan API" subtitle="Painel de obras, atualizações e capítulos" adminOnly>
       <div className="space-y-5">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -77,8 +77,8 @@ function MediocrePanel() {
         {!isAdmin ? <ErrorState message="Somente administradores podem usar esta consulta." />
           : q.isLoading ? <LoadingState />
           : q.error ? <ErrorState message="Não foi possível conectar à API." />
-          : q.data && !q.data.ok ? <ErrorState message={q.data.error.message} />
-          : q.data?.ok ? <Result tab={tab} data={q.data.data} fileName={mediocreFileName(req)} /> : null}
+          : q.data && q.data.ok === false ? <ErrorState message={q.data.error.message} />
+          : q.data?.ok ? <Result tab={tab} data={JSON.parse(q.data.json) as unknown} fileName={mediocreFileName(req)} /> : null}
       </div>
     </AdminShell>
   );
