@@ -9,7 +9,7 @@ import { AdminShell } from "@/components/AdminShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRoles, useSession } from "@/hooks/useAuth";
-import { queryMediocreApi } from "@/lib/mediocre-api.functions";
+import { getMediocreTokenStatus, queryMediocreApi, saveMediocreToken } from "@/lib/mediocre-api.functions";
 import { extractList, extractWork, mediocreFileName, type MediocreRequest } from "@/lib/mediocre-api";
 import { ChapterList, EmptyState, ErrorState, JsonViewer, LoadingState, WorkDetails, WorkGrid } from "@/components/mediocre/MediocreViews";
 
@@ -63,6 +63,8 @@ function MediocrePanel() {
           <Button variant="outline" size="sm" disabled={q.isFetching || !isAdmin} onClick={() => q.refetch()}><RefreshCw className={`mr-1 h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />Atualizar</Button>
         </header>
 
+        {isAdmin && <TokenSettings />}
+
         <nav className="flex gap-2 overflow-x-auto pb-1" aria-label="Consultas">
           {TABS.map((t) => (
             <Button key={t.id} size="sm" variant={tab === t.id ? "default" : "outline"} className="shrink-0" onClick={() => setTab(t.id)} aria-pressed={tab === t.id}>{t.label}</Button>
@@ -94,7 +96,7 @@ function Result({ tab, data, fileName }: { tab: Tab; data: unknown; fileName: st
   } else {
     const list = extractList(data);
     if (!list) body = <EmptyState message="Não foi possível identificar uma lista. Veja o JSON abaixo (modo diagnóstico)." />;
-    else body = tab === "capitulos_usuario" ? <ChapterList chapters={list} /> : <WorkGrid rows={list} showIa={tab === "recentes_ia"} />;
+    else body = tab === "capitulos_usuario" ? <ChapterList chapters={list} /> : <><ImportAllButton rows={list} /><WorkGrid rows={list} showIa={tab === "recentes_ia"} /></>;
   }
   return <div className="space-y-4">{body}<JsonViewer data={data} fileName={fileName} /></div>;
 }
@@ -108,4 +110,52 @@ function ImportButton({ obraId }: { obraId: number }) {
   });
   if (!Number.isSafeInteger(obraId) || obraId <= 0) return null;
   return <Button onClick={() => m.mutate()} disabled={m.isPending}>{m.isPending ? "Adicionando…" : "Adicionar ao Better Mangá"}</Button>;
+}
+
+function ImportAllButton({ rows }: { rows: Record<string, unknown>[] }) {
+  const run = useServerFn(importMediocreWorkFn);
+  const ids = [...new Set(rows.map((r) => Number(r["obr_id"] ?? r["id"])).filter((n) => Number.isSafeInteger(n) && n > 0))];
+  const [prog, setProg] = useState<{ done: number; fail: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const start = async () => {
+    if (!confirm(`Publicar ${ids.length} obras desta página no Better Mangá?`)) return;
+    setBusy(true); let done = 0, fail = 0; setProg({ done, fail });
+    for (const id of ids) {
+      try { await run({ data: { obraId: id } }); done++; } catch { fail++; }
+      setProg({ done, fail });
+    }
+    setBusy(false);
+    toast.success(`${done} obras publicadas/atualizadas${fail ? `, ${fail} com erro` : ""}. Obras longas: clique de novo para continuar capítulos.`);
+  };
+  if (!ids.length) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button onClick={start} disabled={busy}>{busy ? "Publicando…" : `Publicar todas (${ids.length})`}</Button>
+      {prog && <span className="text-sm text-muted-foreground">{prog.done + prog.fail}/{ids.length} · {prog.fail} erros</span>}
+    </div>
+  );
+}
+
+function TokenSettings() {
+  const status = useServerFn(getMediocreTokenStatus);
+  const save = useServerFn(saveMediocreToken);
+  const s = useQuery({ queryKey: ["mediocre-token"], queryFn: () => status() });
+  const [token, setToken] = useState("");
+  const [refresh, setRefresh] = useState("");
+  const m = useMutation({
+    mutationFn: () => save({ data: { token, refreshToken: refresh } }),
+    onSuccess: () => { setToken(""); setRefresh(""); void s.refetch(); toast.success("Token atualizado."); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar."),
+  });
+  return (
+    <details className="rounded-lg border p-3">
+      <summary className="cursor-pointer text-sm font-semibold">Configuração do token {s.data?.hasToken ? `· salvo ${s.data.updatedAt ? new Date(s.data.updatedAt).toLocaleString("pt-BR") : ""}` : "· usando token padrão"}</summary>
+      <form className="mt-3 grid gap-2" onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
+        <Input type="password" autoComplete="off" placeholder="Novo token (Authorization)" value={token} onChange={(e) => setToken(e.target.value)} />
+        <Input type="password" autoComplete="off" placeholder="Refresh token (opcional)" value={refresh} onChange={(e) => setRefresh(e.target.value)} />
+        <p className="text-xs text-muted-foreground">O token fica guardado só no servidor e nunca é mostrado de volta. Se a API falhar, o site usa a última cópia salva.</p>
+        <Button type="submit" disabled={!token || m.isPending} className="w-fit">{m.isPending ? "Salvando…" : "Salvar token"}</Button>
+      </form>
+    </details>
+  );
 }
