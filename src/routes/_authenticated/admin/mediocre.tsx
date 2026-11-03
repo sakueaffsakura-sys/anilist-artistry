@@ -223,6 +223,7 @@ function SyncButton() {
 function TokenSettings() {
   const status = useServerFn(getMediocreTokenStatus);
   const save = useServerFn(saveMediocreToken);
+  const qc = useQueryClient();
   const s = useQuery({ queryKey: ["mediocre-token"], queryFn: () => status() });
   const [token, setToken] = useState("");
   const [refresh, setRefresh] = useState("");
