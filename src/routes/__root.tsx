@@ -24,6 +24,7 @@ import { ProfilesProvider } from "@/hooks/use-profiles";
 import { ProfileGate } from "@/components/ProfilePicker";
 import { ClickSound } from "@/components/ClickSound";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
+import { SiteFx } from "@/components/SiteFx";
 
 function NotFoundComponent() {
   return (
@@ -184,6 +185,7 @@ function RootComponent() {
       <ProfilesProvider>
       <ClickSound />
       <GoogleAnalytics />
+      <SiteFx />
       <Outlet />
       {maintenancePage ? null : <ProfileGate />}
       <Toaster position="top-center" />
