@@ -7,7 +7,7 @@ const MAX_BYTES = 8_000_000;
 type Fetched = { ok: true; status: number; data: unknown; raw: string } | { ok: false; status: number; error: { code: string; message: string } };
 
 // The API answers 429 to bursts and then 403s the token for a while; pace calls per instance.
-const API_GAP_MS = 1000;
+const API_GAP_MS = 1500; // calm pace between API calls
 export const IP_BLOCKED_MESSAGE = "A MediocreScan bloqueou o IP do servidor do site.";
 const BLOCK_PAUSE_MS = 30 * 60_000;
 

@@ -159,6 +159,8 @@ function ImportButton({ obraId }: { obraId: number }) {
 
 const rowId = (r: Record<string, unknown>) => Number(r["obr_id"] ?? r["id"]);
 
+const CALM_PAUSE_MS = 10_000;
+
 /** Cards marked published (check) or not yet (blue X); "Publicar todas" skips the published ones. */
 function PublishableGrid({ rows, showIa }: { rows: Record<string, unknown>[]; showIa: boolean }) {
   const ids = [...new Set(rows.map(rowId).filter((n) => Number.isSafeInteger(n) && n > 0))];
@@ -173,7 +175,7 @@ function PublishableGrid({ rows, showIa }: { rows: Record<string, unknown>[]; sh
   const pending = ids.filter((id) => !have.has(id));
   const start = async () => {
     if (!pending.length) { toast.info("Todas desta página já estão publicadas."); return; }
-    if (!confirm(`Publicar ${pending.length} obras novas? ${ids.length - pending.length} já publicadas serão ignoradas.`)) return;
+    if (!confirm(`Publicar ${pending.length} obras novas? ${ids.length - pending.length} já publicadas serão ignoradas. A publicação é feita com calma (10 s entre obras), mantenha a página aberta.`)) return;
     setBusy(true); let done = 0, fail = 0; const reasons: string[] = []; setProg({ done, fail, total: pending.length });
     for (const id of pending) {
       let ok = false, reason = "";
@@ -188,6 +190,8 @@ function PublishableGrid({ rows, showIa }: { rows: Record<string, unknown>[]; sh
       }
       if (ok) { done++; qc.setQueryData<number[]>(key, (old) => [...(old ?? []), id]); } else { fail++; reasons.push(`#${id}: ${reason}`); }
       setProg({ done, fail, total: pending.length });
+      // Calm pace: 10 s between works so the API never sees a burst.
+      if (id !== pending[pending.length - 1]) await new Promise((r) => setTimeout(r, CALM_PAUSE_MS));
     }
     setBusy(false);
     void imported.refetch();
