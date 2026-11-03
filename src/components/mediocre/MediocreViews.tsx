@@ -28,7 +28,7 @@ function chapterCount(row: Row): string | null {
   return text(pick(row, "total_capitulos", "total_capitulos_ativos", "qtd_capitulos"));
 }
 
-export function WorkCard({ row, showIa, badge }: { row: Row; showIa?: boolean | undefined; badge?: ReactNode }) {
+export function WorkCard({ row, showIa, badge, onSelect }: { row: Row; showIa?: boolean | undefined; badge?: ReactNode; onSelect?: ((row: Row) => void) | undefined }) {
   const img = workImage(row);
   const name = text(pick(row, "obr_nome", "nome", "cap_nome"));
   const tags = tagNames(row["tags"]).slice(0, 4);
@@ -36,7 +36,8 @@ export function WorkCard({ row, showIa, badge }: { row: Row; showIa?: boolean | 
   return (
     <article className="relative flex gap-3 rounded-xl border border-border bg-card p-3">
       {badge}
-      {img ? <img src={img} alt={name ?? "Capa"} loading="lazy" className="aspect-[2/3] w-20 shrink-0 rounded-lg object-cover" /> : <div className="aspect-[2/3] w-20 shrink-0 rounded-lg bg-muted" />}
+      {onSelect && <button type="button" onClick={() => onSelect(row)} className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Opções de ${name ?? "obra"}`} />}
+      {img ? <img src={img} alt={name ?? "Capa"} loading="lazy" decoding="async" className="aspect-[2/3] w-20 shrink-0 rounded-lg object-cover" /> : <div className="aspect-[2/3] w-20 shrink-0 rounded-lg bg-muted" />}
       <div className="min-w-0 space-y-1">
         <h3 className="line-clamp-2 font-semibold">{name ?? "Sem título"}</h3>
         {showIa && hasIaFlag(row) && <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary"><Sparkles className="h-3 w-3" />IA</span>}
@@ -53,9 +54,9 @@ export function WorkCard({ row, showIa, badge }: { row: Row; showIa?: boolean | 
   );
 }
 
-export function WorkGrid({ rows, showIa, badgeFor }: { rows: Row[]; showIa?: boolean; badgeFor?: (row: Row) => ReactNode }) {
+export function WorkGrid({ rows, showIa, badgeFor, onSelect }: { rows: Row[]; showIa?: boolean; badgeFor?: (row: Row) => ReactNode; onSelect?: (row: Row) => void }) {
   if (!rows.length) return <EmptyState />;
-  return <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{rows.map((r, i) => <WorkCard key={String(r["obr_id"] ?? r["cap_id"] ?? i)} row={r} showIa={showIa} badge={badgeFor?.(r)} />)}</div>;
+  return <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{rows.map((r, i) => <WorkCard key={String(r["obr_id"] ?? r["cap_id"] ?? i)} row={r} showIa={showIa} badge={badgeFor?.(r)} onSelect={onSelect} />)}</div>;
 }
 
 const CHAPTER_FIELDS: Array<[string, string]> = [["cap_id", "ID"], ["cap_num", "Número"], ["cap_slug", "Slug"], ["cap_volume", "Volume"], ["cap_tipo", "Tipo"], ["cap_lancado_em", "Lançado"], ["cap_criado_em", "Criado"], ["cap_coment_count", "Comentários"], ["cap_reac_count", "Reações"], ["cap_ia", "IA"]];
