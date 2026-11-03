@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { getImportedMediocreIds, importMediocreWorkFn, syncMediocreNow } from "@/lib/mediocre-import.functions";
+import { enqueueMediocreWorks, getImportedMediocreIds, importMediocreWorkFn, syncMediocreNow } from "@/lib/mediocre-import.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { Check, Copy, Eye, Loader2, RefreshCw, Search, Send, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { useRoles, useSession } from "@/hooks/useAuth";
 import { getMediocreTokenStatus, queryMediocreApi, saveMediocreBypass, saveMediocreToken, testMediocreConnection } from "@/lib/mediocre-api.functions";
 import { extractList, extractPagination, extractWork, mediocreFileName, type MediocreRequest } from "@/lib/mediocre-api";
+import { MediocreQueue, QUEUE_KEY } from "@/components/mediocre/MediocreQueue";
 import { ChapterList, EmptyState, ErrorState, JsonViewer, LoadingState, WorkDetails, WorkGrid } from "@/components/mediocre/MediocreViews";
 
 export const Route = createFileRoute("/_authenticated/admin/mediocre")({
@@ -72,6 +73,7 @@ function MediocrePanel() {
         {isAdmin && <BlockBanner />}
         {isAdmin && <TokenSettings />}
         {isAdmin && <SyncButton />}
+        {isAdmin && <MediocreQueue />}
 
         <nav className="flex gap-2 overflow-x-auto pb-1" aria-label="Consultas">
           {TABS.map((t) => (
@@ -159,7 +161,6 @@ function ImportButton({ obraId }: { obraId: number }) {
 
 const rowId = (r: Record<string, unknown>) => Number(r["obr_id"] ?? r["id"]);
 
-const CALM_PAUSE_MS = 10_000;
 
 /** Cards marked published (check) or not yet (blue X); "Publicar todas" skips the published ones. */
 function PublishableGrid({ rows, showIa }: { rows: Record<string, unknown>[]; showIa: boolean }) {
@@ -169,47 +170,29 @@ function PublishableGrid({ rows, showIa }: { rows: Record<string, unknown>[]; sh
   const key = ["mediocre-imported", ids.join(",")];
   const imported = useQuery({ queryKey: key, queryFn: () => check({ data: { ids } }), staleTime: 30_000 });
   const have = new Set(imported.data ?? []);
-  const run = useServerFn(importMediocreWorkFn);
-  const [prog, setProg] = useState<{ done: number; fail: number; total: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const pending = ids.filter((id) => !have.has(id));
+  const enqueue = useServerFn(enqueueMediocreWorks);
+  const nameOf = (id: number) => { const r = rows.find((x) => rowId(x) === id); return r ? String(r["obr_nome"] ?? r["nome"] ?? "") || null : null; };
+  const addToQueue = async (list: number[]) => {
+    setBusy(true);
+    try {
+      const r = await enqueue({ data: { items: list.map((obraId) => ({ obraId, title: nameOf(obraId) })) } });
+      void qc.invalidateQueries({ queryKey: QUEUE_KEY });
+      toast.success(r.added ? `${r.added} obra(s) colocadas na fila. Um capítulo por minuto, uma obra por vez.` : "Essas obras já estavam na fila.");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Não foi possível colocar na fila."); }
+    finally { setBusy(false); }
+  };
   const start = async () => {
     if (!pending.length) { toast.info("Todas desta página já estão publicadas."); return; }
-    if (!confirm(`Publicar ${pending.length} obras novas? ${ids.length - pending.length} já publicadas serão ignoradas. A publicação é feita com calma (10 s entre obras), mantenha a página aberta.`)) return;
-    setBusy(true); let done = 0, fail = 0; const reasons: string[] = []; setProg({ done, fail, total: pending.length });
-    for (const id of pending) {
-      let ok = false, reason = "";
-      for (let attempt = 0; attempt < 2 && !ok; attempt++) {
-        try { await run({ data: { obraId: id } }); ok = true; }
-        catch (e) { reason = e instanceof Error ? e.message : "erro"; if (attempt === 0) await new Promise((r) => setTimeout(r, 1500)); }
-      }
-      if (!ok && reason.includes("bloqueou o IP")) {
-        fail++; reasons.push(`#${id}: ${reason}`);
-        toast.error(`Publicação interrompida: a MediocreScan bloqueou o IP do servidor.`, { description: `${done} publicadas, ${pending.length - done} ficaram por fazer. ${reason}`, duration: 20000 });
-        setBusy(false); void imported.refetch(); return;
-      }
-      if (ok) { done++; qc.setQueryData<number[]>(key, (old) => [...(old ?? []), id]); } else { fail++; reasons.push(`#${id}: ${reason}`); }
-      setProg({ done, fail, total: pending.length });
-      // Calm pace: 10 s between works so the API never sees a burst.
-      if (id !== pending[pending.length - 1]) await new Promise((r) => setTimeout(r, CALM_PAUSE_MS));
-    }
-    setBusy(false);
-    void imported.refetch();
-    if (fail) toast.error(`${done} obras publicadas, ${fail} com erro.`, { description: reasons.slice(0, 5).join("\n"), duration: 15000 });
-    else toast.success(`${done} obras publicadas.`);
+    if (!confirm(`Colocar ${pending.length} obras novas na fila? ${ids.length - pending.length} já publicadas serão ignoradas. Cada capítulo espera 1 minuto; pode fechar a página.`)) return;
+    await addToQueue(pending);
   };
-  const [sending, setSending] = useState<Set<number>>(new Set());
-  const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
+  const sending = new Set<number>();
   const publishOne = async (id: number) => {
-    if (!Number.isSafeInteger(id) || id <= 0 || sending.has(id)) return;
+    if (!Number.isSafeInteger(id) || id <= 0) return;
     if (have.has(id)) { toast.info("Essa obra já está publicada."); return; }
-    setSending((s) => new Set(s).add(id));
-    try {
-      const r = await run({ data: { obraId: id } });
-      qc.setQueryData<number[]>(key, (old) => [...(old ?? []), id]);
-      toast.success(`Obra publicada: ${r.added} capítulos${r.remaining ? `, faltam ${r.remaining}` : ""}.`);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Não foi possível publicar."); }
-    finally { setSending((s) => { const n = new Set(s); n.delete(id); return n; }); }
+    await addToQueue([id]);
   };
   const badgeFor = (r: Record<string, unknown>) => {
     if (!imported.data) return null;
@@ -231,8 +214,8 @@ function PublishableGrid({ rows, showIa }: { rows: Record<string, unknown>[]; sh
     <>
       {ids.length > 0 && (
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={start} disabled={busy || imported.isLoading}>{busy ? "Publicando…" : `Publicar novas (${pending.length})`}</Button>
-          <span className="text-sm text-muted-foreground">{imported.data ? `${ids.length - pending.length} já publicadas` : "Verificando…"}{prog ? ` · ${prog.done + prog.fail}/${prog.total} · ${prog.fail} erros` : ""}</span>
+          <Button onClick={start} disabled={busy || imported.isLoading}>{busy ? "Colocando na fila…" : `Colocar novas na fila (${pending.length})`}</Button>
+          <span className="text-sm text-muted-foreground">{imported.data ? `${ids.length - pending.length} já publicadas` : "Verificando…"}</span>
         </div>
       )}
       <WorkGrid rows={rows} showIa={showIa} badgeFor={badgeFor} onSelect={setSelected} />
@@ -245,7 +228,7 @@ function PublishableGrid({ rows, showIa }: { rows: Record<string, unknown>[]; sh
           <div className="grid gap-2">
             {have.has(selId)
               ? <Button variant="outline" onClick={() => void publishOne(selId)} disabled><Check className="mr-2 h-4 w-4" />Já publicada</Button>
-              : <Button onClick={() => { void publishOne(selId); setSelected(null); }} disabled={sending.has(selId) || busy}><Send className="mr-2 h-4 w-4" />Enviar para o Better Mangá</Button>}
+              : <Button onClick={() => { void publishOne(selId); setSelected(null); }} disabled={sending.has(selId) || busy}><Send className="mr-2 h-4 w-4" />Colocar na fila de publicação</Button>}
             <Button variant="outline" asChild><a href={`/mediocre/obra/${selId}`} target="_blank" rel="noreferrer"><Eye className="mr-2 h-4 w-4" />Visualizar obra</a></Button>
             <Button variant="outline" onClick={() => { void navigator.clipboard.writeText(String(selId)).then(() => toast.success("ID copiado.")); }}><Copy className="mr-2 h-4 w-4" />Copiar ID ({selId})</Button>
             <Button variant="ghost" onClick={() => setSelected(null)}>Cancelar</Button>
