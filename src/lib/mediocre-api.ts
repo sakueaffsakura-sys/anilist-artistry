@@ -12,7 +12,12 @@ export interface MediocreRequest {
   operation: MediocreOperation;
   obraId?: number;
   capituloId?: number;
+  /** Only for "recentes": API format filter and 1-based page (30 per page, sent as offset). */
+  formato?: number;
+  pagina?: number;
 }
+
+export const RECENTES_PAGE_SIZE = 30;
 
 export type MediocreResult =
   | { ok: true; status: number; json: string }
@@ -27,7 +32,7 @@ function positiveId(value: unknown, label: string): number {
 /** Validates the body sent by the browser; rejects anything outside the allowlist. */
 export function parseMediocreRequest(input: unknown): MediocreRequest {
   if (!input || typeof input !== "object") throw new Error("Requisição inválida.");
-  const { operation, obraId, capituloId } = input as Record<string, unknown>;
+  const { operation, obraId, capituloId, formato, pagina } = input as Record<string, unknown>;
   if (typeof operation !== "string" || !(MEDIOCRE_OPERATIONS as readonly string[]).includes(operation)) {
     throw new Error("Operação não permitida.");
   }
@@ -35,7 +40,22 @@ export function parseMediocreRequest(input: unknown): MediocreRequest {
   if (op === "obra" || op === "capitulos_usuario" || op === "thumbs_capitulos") return { operation: op, obraId: positiveId(obraId, "ID da obra") };
   // Chapter content takes only the chapter id: the server reads uuid/number from the API metadata itself.
   if (op === "capitulo" || op === "conteudo_capitulo") return { operation: op, capituloId: positiveId(capituloId, "ID do capítulo") };
+  if (op === "recentes") {
+    const out: MediocreRequest = { operation: op };
+    if (formato !== undefined && formato !== null) { const f = positiveId(formato, "Formato"); if (f > 50) throw new Error("Formato inválido."); out.formato = f; }
+    if (pagina !== undefined && pagina !== null) { const pg = positiveId(pagina, "Página"); if (pg > 1000) throw new Error("Página inválida."); out.pagina = pg; }
+    return out;
+  }
   return { operation: op };
+}
+
+/** Reads the API's pagination block, when present. */
+export function extractPagination(data: unknown): { page: number; totalPages: number; totalItems: number } | null {
+  const p = data && typeof data === "object" ? (data as Record<string, unknown>)["pagination"] : null;
+  if (!p || typeof p !== "object") return null;
+  const o = p as Record<string, unknown>;
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  return { page: n(o["currentPage"]) || 1, totalPages: n(o["totalPages"]) || 1, totalItems: n(o["totalItems"]) };
 }
 
 /** Maps an operation to a fixed path on back2.mediocrescan.com. Never accepts URLs. */
@@ -43,7 +63,13 @@ export function mediocrePath(req: MediocreRequest): string {
   switch (req.operation) {
     case "home": return "/obras/home?formato=1"; // API requires a format id; 1 is the main catalog
     case "recentes_ia": return "/obras/atualizadas-recentes-ia";
-    case "recentes": return "/obras/atualizadas-recentes";
+    case "recentes": {
+      const qs = new URLSearchParams();
+      if (req.formato) qs.set("formato", String(req.formato));
+      if (req.pagina && req.pagina > 1) qs.set("offset", String((req.pagina - 1) * RECENTES_PAGE_SIZE));
+      const q = qs.toString();
+      return "/obras/atualizadas-recentes" + (q ? `?${q}` : "");
+    }
     case "obra": return `/obras/${req.obraId}`;
     case "capitulo": case "conteudo_capitulo": return `/capitulos/${req.capituloId}`;
     case "thumbs_capitulos": return `/obras/${req.obraId}/thumbs-capitulos.json`; // served by the CDN host
