@@ -99,7 +99,7 @@ function AuthPage() {
   const covers = useQuery({
     queryKey: ["auth-covers"],
     queryFn: async () => {
-      const { data } = await supabase.from("series").select("id, cover_url").eq("published", true).not("cover_url", "is", null).order("updated_at", { ascending: false }).limit(15);
+      const { data } = await supabase.from("series").select("id, cover_url").eq("published", true).not("cover_url", "is", null).order("updated_at", { ascending: false }).limit(20);
       return (data ?? []).filter((c): c is { id: string; cover_url: string } => Boolean(c.cover_url));
     },
     staleTime: 10 * 60_000,
@@ -110,13 +110,15 @@ function AuthPage() {
     <div className="grid min-h-screen bg-background lg:grid-cols-[1.35fr_1fr]">
       <aside className="relative hidden overflow-hidden lg:block" aria-hidden="true">
         <div className="absolute -inset-20 grid -rotate-6 grid-cols-5 gap-4 opacity-60">
-          {(covers.data ?? []).map((c) => (
-            <img key={c.id} src={c.cover_url} alt="" loading="lazy" className="aspect-[2/3] w-full rounded-xl object-cover" />
+          {[...(covers.data ?? []), ...(covers.data ?? [])].slice(0, 25).map((c, i) => (
+            <div key={`${c.id}-${i}`} className="aspect-[2/3] w-full overflow-hidden rounded-xl bg-surface">
+              <img src={c.cover_url} alt="" decoding="async" className="h-full w-full object-cover" />
+            </div>
           ))}
         </div>
         <div className="absolute inset-0 bg-gradient-to-r from-background/40 via-background/60 to-background" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
-        <div className="absolute bottom-12 left-12 max-w-md">
+        <div className="absolute bottom-12 left-12 max-w-xl">
           <img src="https://cdn.mediocrescan.com/usuarios/156358/056c603c2288529c82b19ad4906b02c7f5a67be8.webp" alt="" className="mb-5 h-14 w-auto object-contain" />
           <p className="font-display text-5xl font-extrabold leading-[1.05] tracking-tight">Milhares de capítulos traduzidos, todo dia.</p>
           <p className="mt-4 text-muted-foreground">Comic, mangá, manhwa e novel em português.</p>
