@@ -1,0 +1,1 @@
+ALTER TABLE public.mediocre_settings ADD COLUMN IF NOT EXISTS bypass_header text, ADD COLUMN IF NOT EXISTS blocked_until timestamptz;

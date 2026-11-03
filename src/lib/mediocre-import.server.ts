@@ -152,9 +152,22 @@ export async function importedMediocreIds(admin: Admin, ids: number[]): Promise<
  * Copies new chapters for the imported works least recently checked; each run handles a few
  * works so it fits the scheduler's time budget, and rotation reaches every work over time.
  */
-export async function syncMediocreChapters(admin: Admin, maxWorks = 3): Promise<{ checked: number; added: number }> {
-  const { data } = await admin.from("series").select("id, source_mediocre_id")
+export async function syncMediocreChapters(admin: Admin, maxWorks = 3): Promise<{ checked: number; added: number; blocked?: boolean }> {
+  const { data: cfg } = await admin.from("mediocre_settings").select("blocked_until").eq("id", 1).maybeSingle();
+  if (cfg?.blocked_until && new Date(cfg.blocked_until).getTime() > Date.now()) return { checked: 0, added: 0, blocked: true };
+  // Teste rápido: se o Cloudflare bloquear, pausa por 1 hora.
+  const probe = await mediocreGet("api", "/obras/atualizadas-recentes");
+  if (!probe.ok && probe.error.code === "BLOCKED") {
+    await admin.from("mediocre_settings").update({ blocked_until: new Date(Date.now() + 3_600_000).toISOString() }).eq("id", 1);
+    return { checked: 0, added: 0, blocked: true };
+  }
+  // Obras sem capítulos (importação interrompida) vêm primeiro.
+  const { data: empty } = await admin.from("series").select("id, source_mediocre_id, chapters(count)")
+    .not("source_mediocre_id", "is", null).limit(200);
+  const missing = (empty ?? []).filter((r) => ((r as { chapters?: { count: number }[] }).chapters?.[0]?.count ?? 0) === 0).slice(0, maxWorks);
+  const { data: rotated } = await admin.from("series").select("id, source_mediocre_id")
     .not("source_mediocre_id", "is", null).order("mediocre_synced_at", { ascending: true, nullsFirst: true }).limit(maxWorks);
+  const data = missing.length ? missing : rotated;
   let added = 0;
   for (const s of data ?? []) {
     await admin.from("series").update({ mediocre_synced_at: new Date().toISOString() }).eq("id", s.id);
