@@ -1,0 +1,2 @@
+ALTER TABLE public.series ADD COLUMN IF NOT EXISTS mediocre_synced_at timestamptz;
+CREATE INDEX IF NOT EXISTS series_mediocre_sync_idx ON public.series (mediocre_synced_at NULLS FIRST) WHERE source_mediocre_id IS NOT NULL;
