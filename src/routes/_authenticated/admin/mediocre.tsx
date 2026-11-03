@@ -175,7 +175,7 @@ function PublishableGrid({ rows, showIa }: { rows: Record<string, unknown>[]; sh
   const pending = ids.filter((id) => !have.has(id));
   const start = async () => {
     if (!pending.length) { toast.info("Todas desta página já estão publicadas."); return; }
-    if (!confirm(`Publicar ${pending.length} obras novas? ${ids.length - pending.length} já publicadas serão ignoradas.`)) return;
+    if (!confirm(`Publicar ${pending.length} obras novas? ${ids.length - pending.length} já publicadas serão ignoradas. A publicação é feita com calma (10 s entre obras), mantenha a página aberta.`)) return;
     setBusy(true); let done = 0, fail = 0; const reasons: string[] = []; setProg({ done, fail, total: pending.length });
     for (const id of pending) {
       let ok = false, reason = "";
