@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRoles, useSession } from "@/hooks/useAuth";
 import { getMediocreTokenStatus, queryMediocreApi, saveMediocreBypass, saveMediocreToken, testMediocreConnection } from "@/lib/mediocre-api.functions";
-import { extractList, extractWork, mediocreFileName, type MediocreRequest } from "@/lib/mediocre-api";
+import { extractList, extractPagination, extractWork, mediocreFileName, type MediocreRequest } from "@/lib/mediocre-api";
 import { ChapterList, EmptyState, ErrorState, JsonViewer, LoadingState, WorkDetails, WorkGrid } from "@/components/mediocre/MediocreViews";
 
 export const Route = createFileRoute("/_authenticated/admin/mediocre")({
@@ -37,11 +37,15 @@ function MediocrePanel() {
   const [idInput, setIdInput] = useState("20564");
   const [obraId, setObraId] = useState(20564);
   const call = useServerFn(queryMediocreApi);
-  const req: MediocreRequest = tab === "obra" || tab === "capitulos_usuario" ? { operation: tab, obraId } : { operation: tab };
+  const [formato, setFormato] = useState<number | null>(null);
+  const [pagina, setPagina] = useState(1);
+  const req: MediocreRequest = tab === "obra" || tab === "capitulos_usuario" ? { operation: tab, obraId }
+    : tab === "recentes" ? { operation: tab, ...(formato ? { formato } : {}), pagina }
+    : { operation: tab };
 
   // In-memory cache (5 min) keyed by operation; TanStack Query dedupes concurrent calls.
   const q = useQuery({
-    queryKey: ["mediocre-api", req.operation, req.obraId ?? null],
+    queryKey: ["mediocre-api", req.operation, req.obraId ?? null, req.formato ?? null, req.pagina ?? null],
     enabled: isAdmin,
     staleTime: 5 * 60_000,
     retry: false,
@@ -81,6 +85,12 @@ function MediocrePanel() {
           </form>
         )}
 
+        {tab === "recentes" && isAdmin && (
+          <PageControls formato={formato} pagina={pagina} busy={q.isFetching}
+            pagination={q.data?.ok ? extractPagination(JSON.parse(q.data.json)) : null}
+            onFormato={(f) => { setFormato(f); setPagina(1); }} onPagina={setPagina} />
+        )}
+
         {!isAdmin ? <ErrorState message="Somente administradores podem usar esta consulta." />
           : q.isLoading ? <LoadingState />
           : q.error ? <ErrorState message="Não foi possível conectar à API." />
@@ -88,6 +98,37 @@ function MediocrePanel() {
           : q.data?.ok ? <Result tab={tab} data={JSON.parse(q.data.json) as unknown} fileName={mediocreFileName(req)} /> : null}
       </div>
     </AdminShell>
+  );
+}
+
+function PageControls({ formato, pagina, busy, pagination, onFormato, onPagina }: {
+  formato: number | null; pagina: number; busy: boolean;
+  pagination: { page: number; totalPages: number; totalItems: number } | null;
+  onFormato: (f: number | null) => void; onPagina: (p: number) => void;
+}) {
+  const [fmt, setFmt] = useState(formato ? String(formato) : "");
+  const [go, setGo] = useState("");
+  const total = Math.min(pagination?.totalPages ?? pagina, 1000);
+  const applyFmt = (e: FormEvent) => { e.preventDefault(); const n = Number(fmt); onFormato(fmt && n >= 1 && n <= 50 ? n : null); };
+  const jump = (e: FormEvent) => { e.preventDefault(); const n = Number(go); if (n >= 1 && n <= total) { onPagina(n); setGo(""); } };
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card/60 p-3 text-sm">
+      <form onSubmit={applyFmt} className="flex items-center gap-2">
+        <span className="text-muted-foreground">Formato</span>
+        <Input className="h-8 w-20" inputMode="numeric" placeholder="Todos" value={fmt} onChange={(e) => setFmt(e.target.value.replace(/\D/g, "").slice(0, 2))} aria-label="Formato" />
+        <Button type="submit" size="sm" variant="outline" disabled={busy}>Aplicar</Button>
+        {formato && <Button type="button" size="sm" variant="ghost" onClick={() => { setFmt(""); onFormato(null); }}>Todos</Button>}
+      </form>
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" disabled={busy || pagina <= 1} onClick={() => onPagina(pagina - 1)}>Anterior</Button>
+        <span>Página {pagina} de {total}{pagination ? ` · ${pagination.totalItems.toLocaleString("pt-BR")} obras` : ""}</span>
+        <Button size="sm" variant="outline" disabled={busy || pagina >= total} onClick={() => onPagina(pagina + 1)}>Próxima</Button>
+      </div>
+      <form onSubmit={jump} className="flex items-center gap-2">
+        <Input className="h-8 w-20" inputMode="numeric" placeholder="Ir para" value={go} onChange={(e) => setGo(e.target.value.replace(/\D/g, "").slice(0, 4))} aria-label="Ir para página" />
+        <Button type="submit" size="sm" variant="outline" disabled={busy}>Ir</Button>
+      </form>
+    </div>
   );
 }
 

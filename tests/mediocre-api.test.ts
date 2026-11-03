@@ -47,3 +47,10 @@ describe("MediocreScan chapter content", () => {
     expect(titleKey("Diário")).toBe("diario");
   });
 });
+
+it("recentes paging uses offset of 30 per page with format", () => {
+  expect(mediocrePath({ operation: "recentes", formato: 4, pagina: 3 })).toBe("/obras/atualizadas-recentes?formato=4&offset=60");
+  expect(mediocrePath({ operation: "recentes" })).toBe("/obras/atualizadas-recentes");
+  expect(() => parseMediocreRequest({ operation: "recentes", pagina: 0 })).toThrow();
+  expect(() => parseMediocreRequest({ operation: "recentes", formato: 99 })).toThrow();
+});
