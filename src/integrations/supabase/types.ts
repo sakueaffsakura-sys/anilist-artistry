@@ -650,18 +650,24 @@ export type Database = {
       }
       mediocre_settings: {
         Row: {
+          blocked_until: string | null
+          bypass_header: string | null
           id: number
           refresh_token: string | null
           token: string | null
           updated_at: string
         }
         Insert: {
+          blocked_until?: string | null
+          bypass_header?: string | null
           id?: number
           refresh_token?: string | null
           token?: string | null
           updated_at?: string
         }
         Update: {
+          blocked_until?: string | null
+          bypass_header?: string | null
           id?: number
           refresh_token?: string | null
           token?: string | null
