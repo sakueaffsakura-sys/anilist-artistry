@@ -28,6 +28,7 @@ import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiVersionRouteImport } from './routes/api/version'
 import { Route as ListasIndexRouteImport } from './routes/listas/index'
 import { Route as ListasIdRouteImport } from './routes/listas/$id'
+import { Route as MediocreIndexRouteImport } from './routes/mediocre.index'
 import { Route as UUsernameRouteImport } from './routes/u/$username'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminIdRouteImport } from './routes/_authenticated/admin/$id'
@@ -48,6 +49,8 @@ import { Route as AuthenticatedAdminSuporteRouteImport } from './routes/_authent
 import { Route as ApiAdminClassificarObrasRouteImport } from './routes/api/admin/classificar-obras'
 import { Route as ApiPublicMaintenanceRouteImport } from './routes/api/public/maintenance'
 import { Route as ApiPublicVersionRouteImport } from './routes/api/public/version'
+import { Route as MediocreCapituloIdRouteImport } from './routes/mediocre.capitulo.$id'
+import { Route as MediocreObraIdRouteImport } from './routes/mediocre.obra.$id'
 import { Route as AuthenticatedObraSlugIndexRouteImport } from './routes/_authenticated/obra/$slug/index'
 import { Route as AuthenticatedObraSlugChapterRouteImport } from './routes/_authenticated/obra/$slug/$chapter'
 
@@ -143,6 +146,11 @@ const ListasIndexRoute = ListasIndexRouteImport.update({
 const ListasIdRoute = ListasIdRouteImport.update({
   id: '/listas/$id',
   path: '/listas/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MediocreIndexRoute = MediocreIndexRouteImport.update({
+  id: '/mediocre/',
+  path: '/mediocre/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UUsernameRoute = UUsernameRouteImport.update({
@@ -255,6 +263,16 @@ const ApiPublicVersionRoute = ApiPublicVersionRouteImport.update({
   path: '/api/public/version',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MediocreCapituloIdRoute = MediocreCapituloIdRouteImport.update({
+  id: '/mediocre/capitulo/$id',
+  path: '/mediocre/capitulo/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MediocreObraIdRoute = MediocreObraIdRouteImport.update({
+  id: '/mediocre/obra/$id',
+  path: '/mediocre/obra/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedObraSlugIndexRoute =
   AuthenticatedObraSlugIndexRouteImport.update({
     id: '/obra/$slug/',
@@ -288,6 +306,7 @@ export interface FileRoutesByFullPath {
   '/listas/$id': typeof ListasIdRoute
   '/u/$username': typeof UUsernameRoute
   '/listas/': typeof ListasIndexRoute
+  '/mediocre/': typeof MediocreIndexRoute
   '/admin/$id': typeof AuthenticatedAdminIdRoute
   '/admin/app': typeof AuthenticatedAdminAppRoute
   '/admin/contas': typeof AuthenticatedAdminContasRoute
@@ -306,6 +325,8 @@ export interface FileRoutesByFullPath {
   '/api/admin/classificar-obras': typeof ApiAdminClassificarObrasRoute
   '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
   '/api/public/version': typeof ApiPublicVersionRoute
+  '/mediocre/capitulo/$id': typeof MediocreCapituloIdRoute
+  '/mediocre/obra/$id': typeof MediocreObraIdRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/obra/$slug/$chapter': typeof AuthenticatedObraSlugChapterRoute
   '/obra/$slug/': typeof AuthenticatedObraSlugIndexRoute
@@ -330,6 +351,7 @@ export interface FileRoutesByTo {
   '/listas/$id': typeof ListasIdRoute
   '/u/$username': typeof UUsernameRoute
   '/listas': typeof ListasIndexRoute
+  '/mediocre': typeof MediocreIndexRoute
   '/admin/$id': typeof AuthenticatedAdminIdRoute
   '/admin/app': typeof AuthenticatedAdminAppRoute
   '/admin/contas': typeof AuthenticatedAdminContasRoute
@@ -348,6 +370,8 @@ export interface FileRoutesByTo {
   '/api/admin/classificar-obras': typeof ApiAdminClassificarObrasRoute
   '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
   '/api/public/version': typeof ApiPublicVersionRoute
+  '/mediocre/capitulo/$id': typeof MediocreCapituloIdRoute
+  '/mediocre/obra/$id': typeof MediocreObraIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/obra/$slug/$chapter': typeof AuthenticatedObraSlugChapterRoute
   '/obra/$slug': typeof AuthenticatedObraSlugIndexRoute
@@ -374,6 +398,7 @@ export interface FileRoutesById {
   '/listas/$id': typeof ListasIdRoute
   '/u/$username': typeof UUsernameRoute
   '/listas/': typeof ListasIndexRoute
+  '/mediocre/': typeof MediocreIndexRoute
   '/_authenticated/admin/$id': typeof AuthenticatedAdminIdRoute
   '/_authenticated/admin/app': typeof AuthenticatedAdminAppRoute
   '/_authenticated/admin/contas': typeof AuthenticatedAdminContasRoute
@@ -392,6 +417,8 @@ export interface FileRoutesById {
   '/api/admin/classificar-obras': typeof ApiAdminClassificarObrasRoute
   '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
   '/api/public/version': typeof ApiPublicVersionRoute
+  '/mediocre/capitulo/$id': typeof MediocreCapituloIdRoute
+  '/mediocre/obra/$id': typeof MediocreObraIdRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/obra/$slug/$chapter': typeof AuthenticatedObraSlugChapterRoute
   '/_authenticated/obra/$slug/': typeof AuthenticatedObraSlugIndexRoute
@@ -418,6 +445,7 @@ export interface FileRouteTypes {
     | '/listas/$id'
     | '/u/$username'
     | '/listas/'
+    | '/mediocre/'
     | '/admin/$id'
     | '/admin/app'
     | '/admin/contas'
@@ -436,6 +464,8 @@ export interface FileRouteTypes {
     | '/api/admin/classificar-obras'
     | '/api/public/maintenance'
     | '/api/public/version'
+    | '/mediocre/capitulo/$id'
+    | '/mediocre/obra/$id'
     | '/admin/'
     | '/obra/$slug/$chapter'
     | '/obra/$slug/'
@@ -460,6 +490,7 @@ export interface FileRouteTypes {
     | '/listas/$id'
     | '/u/$username'
     | '/listas'
+    | '/mediocre'
     | '/admin/$id'
     | '/admin/app'
     | '/admin/contas'
@@ -478,6 +509,8 @@ export interface FileRouteTypes {
     | '/api/admin/classificar-obras'
     | '/api/public/maintenance'
     | '/api/public/version'
+    | '/mediocre/capitulo/$id'
+    | '/mediocre/obra/$id'
     | '/admin'
     | '/obra/$slug/$chapter'
     | '/obra/$slug'
@@ -503,6 +536,7 @@ export interface FileRouteTypes {
     | '/listas/$id'
     | '/u/$username'
     | '/listas/'
+    | '/mediocre/'
     | '/_authenticated/admin/$id'
     | '/_authenticated/admin/app'
     | '/_authenticated/admin/contas'
@@ -521,6 +555,8 @@ export interface FileRouteTypes {
     | '/api/admin/classificar-obras'
     | '/api/public/maintenance'
     | '/api/public/version'
+    | '/mediocre/capitulo/$id'
+    | '/mediocre/obra/$id'
     | '/_authenticated/admin/'
     | '/_authenticated/obra/$slug/$chapter'
     | '/_authenticated/obra/$slug/'
@@ -541,9 +577,12 @@ export interface RootRouteChildren {
   ListasIdRoute: typeof ListasIdRoute
   UUsernameRoute: typeof UUsernameRoute
   ListasIndexRoute: typeof ListasIndexRoute
+  MediocreIndexRoute: typeof MediocreIndexRoute
   ApiAdminClassificarObrasRoute: typeof ApiAdminClassificarObrasRoute
   ApiPublicMaintenanceRoute: typeof ApiPublicMaintenanceRoute
   ApiPublicVersionRoute: typeof ApiPublicVersionRoute
+  MediocreCapituloIdRoute: typeof MediocreCapituloIdRoute
+  MediocreObraIdRoute: typeof MediocreObraIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -679,6 +718,13 @@ declare module '@tanstack/react-router' {
       path: '/listas/$id'
       fullPath: '/listas/$id'
       preLoaderRoute: typeof ListasIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mediocre/': {
+      id: '/mediocre/'
+      path: '/mediocre'
+      fullPath: '/mediocre/'
+      preLoaderRoute: typeof MediocreIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/u/$username': {
@@ -821,6 +867,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicVersionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/mediocre/capitulo/$id': {
+      id: '/mediocre/capitulo/$id'
+      path: '/mediocre/capitulo/$id'
+      fullPath: '/mediocre/capitulo/$id'
+      preLoaderRoute: typeof MediocreCapituloIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mediocre/obra/$id': {
+      id: '/mediocre/obra/$id'
+      path: '/mediocre/obra/$id'
+      fullPath: '/mediocre/obra/$id'
+      preLoaderRoute: typeof MediocreObraIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/obra/$slug/': {
       id: '/_authenticated/obra/$slug/'
       path: '/obra/$slug'
@@ -910,9 +970,12 @@ const rootRouteChildren: RootRouteChildren = {
   ListasIdRoute: ListasIdRoute,
   UUsernameRoute: UUsernameRoute,
   ListasIndexRoute: ListasIndexRoute,
+  MediocreIndexRoute: MediocreIndexRoute,
   ApiAdminClassificarObrasRoute: ApiAdminClassificarObrasRoute,
   ApiPublicMaintenanceRoute: ApiPublicMaintenanceRoute,
   ApiPublicVersionRoute: ApiPublicVersionRoute,
+  MediocreCapituloIdRoute: MediocreCapituloIdRoute,
+  MediocreObraIdRoute: MediocreObraIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
