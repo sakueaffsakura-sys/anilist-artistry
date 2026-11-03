@@ -151,7 +151,7 @@ export async function importedMediocreIds(admin: Admin, ids: number[]): Promise<
  * Copies new chapters for the imported works least recently checked; each run handles a few
  * works so it fits the scheduler's time budget, and rotation reaches every work over time.
  */
-export async function syncMediocreChapters(admin: Admin, maxWorks = 3): Promise<{ checked: number; added: number; blocked?: boolean }> {
+export async function syncMediocreChapters(admin: Admin, maxWorks = 2): Promise<{ checked: number; added: number; blocked?: boolean }> {
   const { data: cfg } = await admin.from("mediocre_settings").select("blocked_until").eq("id", 1).maybeSingle();
   if (cfg?.blocked_until && new Date(cfg.blocked_until).getTime() > Date.now()) return { checked: 0, added: 0, blocked: true };
   // Teste rápido: bloqueio Cloudflare pausa 1 hora; recusa/limite da API pausa 20 minutos para não piorar o bloqueio.
