@@ -23,6 +23,7 @@ import { SessionProvider } from "@/hooks/useAuth";
 import { ProfilesProvider } from "@/hooks/use-profiles";
 import { ProfileGate } from "@/components/ProfilePicker";
 import { ClickSound } from "@/components/ClickSound";
+import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 
 function NotFoundComponent() {
   return (
@@ -182,6 +183,7 @@ function RootComponent() {
       <SessionProvider>
       <ProfilesProvider>
       <ClickSound />
+      <GoogleAnalytics />
       <Outlet />
       {maintenancePage ? null : <ProfileGate />}
       <Toaster position="top-center" />
