@@ -10,3 +10,4 @@
 - TXT/JSON chapter imports validate CDN links in browser-safe parsers and write sequentially with RLS, never storing originals or capturing external sessions; share filename numbering.
 - Novel file imports use a browser-safe text parser and sequential authenticated chapter writes with an explicit review step; original TXT/HTML files never enter Storage, preserving illustrations without retaining source files.
 - MediocreScan token: admin-saved token in service-role-only mediocre_settings overrides the env secret; successful API answers are kept in mediocre_cache and served when the live call fails, so token expiry does not blank the showcase.
+- MediocreScan chapter sync: a managed 10-minute schedule hits /api/public/jobs/mediocre-sync, which rotates a few imported works by series.mediocre_synced_at to stay within the scheduler time budget; publish-all skips works already linked by source_mediocre_id.
