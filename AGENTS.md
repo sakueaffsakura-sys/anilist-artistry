@@ -9,6 +9,7 @@
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
 
+- Subdirectories have their own AGENTS.md (src/lib/AGENTS.md: maintenance, novels, chapter imports); read it before changing files there.
 - Load DB-backed SEO metadata in loaders.
 - Sitemap: only public static pages and public community lists; work pages require an account and a chosen profile, so they are excluded.
 - Work pages (`/catalogo`, `/obra/*`) live under `_authenticated` and require both sign-in and a chosen profile (`hasProfileChosen` in `src/lib/active-profile.ts`, set by `switchTo`); gates redirect to `/perfis` and the fullscreen picker blocks the app until a profile is picked.
@@ -16,13 +17,7 @@
 - Use Sora headings and Manrope body; profiles contain dense achievements in a scannable bento layout.
 - Shared presentation uses semantic CSS tokens and scoped site-content/site-header/admin classes; reader dimensions and user-selected reading preferences remain independent.
 - Keep novels on the shared work details route, but give them a dedicated text reader while manga/comics retain the image reader, so both formats share catalog data without compromising reading ergonomics.
-- Novel narration uses Lovable AI TTS via the signed-in /api/tts route with device speech as fallback, because AI voices sound natural while fallback keeps reading working.
-- Remote novel imports enforce an exact server host allowlist, deadline and byte budget; revalidate every redirect.
 - Bun regression tests live in tests/ outside the application compiler inputs so test-runner globals do not change the hosted runtime's DOM types.
-- Maintenance uses singleton settings and restrictive RLS; request middleware gates documents/API, function middleware gates RPCs where metadata is available. Verified admin bearer sessions bridge refresh via a short-lived HTTP-only cookie, never client roles. Media uses a private bucket and renewable signed URLs.
-- Browser maintenance status uses a public HTTP projection, SSR a server function; failed checks fail closed to avoid blank notices or bypasses.
-- Maintenance backgrounds use lazy-loaded TUS uploads in 6 MiB chunks with session refresh, retries and real progress; storage validation accepts preflight contentLength or legacy null metadata and completed size, while admin-only policies and bucket limits remain mandatory so resumable authorization does not reject valid uploads.
-- Maintenance video audio uses a shared playback helper with muted fallback, interaction retry and visibility resume; preview listeners stay scoped so browser autoplay restrictions do not stop the video.
 - cPanel uses CPANEL_BUILD=1 and Nitro node-server; app.cjs validates output/config via scripts/cpanel-runtime.cjs and honors Passenger ports without changing hosted builds.
 - Session state is provided once by SessionProvider in the root; useSession consumes it so repeated catalog cards do not create individual auth subscriptions.
 - Global click audio uses one client-only player and delegated document listener mounted in the root, so navigation preserves playback without per-control subscriptions.
@@ -30,13 +25,9 @@
 - Work requests and availability notifications are user-scoped tables; database triggers fulfill exact title/type matches on publication and an admin-only RPC resolves other matches atomically, so imports and manual publications share one notification path.
 - Share work categories and age-rating display through browser-safe modules and one badge component, so filters, cards, details, shelves and the panel stay consistent.
 
-- Novel illustrations use validated standalone image markers in chapters.content and a browser-safe shared HTML parser; reader and preview consume ordered blocks, and narration receives empty image entries to preserve paragraph indexes without speaking URLs.
-- TXT/JSON chapter imports validate CDN links in browser-safe parsers and write sequentially with RLS, never storing originals or capturing external sessions; share filename numbering.
-
 - Genre selectors, import writes and public genre labels use the browser-safe work-genres module; alias-aware catalog filtering preserves old records without bulk rewrites.
 - Homepage discovery shelves use admin-only persisted selection settings and lightweight published-work queries; automatic ordering uses saved AniList metrics so home visits never call AniList, while manual selection preserves its order without fallback.
 - Recent updates uses the shared horizontal shelf and browser-safe selection helper for both query and display limits, keeping layout and result counts consistent.
-- Novel file imports use a browser-safe text parser and sequential authenticated chapter writes with an explicit review step; original TXT/HTML files never enter Storage, preserving illustrations without retaining source files.
 - List queries use aggregate chapter totals and aliased bounded previews; details cache full indexes separately from reader content to avoid oversized downloads.
 
 - Use RLS reads and server APK signing; minimum-only edits preserve files and publication.
