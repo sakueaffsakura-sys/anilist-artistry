@@ -114,7 +114,7 @@ function AdminPage() {
 
   return (
     <AdminShell title="Visão geral" subtitle="Seu catálogo, em um só lugar." actions={<Button asChild><Link to="/admin/nova"><Plus className="h-4 w-4" /> Nova obra</Link></Button>}>
-      <div className="admin-metrics grid grid-cols-2 border-y border-border bg-surface/40 xl:grid-cols-4">
+      <div className="admin-metrics grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCard label="Obras" value={d ? fmt(d.series) : "—"} icon={<BookOpen className="h-5 w-5" />} />
         <StatCard label="Capítulos" value={d ? fmt(d.chapters) : "—"} icon={<Layers className="h-5 w-5" />} />
         <StatCard label="Visualizações" value={d ? fmt(d.views) : "—"} icon={<Eye className="h-5 w-5" />} />
