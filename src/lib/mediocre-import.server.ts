@@ -120,3 +120,26 @@ export async function findMediocreByTitle(title: string): Promise<number | null>
   }
   return ids.size === 1 ? [...ids][0]! : null;
 }
+
+/** Which MediocreScan work IDs already exist in the catalog (used to skip republishing). */
+export async function importedMediocreIds(admin: Admin, ids: number[]): Promise<number[]> {
+  if (!ids.length) return [];
+  const { data } = await admin.from("series").select("source_mediocre_id").in("source_mediocre_id", ids.slice(0, 500));
+  return (data ?? []).map((r) => Number(r.source_mediocre_id)).filter((n) => Number.isSafeInteger(n));
+}
+
+/**
+ * Copies new chapters for the imported works least recently checked; each run handles a few
+ * works so it fits the scheduler's time budget, and rotation reaches every work over time.
+ */
+export async function syncMediocreChapters(admin: Admin, maxWorks = 3): Promise<{ checked: number; added: number }> {
+  const { data } = await admin.from("series").select("id, source_mediocre_id")
+    .not("source_mediocre_id", "is", null).order("mediocre_synced_at", { ascending: true, nullsFirst: true }).limit(maxWorks);
+  let added = 0;
+  for (const s of data ?? []) {
+    await admin.from("series").update({ mediocre_synced_at: new Date().toISOString() }).eq("id", s.id);
+    try { added += (await importMediocreWork(admin, Number(s.source_mediocre_id), { createdBy: null })).added; }
+    catch (e) { console.log("[mediocre] sync falhou", s.source_mediocre_id, e instanceof Error ? e.message : "erro"); }
+  }
+  return { checked: data?.length ?? 0, added };
+}
