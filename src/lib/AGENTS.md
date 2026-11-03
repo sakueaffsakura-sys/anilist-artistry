@@ -9,3 +9,4 @@
 - Novel illustrations use validated standalone image markers in chapters.content and a browser-safe shared HTML parser; reader and preview consume ordered blocks, and narration receives empty image entries to preserve paragraph indexes without speaking URLs.
 - TXT/JSON chapter imports validate CDN links in browser-safe parsers and write sequentially with RLS, never storing originals or capturing external sessions; share filename numbering.
 - Novel file imports use a browser-safe text parser and sequential authenticated chapter writes with an explicit review step; original TXT/HTML files never enter Storage, preserving illustrations without retaining source files.
+- MediocreScan token: admin-saved token in service-role-only mediocre_settings overrides the env secret; successful API answers are kept in mediocre_cache and served when the live call fails, so token expiry does not blank the showcase.
