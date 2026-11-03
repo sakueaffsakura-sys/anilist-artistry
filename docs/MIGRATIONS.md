@@ -85,3 +85,4 @@ Aplicada `0045_prevent_duplicate_work_titles.sql`: reservas atômicas internas c
 
 Aplicada `0049_series_mediocre_source.sql`: coluna `source_mediocre_id` com índice único parcial em `series`, para impedir importar a mesma obra da MediocreScan duas vezes.
 | 0050_mediocre_token_and_cache.sql | Token MediocreScan salvo pelo painel e cópia das respostas da API (somente servidor). Aplicada 2026-11-03. |
+| 0052_mediocre_bypass_and_block.sql | Chave de liberação Cloudflare e pausa de sincronização do MediocreScan. |

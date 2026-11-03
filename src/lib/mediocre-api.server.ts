@@ -8,7 +8,7 @@ type Fetched = { ok: true; status: number; data: unknown; raw: string } | { ok: 
 
 /** GET a fixed-host path with the server-only token. Never logs or returns the token. */
 export async function mediocreGet(host: "api" | "cdn", path: string): Promise<Fetched> {
-  const token = await mediocreToken();
+  const { token, bypass } = await mediocreAuth();
   if (!token) return { ok: false, status: 500, error: { code: "MISSING_TOKEN", message: "O token da API ainda não foi configurado." } };
   if (!path.startsWith("/") || path.includes("..") || path.includes("//")) return { ok: false, status: 400, error: mediocreErrorFor(400) };
   const started = Date.now();
@@ -17,10 +17,17 @@ export async function mediocreGet(host: "api" | "cdn", path: string): Promise<Fe
       method: "GET",
       redirect: "manual", // workerd does not support "error"; 3xx is treated as failure
       signal: AbortSignal.timeout(15_000),
-      headers: host === "api" ? { Authorization: `Bearer ${token}`, Accept: "application/json", "User-Agent": "Mozilla/5.0" } : { Accept: "application/json", "User-Agent": "Mozilla/5.0" },
+      headers: {
+        Accept: "application/json", "User-Agent": "Mozilla/5.0",
+        ...(host === "api" ? { Authorization: `Bearer ${token}` } : {}),
+        ...(bypass ? { "X-BetterManga-Key": bypass } : {}),
+      },
     });
     console.log(`[mediocre] ${host} ${res.status} ${Date.now() - started}ms`);
     if (res.status >= 300 && res.status < 400) return { ok: false, status: 502, error: mediocreErrorFor(0) };
+    if (res.status === 403 && !(res.headers.get("content-type") ?? "").includes("json")) {
+      return { ok: false, status: 403, error: { code: "BLOCKED", message: "O MediocreScan bloqueou o servidor do site (proteção Cloudflare). O token não é o problema." } };
+    }
     if (!res.ok) return { ok: false, status: res.status, error: mediocreErrorFor(res.status) };
     const raw = await res.text();
     if (raw.length > MAX_BYTES) return { ok: false, status: 502, error: { code: "TOO_LARGE", message: "A resposta da API é grande demais." } };
@@ -38,12 +45,11 @@ async function admin() {
 }
 
 /** Token saved in the panel wins; the env secret is the fallback. */
-async function mediocreToken(): Promise<string | undefined> {
+async function mediocreAuth(): Promise<{ token: string | undefined; bypass: string | null }> {
   try {
-    const { data } = await (await admin()).from("mediocre_settings").select("token").eq("id", 1).maybeSingle();
-    if (data?.token) return data.token;
-  } catch { /* fall back */ }
-  return process.env["MEDIOCRE_API_TOKEN"];
+    const { data } = await (await admin()).from("mediocre_settings").select("token, bypass_header").eq("id", 1).maybeSingle();
+    return { token: data?.token || process.env["MEDIOCRE_API_TOKEN"], bypass: data?.bypass_header ?? null };
+  } catch { return { token: process.env["MEDIOCRE_API_TOKEN"], bypass: null }; }
 }
 
 async function cacheWrite(key: string, payload: string) {

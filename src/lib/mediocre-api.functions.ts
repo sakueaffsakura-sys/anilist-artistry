@@ -36,8 +36,8 @@ export const getMediocreTokenStatus = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await supabaseAdmin.from("mediocre_settings").select("token, refresh_token, updated_at").eq("id", 1).maybeSingle();
-    return { hasToken: !!data?.token, hasRefresh: !!data?.refresh_token, updatedAt: data?.updated_at ?? null };
+    const { data } = await supabaseAdmin.from("mediocre_settings").select("token, refresh_token, updated_at, bypass_header").eq("id", 1).maybeSingle();
+    return { hasToken: !!data?.token, hasRefresh: !!data?.refresh_token, hasBypass: !!data?.bypass_header, updatedAt: data?.updated_at ?? null };
   });
 
 export const saveMediocreToken = createServerFn({ method: "POST" })
@@ -62,4 +62,35 @@ export const saveMediocreToken = createServerFn({ method: "POST" })
     const { error: cacheError } = await supabaseAdmin.from("mediocre_cache").delete().neq("key", "");
     if (cacheError) throw new Error("Não foi possível limpar as cópias salvas.");
     return { ok: true };
+  });
+
+/** Saves (or clears) the secret header MediocreScan's Cloudflare rule lets through. */
+export const saveMediocreBypass = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { value: string }) => {
+    const value = typeof input?.value === "string" ? input.value.trim() : "";
+    if (value && !/^[A-Za-z0-9._\-]{16,512}$/.test(value)) throw new Error("Chave inválida (mínimo 16 letras/números).");
+    return { value };
+  })
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("mediocre_settings").update({ bypass_header: data.value || null, blocked_until: null }).eq("id", 1);
+    if (error) throw new Error("Não foi possível salvar.");
+    return { ok: true };
+  });
+
+/** Live connection check from the site's server; never returns the token. */
+export const testMediocreConnection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { mediocreGet } = await import("./mediocre-api.server");
+    const r = await mediocreGet("api", "/obras/atualizadas-recentes");
+    if (r.ok) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("mediocre_settings").update({ blocked_until: null }).eq("id", 1);
+      return { ok: true, message: "Conexão OK: token e acesso funcionando." };
+    }
+    return { ok: false, message: r.error.message };
   });

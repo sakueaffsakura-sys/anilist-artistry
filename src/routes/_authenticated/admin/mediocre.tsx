@@ -11,7 +11,7 @@ import { AdminShell } from "@/components/AdminShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRoles, useSession } from "@/hooks/useAuth";
-import { getMediocreTokenStatus, queryMediocreApi, saveMediocreToken } from "@/lib/mediocre-api.functions";
+import { getMediocreTokenStatus, queryMediocreApi, saveMediocreBypass, saveMediocreToken, testMediocreConnection } from "@/lib/mediocre-api.functions";
 import { extractList, extractWork, mediocreFileName, type MediocreRequest } from "@/lib/mediocre-api";
 import { ChapterList, EmptyState, ErrorState, JsonViewer, LoadingState, WorkDetails, WorkGrid } from "@/components/mediocre/MediocreViews";
 
@@ -241,6 +241,34 @@ function TokenSettings() {
         <p className="text-xs text-muted-foreground">O token fica guardado só no servidor e nunca é mostrado de volta. Ao salvar um token novo, todas as cópias salvas da API antiga são apagadas e o site volta a buscar tudo ao vivo.</p>
         <Button type="submit" disabled={!token || m.isPending} className="w-fit">{m.isPending ? "Salvando…" : "Salvar token"}</Button>
       </form>
+      <BypassAndTest hasBypass={!!s.data?.hasBypass} onSaved={() => void s.refetch()} />
     </details>
+  );
+}
+
+function BypassAndTest({ hasBypass, onSaved }: { hasBypass: boolean; onSaved: () => void }) {
+  const saveB = useServerFn(saveMediocreBypass);
+  const test = useServerFn(testMediocreConnection);
+  const [value, setValue] = useState("");
+  const b = useMutation({
+    mutationFn: () => saveB({ data: { value } }),
+    onSuccess: () => { setValue(""); onSaved(); toast.success("Chave de liberação salva."); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar."),
+  });
+  const t = useMutation({
+    mutationFn: () => test(),
+    onSuccess: (r) => (r.ok ? toast.success(r.message) : toast.error(r.message)),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha no teste."),
+  });
+  return (
+    <div className="mt-4 grid gap-2 border-t pt-3">
+      <p className="text-sm font-semibold">Liberação no Cloudflare {hasBypass ? "· chave salva" : ""}</p>
+      <p className="text-xs text-muted-foreground">Se o MediocreScan bloquear o servidor do site, crie no Cloudflare do MediocreScan uma regra que libere pedidos com o cabeçalho <code>X-BetterManga-Key</code> igual à chave abaixo. Deixe vazio e salve para remover.</p>
+      <form className="flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); b.mutate(); }}>
+        <Input type="password" autoComplete="off" className="max-w-sm" placeholder="Chave de liberação" value={value} onChange={(e) => setValue(e.target.value)} />
+        <Button type="submit" variant="outline" disabled={b.isPending}>{b.isPending ? "Salvando…" : "Salvar chave"}</Button>
+        <Button type="button" onClick={() => t.mutate()} disabled={t.isPending}>{t.isPending ? "Testando…" : "Testar conexão"}</Button>
+      </form>
+    </div>
   );
 }
