@@ -101,3 +101,4 @@
 - [x] Criar modo de leitura dedicado para novels com controles de texto responsivos
 - [x] Melhorar publicação de novels com editor, prévia, rascunhos e gestão de capítulos
 - [x] Concluir botão Cloudinary no novo capítulo, com progresso e links automáticos; botão conferido no painel, envio real não testado
+- [x] Vitrine pública MediocreScan (/mediocre) e adição automática de obras pedidas encontradas na API
