@@ -109,9 +109,9 @@ function AuthPage() {
   return (
     <div className="grid min-h-screen bg-background lg:grid-cols-[1.35fr_1fr]">
       <aside className="relative hidden overflow-hidden lg:block" aria-hidden="true">
-        <div className="absolute -inset-16 grid -rotate-6 grid-cols-4 gap-3">
+        <div className="absolute -inset-16 grid -rotate-6 grid-cols-4 gap-3 [grid-auto-rows:220px]">
           {[...(covers.data ?? []), ...(covers.data ?? [])].slice(0, 48).map((c, i) => (
-            <div key={`${c.id}-${i}`} className="aspect-[2/3] w-full overflow-hidden rounded-lg bg-surface">
+            <div key={`${c.id}-${i}`} className="h-full w-full overflow-hidden rounded-lg bg-surface">
               <img src={c.cover_url} alt="" decoding="async" onError={(e) => { const tile = e.currentTarget.parentElement; if (tile) tile.style.display = "none"; }} className="h-full w-full object-cover" />
             </div>
           ))}
