@@ -6,6 +6,7 @@ import { EmptyState, JsonViewer } from "@/components/mediocre/MediocreViews";
 import { ChapterReader, RetryError, ShowcaseLayout, SkeletonGrid, useMediocrePublic } from "@/components/mediocre/MediocreShowcase";
 
 export const Route = createFileRoute("/mediocre/capitulo/$id")({
+  staticData: { sitemap: false },
   head: ({ params }) => ({ meta: [{ title: `Capítulo ${params.id} — MediocreScan Obras` }, { name: "description", content: "Leitura de capítulo carregado da API MediocreScan." }, { property: "og:title", content: `Capítulo ${params.id} — MediocreScan Obras` }, { property: "og:description", content: "Ler capítulo." }, { property: "og:type", content: "article" }, { name: "twitter:card", content: "summary" }] }),
   component: ShowcaseChapter,
 });

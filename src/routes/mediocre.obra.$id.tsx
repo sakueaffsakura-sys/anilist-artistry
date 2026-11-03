@@ -4,6 +4,7 @@ import { EmptyState, JsonViewer, WorkDetails } from "@/components/mediocre/Medio
 import { RetryError, ShowcaseLayout, SkeletonGrid, useMediocrePublic } from "@/components/mediocre/MediocreShowcase";
 
 export const Route = createFileRoute("/mediocre/obra/$id")({
+  staticData: { sitemap: false },
   head: ({ params }) => ({ meta: [{ title: `Obra ${params.id} — MediocreScan Obras` }, { name: "description", content: "Detalhes da obra e lista de capítulos carregados da API MediocreScan." }, { property: "og:title", content: `Obra ${params.id} — MediocreScan Obras` }, { property: "og:description", content: "Detalhes e capítulos da obra." }, { property: "og:type", content: "article" }, { name: "twitter:card", content: "summary" }] }),
   component: ShowcaseWork,
 });

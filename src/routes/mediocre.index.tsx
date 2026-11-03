@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/mediocre/MediocreViews";
 import { PublicWorkCard, RetryError, ShowcaseLayout, SkeletonGrid, useMediocrePublic } from "@/components/mediocre/MediocreShowcase";
 
 export const Route = createFileRoute("/mediocre/")({
+  staticData: { sitemap: true },
   head: () => ({ meta: [{ title: "MediocreScan Obras — Better Mangá" }, { name: "description", content: "Explore obras, novels, capítulos e conteúdos disponíveis na API MediocreScan." }, { property: "og:title", content: "MediocreScan Obras" }, { property: "og:description", content: "Explore obras, novels, capítulos e conteúdos disponíveis na API." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   component: ShowcaseHome,
 });
