@@ -53,9 +53,13 @@ export const saveMediocreToken = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const row: { id: number; token: string; updated_at: string; refresh_token?: string } = { id: 1, token: data.token, updated_at: new Date().toISOString() };
-    if (data.refreshToken) row.refresh_token = data.refreshToken;
+    const row: { id: number; token: string; updated_at: string; refresh_token?: string | null } = { id: 1, token: data.token, updated_at: new Date().toISOString() };
+    // Um token novo substitui tudo: refresh antigo sai se não for reenviado.
+    row.refresh_token = data.refreshToken || null;
     const { error } = await supabaseAdmin.from("mediocre_settings").upsert(row);
     if (error) throw new Error("Não foi possível salvar.");
+    // Limpa todas as cópias salvas da API antiga para não servir dados do token expirado.
+    const { error: cacheError } = await supabaseAdmin.from("mediocre_cache").delete().neq("key", "");
+    if (cacheError) throw new Error("Não foi possível limpar as cópias salvas.");
     return { ok: true };
   });
