@@ -189,6 +189,7 @@ function PublishableGrid({ rows, showIa }: { rows: Record<string, unknown>[]; sh
     await addToQueue(pending);
   };
   const sending = new Set<number>();
+  const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
   const publishOne = async (id: number) => {
     if (!Number.isSafeInteger(id) || id <= 0) return;
     if (have.has(id)) { toast.info("Essa obra já está publicada."); return; }
