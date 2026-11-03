@@ -57,7 +57,7 @@ async function importChapter(admin: Admin, seriesId: string, capId: number, isNo
 }
 
 /** Imports (or continues importing) a MediocreScan work into the catalog. */
-export async function importMediocreWork(admin: Admin, obraId: number, opts: { kind?: string; createdBy: string }): Promise<ImportOutcome> {
+export async function importMediocreWork(admin: Admin, obraId: number, opts: { kind?: string; createdBy: string | null }): Promise<ImportOutcome> {
   const res = await mediocreGet("api", `/obras/${obraId}`);
   if (!res.ok) throw new Error(res.error.message);
   const work = extractWork(res.data);
