@@ -344,6 +344,13 @@
       "when": 1793233631521,
       "tag": "0048_reels_auto_approve",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1793715545129,
+      "tag": "0049_series_mediocre_source",
+      "breakpoints": true
     }
   ]
 }
