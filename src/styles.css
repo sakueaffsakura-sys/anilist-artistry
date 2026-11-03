@@ -415,3 +415,66 @@
 .admin-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin: 0 32px; padding: 18px 0; border-top: 1px solid var(--border); font-size: 10px; color: var(--muted-foreground); }
 @media (max-width: 639px) { .admin-hero { padding: 18px; } .admin-hero-icon { width: 44px; height: 44px; } .admin-foot { margin: 0 16px; } }
 @media (prefers-reduced-motion: reduce) { .admin-body { animation: none; } .admin-workspace .admin-stat:hover { transform: none; } }
+
+/* ===== Admin studio v4: motion & detail ===== */
+.admin-workspace { position: relative; isolation: isolate; }
+.admin-workspace::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5; background-image: radial-gradient(color-mix(in oklab, var(--foreground) 7%, transparent) 1px, transparent 1px); background-size: 3px 3px; mix-blend-mode: overlay; }
+.admin-ambient { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.admin-ambient span { position: absolute; width: 520px; height: 520px; border-radius: 999px; filter: blur(90px); opacity: .22; background: var(--primary); animation: admin-drift 22s ease-in-out infinite alternate; }
+.admin-ambient span:first-child { top: -180px; right: -120px; }
+.admin-ambient span:last-child { bottom: -240px; left: 10%; opacity: .1; animation-delay: -11s; }
+@keyframes admin-drift { to { transform: translate(-120px, 80px) scale(1.15); } }
+.admin-route-bar { position: fixed; top: 0; left: 0; height: 2px; width: 0; z-index: 60; background: linear-gradient(90deg, var(--primary), color-mix(in oklab, var(--primary) 40%, var(--foreground))); box-shadow: 0 0 12px var(--primary); opacity: 0; transition: width .3s, opacity .4s; }
+.admin-route-bar[data-active="true"] { width: 80%; opacity: 1; transition: width 2.5s cubic-bezier(.1,.7,.2,1), opacity .1s; }
+.admin-workspace-brand { backdrop-filter: blur(10px); }
+.admin-workspace-brand img { filter: drop-shadow(0 0 10px color-mix(in oklab, var(--primary) 55%, transparent)); transition: transform .3s; }
+.admin-workspace-brand:hover img { transform: rotate(-6deg) scale(1.06); }
+.admin-workspace-link:hover .admin-nav-icon { transform: scale(1.1); color: var(--primary); border-color: color-mix(in oklab, var(--primary) 50%, var(--border)); box-shadow: 0 0 14px -4px var(--primary); }
+.admin-workspace-link:hover { transform: translateX(3px); }
+.admin-workspace-link-active::before { animation: admin-bar-in .35s cubic-bezier(.2,.9,.3,1.3) both; }
+@keyframes admin-bar-in { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.admin-clock { display: flex; align-items: center; gap: 8px; padding: 0 6px; font-size: 11px; font-weight: 600; }
+.admin-live-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--success, var(--primary)); box-shadow: 0 0 0 0 currentColor; animation: admin-ping 1.8s infinite; color: var(--success, var(--primary)); }
+@keyframes admin-ping { 0% { box-shadow: 0 0 0 0 color-mix(in oklab, currentColor 60%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
+.admin-hero { clip-path: polygon(0 0, calc(100% - 28px) 0, 100% 28px, 100% 100%, 28px 100%, 0 calc(100% - 28px)); border-radius: 6px; }
+.admin-hero::after { animation: admin-drift 14s ease-in-out infinite alternate; }
+.admin-hero-grid { position: absolute; inset: 0; z-index: 0 !important; pointer-events: none; background-image: radial-gradient(color-mix(in oklab, var(--primary) 30%, transparent) 1px, transparent 1.4px); background-size: 18px 18px; mask-image: linear-gradient(90deg, transparent 30%, black); opacity: .5; }
+.admin-hero-sweep { position: absolute; inset: 0; z-index: 0 !important; pointer-events: none; background: linear-gradient(105deg, transparent 40%, color-mix(in oklab, var(--primary) 16%, transparent) 50%, transparent 60%); background-size: 250% 100%; animation: admin-sweep 6s linear infinite; }
+@keyframes admin-sweep { from { background-position: 150% 0; } to { background-position: -100% 0; } }
+.admin-hero h1 { letter-spacing: -.01em; background: linear-gradient(90deg, var(--foreground), color-mix(in oklab, var(--foreground) 70%, var(--primary))); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.admin-hero-icon { position: relative; animation: admin-float 4s ease-in-out infinite; }
+.admin-hero-icon::after { content: ""; position: absolute; inset: -6px; border-radius: 20px; border: 2px solid var(--primary); opacity: 0; animation: admin-ring 2.4s ease-out infinite; }
+@keyframes admin-float { 50% { transform: translateY(-4px) rotate(-3deg); } }
+@keyframes admin-ring { 0% { opacity: .7; transform: scale(.9); } 100% { opacity: 0; transform: scale(1.25); } }
+.admin-dashes { display: flex; gap: 5px; margin-top: 12px; }
+.admin-dashes span { width: 20px; height: 3px; transform: skewX(-24deg); background: var(--border); }
+.admin-dashes span:nth-child(-n+2) { background: var(--primary); animation: admin-dash 2.4s ease-in-out infinite; }
+.admin-dashes span:nth-child(2) { animation-delay: .3s; }
+@keyframes admin-dash { 50% { opacity: .35; } }
+/* cascata */
+.admin-body > *, .admin-body > * > *, .admin-workspace .admin-work-row, .admin-workspace .admin-stat { animation: admin-in .5s cubic-bezier(.2,.8,.2,1) both; }
+.admin-body > *:nth-child(2), .admin-body > * > *:nth-child(2), .admin-workspace .admin-work-row:nth-child(2), .admin-workspace .admin-stat:nth-child(2) { animation-delay: .06s; }
+.admin-body > *:nth-child(3), .admin-body > * > *:nth-child(3), .admin-workspace .admin-work-row:nth-child(3), .admin-workspace .admin-stat:nth-child(3) { animation-delay: .12s; }
+.admin-body > *:nth-child(4), .admin-body > * > *:nth-child(4), .admin-workspace .admin-work-row:nth-child(4), .admin-workspace .admin-stat:nth-child(4) { animation-delay: .18s; }
+.admin-body > * > *:nth-child(n+5), .admin-workspace .admin-work-row:nth-child(n+5) { animation-delay: .24s; }
+.admin-hero { animation: admin-in .45s cubic-bezier(.2,.8,.2,1) both; }
+/* brilho seguindo o mouse */
+.admin-workspace :is(.admin-stat, .admin-work-row, .admin-body section) { position: relative; }
+.admin-workspace :is(.admin-stat, .admin-body section)::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .3s; background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), color-mix(in oklab, var(--primary) 13%, transparent), transparent 70%); }
+.admin-workspace :is(.admin-stat, .admin-body section):hover::before { opacity: 1; }
+.admin-workspace .admin-work-row { background-image: radial-gradient(220px circle at var(--mx, -999px) var(--my, -999px), color-mix(in oklab, var(--primary) 10%, transparent), transparent 70%); }
+.admin-workspace .admin-stat::after { content: ""; position: absolute; top: 0; right: 0; width: 22px; height: 22px; background: linear-gradient(225deg, var(--primary) 50%, transparent 50%); opacity: .85; }
+.admin-workspace .admin-stat:hover .admin-stat-icon { transform: rotate(-8deg) scale(1.1); }
+.admin-stat-icon { transition: transform .3s; }
+.admin-workspace .admin-work-row img { transition: transform .35s; }
+.admin-workspace .admin-work-row:hover img { transform: scale(1.06) rotate(-1deg); }
+/* botões */
+.admin-workspace [data-slot="button"] { position: relative; overflow: hidden; transition: transform .15s, box-shadow .2s; }
+.admin-workspace [data-slot="button"]:active { transform: scale(.97); }
+.admin-workspace [data-slot="button"]::after { content: ""; position: absolute; inset: 0; pointer-events: none; transform: translateX(-120%); background: linear-gradient(110deg, transparent 30%, color-mix(in oklab, var(--foreground) 22%, transparent) 50%, transparent 70%); }
+.admin-workspace [data-slot="button"]:hover::after { transition: transform .6s; transform: translateX(120%); }
+.admin-workspace .admin-body [class*="animate-pulse"] { animation: none; background-image: linear-gradient(90deg, var(--surface-2), color-mix(in oklab, var(--surface-2) 60%, var(--foreground)), var(--surface-2)); background-size: 200% 100%; animation: admin-shimmer 1.4s linear infinite; }
+@keyframes admin-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .admin-workspace *, .admin-workspace *::before, .admin-workspace *::after { animation: none !important; transition: none !important; }
+}
