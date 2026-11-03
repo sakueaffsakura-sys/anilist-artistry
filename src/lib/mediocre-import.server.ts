@@ -10,7 +10,19 @@ type Admin = SupabaseClient<Database>;
 type Row = Record<string, unknown>;
 
 /** Chapters copied per call, to stay inside the worker time budget; the admin can run again to continue. */
-export const IMPORT_CHAPTER_LIMIT = 40;
+export const IMPORT_CHAPTER_LIMIT = 20;
+
+/** Existing catalog work whose main or alternative title matches one of the given names. */
+async function findExistingByTitle(admin: Admin, names: string[]): Promise<{ id: string; slug: string; kind: string } | null> {
+  const keys = new Set(names.map(titleKey).filter(Boolean));
+  for (const n of names.slice(0, 5)) {
+    const pattern = `%${n.replace(/[%_,()]/g, " ").trim().slice(0, 60)}%`;
+    const { data } = await admin.from("series").select("id, slug, kind, title, alt_titles").or(`title.ilike.${pattern},alt_titles.ilike.${pattern}`).limit(10);
+    const hit = (data ?? []).find((s) => [s.title, ...(s.alt_titles ?? "").split(",")].some((t) => keys.has(titleKey(t))));
+    if (hit) return { id: hit.id, slug: hit.slug, kind: hit.kind };
+  }
+  return null;
+}
 
 export interface ImportOutcome { seriesId: string; slug: string; created: boolean; added: number; skipped: number; remaining: number }
 
@@ -85,9 +97,17 @@ export async function importMediocreWork(admin: Admin, obraId: number, opts: { k
       created_by: opts.createdBy,
       source_mediocre_id: obraId,
     }).select("id, slug, kind").single();
-    if (insert.error) throw new Error(insert.error.message.includes("título") || insert.error.code === "23505" ? "Já existe uma obra com este título no Better Mangá." : "Não foi possível criar a obra.");
-    series = insert.data;
-    created = true;
+    if (insert.error) {
+      // Same title already on the site: link that work instead of failing, so it counts as published.
+      const clash = insert.error.message.includes("título") || insert.error.code === "23505";
+      const existingWork = clash ? await findExistingByTitle(admin, [name, ...alts]) : null;
+      if (!existingWork) throw new Error(clash ? `"${name}" já existe no Better Mangá com outro vínculo.` : `Não foi possível criar "${name}": ${insert.error.message}`);
+      await admin.from("series").update({ source_mediocre_id: obraId }).eq("id", existingWork.id).is("source_mediocre_id", null);
+      series = existingWork;
+    } else {
+      series = insert.data;
+      created = true;
+    }
   }
 
   const chapters = (extractList({ capitulos: work["capitulos"] }) ?? []).filter((c) => typeof c["cap_id"] === "number");
