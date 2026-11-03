@@ -237,7 +237,7 @@ function TokenSettings() {
       <form className="mt-3 grid gap-2" onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
         <Input type="password" autoComplete="off" placeholder="Novo token (Authorization)" value={token} onChange={(e) => setToken(e.target.value)} />
         <Input type="password" autoComplete="off" placeholder="Refresh token (opcional)" value={refresh} onChange={(e) => setRefresh(e.target.value)} />
-        <p className="text-xs text-muted-foreground">O token fica guardado só no servidor e nunca é mostrado de volta. Se a API falhar, o site usa a última cópia salva.</p>
+        <p className="text-xs text-muted-foreground">O token fica guardado só no servidor e nunca é mostrado de volta. Ao salvar um token novo, todas as cópias salvas da API antiga são apagadas e o site volta a buscar tudo ao vivo.</p>
         <Button type="submit" disabled={!token || m.isPending} className="w-fit">{m.isPending ? "Salvando…" : "Salvar token"}</Button>
       </form>
     </details>
