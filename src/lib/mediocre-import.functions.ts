@@ -34,7 +34,7 @@ export const autoFulfillRequest = createServerFn({ method: "POST" })
     if (!obraId) return { added: false };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     try {
-      const out = await importMediocreWork(supabaseAdmin, obraId, { kind: req.kind, createdBy: null } // never grant the reader authorship rights);
+      const out = await importMediocreWork(supabaseAdmin, obraId, { kind: req.kind, createdBy: null });
       // Fulfil explicitly; the notification trigger fires on this status change.
       await supabaseAdmin.from("work_requests").update({ status: "fulfilled", series_id: out.seriesId, admin_note: "Adicionada automaticamente." }).eq("id", req.id).eq("status", "pending");
       return { added: true, slug: out.slug };
