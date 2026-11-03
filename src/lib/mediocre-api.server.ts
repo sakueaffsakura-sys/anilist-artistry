@@ -1,0 +1,58 @@
+import { chapterContentPath, mediocreErrorFor, mediocrePath, type MediocreRequest, type MediocreResult } from "./mediocre-api";
+
+const API = "https://back2.mediocrescan.com";
+const CDN = "https://cdn.mediocrescan.com";
+const MAX_BYTES = 8_000_000;
+
+type Fetched = { ok: true; status: number; data: unknown; raw: string } | { ok: false; status: number; error: { code: string; message: string } };
+
+/** GET a fixed-host path with the server-only token. Never logs or returns the token. */
+export async function mediocreGet(host: "api" | "cdn", path: string): Promise<Fetched> {
+  const token = process.env["MEDIOCRE_API_TOKEN"];
+  if (!token) return { ok: false, status: 500, error: { code: "MISSING_TOKEN", message: "O token da API ainda não foi configurado." } };
+  if (!path.startsWith("/") || path.includes("..") || path.includes("//")) return { ok: false, status: 400, error: mediocreErrorFor(400) };
+  const started = Date.now();
+  try {
+    const res = await fetch((host === "api" ? API : CDN) + path, {
+      method: "GET",
+      redirect: "manual", // workerd does not support "error"; 3xx is treated as failure
+      signal: AbortSignal.timeout(15_000),
+      headers: host === "api" ? { Authorization: `Bearer ${token}`, Accept: "application/json", "User-Agent": "Mozilla/5.0" } : { Accept: "application/json", "User-Agent": "Mozilla/5.0" },
+    });
+    console.log(`[mediocre] ${host} ${res.status} ${Date.now() - started}ms`);
+    if (res.status >= 300 && res.status < 400) return { ok: false, status: 502, error: mediocreErrorFor(0) };
+    if (!res.ok) return { ok: false, status: res.status, error: mediocreErrorFor(res.status) };
+    const raw = await res.text();
+    if (raw.length > MAX_BYTES) return { ok: false, status: 502, error: { code: "TOO_LARGE", message: "A resposta da API é grande demais." } };
+    const safe = raw.split(token).join("[removido]");
+    try { return { ok: true, status: res.status, data: JSON.parse(safe) as unknown, raw: safe }; }
+    catch { return { ok: false, status: 502, error: { code: "INVALID_JSON", message: "O formato retornado não foi reconhecido." } }; }
+  } catch {
+    console.log(`[mediocre] ${host} falha de conexão ${Date.now() - started}ms`);
+    return { ok: false, status: 0, error: mediocreErrorFor(0) };
+  }
+}
+
+/** Runs one validated operation; chapter content resolves its CDN path from API metadata. */
+export async function runMediocre(req: MediocreRequest): Promise<MediocreResult> {
+  if (req.operation === "thumbs_capitulos") {
+    const r = await mediocreGet("cdn", mediocrePath(req));
+    return r.ok ? { ok: true, status: r.status, json: r.raw } : r;
+  }
+  const r = await mediocreGet("api", mediocrePath(req));
+  if (!r.ok) return r;
+  if (req.operation !== "conteudo_capitulo") return { ok: true, status: r.status, json: r.raw };
+  const meta = r.data as Record<string, unknown>;
+  const text = typeof meta?.["cap_conteudo_texto"] === "string" ? meta["cap_conteudo_texto"] : null;
+  const path = chapterContentPath(meta);
+  if (!path) {
+    if (text) return { ok: true, status: 200, json: JSON.stringify({ capitulo: meta, conteudo: { content: text } }) };
+    return { ok: false, status: 404, error: { code: "NO_CONTENT", message: "O conteúdo deste capítulo não está disponível." } };
+  }
+  const c = await mediocreGet("cdn", path);
+  if (!c.ok) {
+    if (text) return { ok: true, status: 200, json: JSON.stringify({ capitulo: meta, conteudo: { content: text } }) };
+    return { ok: false, status: c.status, error: c.status === 404 ? { code: "NO_CONTENT", message: "O conteúdo deste capítulo não está disponível." } : c.error };
+  }
+  return { ok: true, status: 200, json: JSON.stringify({ capitulo: meta, conteudo: c.data }) };
+}
