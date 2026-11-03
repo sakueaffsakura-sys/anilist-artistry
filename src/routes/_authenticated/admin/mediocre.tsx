@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { importMediocreWorkFn } from "@/lib/mediocre-import.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { RefreshCw, Search } from "lucide-react";
 import { AdminShell } from "@/components/AdminShell";
@@ -88,11 +90,22 @@ function Result({ tab, data, fileName }: { tab: Tab; data: unknown; fileName: st
   let body;
   if (tab === "obra") {
     const work = extractWork(data);
-    body = work ? <WorkDetails work={work} /> : <EmptyState message="Formato não reconhecido. Veja o JSON abaixo (modo diagnóstico)." />;
+    body = work ? <><ImportButton obraId={Number(work["obr_id"])} /><WorkDetails work={work} /></> : <EmptyState message="Formato não reconhecido. Veja o JSON abaixo (modo diagnóstico)." />;
   } else {
     const list = extractList(data);
     if (!list) body = <EmptyState message="Não foi possível identificar uma lista. Veja o JSON abaixo (modo diagnóstico)." />;
     else body = tab === "capitulos_usuario" ? <ChapterList chapters={list} /> : <WorkGrid rows={list} showIa={tab === "recentes_ia"} />;
   }
   return <div className="space-y-4">{body}<JsonViewer data={data} fileName={fileName} /></div>;
+}
+
+function ImportButton({ obraId }: { obraId: number }) {
+  const run = useServerFn(importMediocreWorkFn);
+  const m = useMutation({
+    mutationFn: () => run({ data: { obraId } }),
+    onSuccess: (r) => toast.success(`${r.created ? "Obra criada" : "Obra atualizada"}: ${r.added} capítulos adicionados${r.skipped ? `, ${r.skipped} sem conteúdo` : ""}${r.remaining ? `. Faltam ${r.remaining}; clique de novo para continuar.` : "."}`),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Não foi possível importar."),
+  });
+  if (!Number.isSafeInteger(obraId) || obraId <= 0) return null;
+  return <Button onClick={() => m.mutate()} disabled={m.isPending}>{m.isPending ? "Adicionando…" : "Adicionar ao Better Mangá"}</Button>;
 }

@@ -1,0 +1,2 @@
+ALTER TABLE public.series ADD COLUMN IF NOT EXISTS source_mediocre_id integer;
+CREATE UNIQUE INDEX IF NOT EXISTS series_source_mediocre_id_key ON public.series (source_mediocre_id) WHERE source_mediocre_id IS NOT NULL;

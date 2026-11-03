@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mediocreErrorFor, mediocrePath, parseMediocreRequest } from "../src/lib/mediocre-api";
+import { chapterContentPath, mediocreErrorFor, mediocrePath, normalizeChapterContent, parseMediocreRequest, titleKey } from "../src/lib/mediocre-api";
 
 describe("MediocreScan proxy rules", () => {
   it("maps obra to its fixed path", () => {
@@ -19,6 +19,31 @@ describe("MediocreScan proxy rules", () => {
     expect(() => parseMediocreRequest({ operation: "obra", obraId: -5 })).toThrow();
   });
   it("uses the 401 message", () => {
-    expect(mediocreErrorFor(401).message).toBe("O token da API é inválido ou expirou.");
+    expect(mediocreErrorFor(401).message).toBe("O token da API está inválido ou expirou.");
+  });
+});
+
+describe("MediocreScan chapter content", () => {
+  it("content path only from valid metadata", () => {
+    expect(chapterContentPath({ obr_id: 20564, cap_num: 1, cap_uuid: "28cc5d19-b7ad-46c4-982c-a52a2b1ed8a2" })).toBe("/obras/20564/capitulos/1/28cc5d19-b7ad-46c4-982c-a52a2b1ed8a2.json");
+    expect(chapterContentPath({ obr_id: 20564, cap_num: 1, cap_uuid: "../x" })).toBeNull();
+  });
+  it("chapter content takes only chapter id", () => {
+    expect(parseMediocreRequest({ operation: "conteudo_capitulo", capituloId: 548465, url: "https://evil" })).toEqual({ operation: "conteudo_capitulo", capituloId: 548465 });
+  });
+  it("orders CDN pages by ordem and resolves relative urls", () => {
+    const b = normalizeChapterContent([{ url: "obras/1/capitulos/1/b.webp", ordem: 2 }, { url: "obras/1/capitulos/1/a.webp", ordem: 1 }]);
+    expect(b).toEqual([{ type: "image", url: "https://cdn.mediocrescan.com/obras/1/capitulos/1/a.webp" }, { type: "image", url: "https://cdn.mediocrescan.com/obras/1/capitulos/1/b.webp" }]);
+  });
+  it("keeps mixed block order", () => {
+    const b = normalizeChapterContent({ blocks: [{ type: "text", content: "Oi" }, { type: "image", url: "https://x.com/p.jpg" }] });
+    expect(b.map((x) => x.type)).toEqual(["text", "image"]);
+  });
+  it("reads plain text content", () => {
+    expect(normalizeChapterContent({ content: "Texto" })).toEqual([{ type: "text", text: "Texto" }]);
+  });
+  it("title match ignores accents and case", () => {
+    expect(titleKey("Esposa  Falsa!")).toBe(titleKey("esposa falsa"));
+    expect(titleKey("Diário")).toBe("diario");
   });
 });

@@ -992,6 +992,7 @@ export type Database = {
           published: boolean
           rating: number
           slug: string
+          source_mediocre_id: number | null
           status: string
           synopsis: string | null
           title: string
@@ -1018,6 +1019,7 @@ export type Database = {
           published?: boolean
           rating?: number
           slug: string
+          source_mediocre_id?: number | null
           status?: string
           synopsis?: string | null
           title: string
@@ -1044,6 +1046,7 @@ export type Database = {
           published?: boolean
           rating?: number
           slug?: string
+          source_mediocre_id?: number | null
           status?: string
           synopsis?: string | null
           title?: string
