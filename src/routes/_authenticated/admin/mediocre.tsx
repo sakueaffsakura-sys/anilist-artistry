@@ -229,7 +229,7 @@ function TokenSettings() {
   const [refresh, setRefresh] = useState("");
   const m = useMutation({
     mutationFn: () => save({ data: { token, refreshToken: refresh } }),
-    onSuccess: () => { setToken(""); setRefresh(""); void s.refetch(); toast.success("Token atualizado."); },
+    onSuccess: () => { setToken(""); setRefresh(""); void s.refetch(); void qc.invalidateQueries({ queryKey: ["mediocre-api"] }); void qc.invalidateQueries({ queryKey: ["mediocre-imported"] }); toast.success("Token atualizado. Cópias salvas apagadas."); },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar."),
   });
   return (
