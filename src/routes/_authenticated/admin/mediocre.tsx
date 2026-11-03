@@ -4,7 +4,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getImportedMediocreIds, importMediocreWorkFn, syncMediocreNow } from "@/lib/mediocre-import.functions";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, RefreshCw, Search, X } from "lucide-react";
+import { Check, Copy, Eye, Loader2, RefreshCw, Search, Send, X } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { AdminShell } from "@/components/AdminShell";
 import { Button } from "@/components/ui/button";
@@ -140,15 +141,35 @@ function PublishableGrid({ rows, showIa }: { rows: Record<string, unknown>[]; sh
     void imported.refetch();
     toast.success(`${done} obras publicadas${fail ? `, ${fail} com erro` : ""}.`);
   };
+  const [sending, setSending] = useState<Set<number>>(new Set());
+  const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
+  const publishOne = async (id: number) => {
+    if (!Number.isSafeInteger(id) || id <= 0 || sending.has(id)) return;
+    if (have.has(id)) { toast.info("Essa obra já está publicada."); return; }
+    setSending((s) => new Set(s).add(id));
+    try {
+      const r = await run({ data: { obraId: id } });
+      qc.setQueryData<number[]>(key, (old) => [...(old ?? []), id]);
+      toast.success(`Obra publicada: ${r.added} capítulos${r.remaining ? `, faltam ${r.remaining}` : ""}.`);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Não foi possível publicar."); }
+    finally { setSending((s) => { const n = new Set(s); n.delete(id); return n; }); }
+  };
   const badgeFor = (r: Record<string, unknown>) => {
     if (!imported.data) return null;
-    const ok = have.has(rowId(r));
+    const id = rowId(r);
+    const ok = have.has(id);
+    if (ok) return (
+      <span key="ok" className="mediocre-status mediocre-status-ok z-10" title="Já publicada" aria-label="Já publicada"><Check className="h-4 w-4" /></span>
+    );
+    const isSending = sending.has(id);
     return (
-      <span key={String(ok)} className={`mediocre-status ${ok ? "mediocre-status-ok" : "mediocre-status-new"}`} title={ok ? "Já publicada" : "Ainda não publicada"} aria-label={ok ? "Já publicada" : "Ainda não publicada"}>
-        {ok ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
-      </span>
+      <button key="new" type="button" onClick={() => void publishOne(id)} disabled={isSending || busy} className="mediocre-status mediocre-status-new z-10 cursor-pointer" title="Enviar esta obra" aria-label="Enviar esta obra">
+        {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+      </button>
     );
   };
+  const selId = selected ? rowId(selected) : 0;
+  const selName = selected ? String(selected["obr_nome"] ?? selected["nome"] ?? "Obra") : "";
   return (
     <>
       {ids.length > 0 && (
@@ -157,7 +178,23 @@ function PublishableGrid({ rows, showIa }: { rows: Record<string, unknown>[]; sh
           <span className="text-sm text-muted-foreground">{imported.data ? `${ids.length - pending.length} já publicadas` : "Verificando…"}{prog ? ` · ${prog.done + prog.fail}/${prog.total} · ${prog.fail} erros` : ""}</span>
         </div>
       )}
-      <WorkGrid rows={rows} showIa={showIa} badgeFor={badgeFor} />
+      <WorkGrid rows={rows} showIa={showIa} badgeFor={badgeFor} onSelect={setSelected} />
+      <Dialog open={!!selected} onOpenChange={(o) => { if (!o) setSelected(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="line-clamp-2">{selName}</DialogTitle>
+            <DialogDescription>{have.has(selId) ? "Esta obra já está publicada no Better Mangá." : "Esta obra ainda não foi publicada."} O que deseja fazer?</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            {have.has(selId)
+              ? <Button variant="outline" onClick={() => void publishOne(selId)} disabled><Check className="mr-2 h-4 w-4" />Já publicada</Button>
+              : <Button onClick={() => { void publishOne(selId); setSelected(null); }} disabled={sending.has(selId) || busy}><Send className="mr-2 h-4 w-4" />Enviar para o Better Mangá</Button>}
+            <Button variant="outline" asChild><a href={`/mediocre/obra/${selId}`} target="_blank" rel="noreferrer"><Eye className="mr-2 h-4 w-4" />Visualizar obra</a></Button>
+            <Button variant="outline" onClick={() => { void navigator.clipboard.writeText(String(selId)).then(() => toast.success("ID copiado.")); }}><Copy className="mr-2 h-4 w-4" />Copiar ID ({selId})</Button>
+            <Button variant="ghost" onClick={() => setSelected(null)}>Cancelar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
