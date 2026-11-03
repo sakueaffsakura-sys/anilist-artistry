@@ -24,3 +24,38 @@ export const queryMediocrePublic = createServerFn({ method: "POST" })
     const { runMediocre } = await import("./mediocre-api.server");
     return runMediocre(data);
   });
+
+async function assertAdmin(context: { supabase: { rpc: (...a: never[]) => unknown }; userId: string }) {
+  const { data } = await (context.supabase.rpc as unknown as (f: string, a: object) => Promise<{ data: boolean | null }>)("has_role", { _user_id: context.userId, _role: "admin" });
+  if (!data) throw new Error("Somente administradores.");
+}
+
+/** Status only — never returns the saved token. */
+export const getMediocreTokenStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin.from("mediocre_settings").select("token, refresh_token, updated_at").eq("id", 1).maybeSingle();
+    return { hasToken: !!data?.token, hasRefresh: !!data?.refresh_token, updatedAt: data?.updated_at ?? null };
+  });
+
+export const saveMediocreToken = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { token: string; refreshToken?: string }) => {
+    const clean = (v: unknown) => (typeof v === "string" ? v.trim().replace(/^Bearer\s+/i, "") : "");
+    const token = clean(input?.token);
+    if (!/^[A-Za-z0-9._\-]{20,4096}$/.test(token)) throw new Error("Token inválido.");
+    const refreshToken = clean(input?.refreshToken);
+    if (refreshToken && !/^[A-Za-z0-9._\-]{20,4096}$/.test(refreshToken)) throw new Error("Refresh token inválido.");
+    return { token, refreshToken };
+  })
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const row: { id: number; token: string; updated_at: string; refresh_token?: string } = { id: 1, token: data.token, updated_at: new Date().toISOString() };
+    if (data.refreshToken) row.refresh_token = data.refreshToken;
+    const { error } = await supabaseAdmin.from("mediocre_settings").upsert(row);
+    if (error) throw new Error("Não foi possível salvar.");
+    return { ok: true };
+  });
