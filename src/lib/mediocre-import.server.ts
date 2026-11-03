@@ -155,10 +155,11 @@ export async function importedMediocreIds(admin: Admin, ids: number[]): Promise<
 export async function syncMediocreChapters(admin: Admin, maxWorks = 3): Promise<{ checked: number; added: number; blocked?: boolean }> {
   const { data: cfg } = await admin.from("mediocre_settings").select("blocked_until").eq("id", 1).maybeSingle();
   if (cfg?.blocked_until && new Date(cfg.blocked_until).getTime() > Date.now()) return { checked: 0, added: 0, blocked: true };
-  // Teste rápido: se o Cloudflare bloquear, pausa por 1 hora.
+  // Teste rápido: bloqueio Cloudflare pausa 1 hora; recusa/limite da API pausa 20 minutos para não piorar o bloqueio.
   const probe = await mediocreGet("api", "/obras/atualizadas-recentes");
-  if (!probe.ok && probe.error.code === "BLOCKED") {
-    await admin.from("mediocre_settings").update({ blocked_until: new Date(Date.now() + 3_600_000).toISOString() }).eq("id", 1);
+  if (!probe.ok && (probe.error.code === "BLOCKED" || probe.status === 403 || probe.status === 429)) {
+    const ms = probe.error.code === "BLOCKED" ? 3_600_000 : 1_200_000;
+    await admin.from("mediocre_settings").update({ blocked_until: new Date(Date.now() + ms).toISOString() }).eq("id", 1);
     return { checked: 0, added: 0, blocked: true };
   }
   // Obras sem capítulos (importação interrompida) vêm primeiro.

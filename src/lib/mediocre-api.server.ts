@@ -6,37 +6,66 @@ const MAX_BYTES = 8_000_000;
 
 type Fetched = { ok: true; status: number; data: unknown; raw: string } | { ok: false; status: number; error: { code: string; message: string } };
 
+// The API answers 429 to bursts and then 403s the token for a while; pace calls per instance.
+const API_GAP_MS = 400;
+let apiChain: Promise<void> = Promise.resolve();
+function apiSlot(): Promise<void> {
+  const slot = apiChain.then(() => new Promise<void>((r) => setTimeout(r, API_GAP_MS)));
+  apiChain = slot.catch(() => undefined);
+  return apiChain.then(() => undefined);
+}
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /** GET a fixed-host path with the server-only token. Never logs or returns the token. */
 export async function mediocreGet(host: "api" | "cdn", path: string): Promise<Fetched> {
   const { token, bypass } = await mediocreAuth();
   if (!token) return { ok: false, status: 500, error: { code: "MISSING_TOKEN", message: "O token da API ainda não foi configurado." } };
   if (!path.startsWith("/") || path.includes("..") || path.includes("//")) return { ok: false, status: 400, error: mediocreErrorFor(400) };
-  const started = Date.now();
-  try {
-    const res = await fetch((host === "api" ? API : CDN) + path, {
-      method: "GET",
-      redirect: "manual", // workerd does not support "error"; 3xx is treated as failure
-      signal: AbortSignal.timeout(15_000),
-      headers: {
-        Accept: "application/json", "User-Agent": "Mozilla/5.0",
-        ...(host === "api" ? { Authorization: `Bearer ${token}` } : {}),
-        ...(bypass ? { "X-BetterManga-Key": bypass } : {}),
-      },
-    });
+  for (let attempt = 0; ; attempt++) {
+    if (host === "api") await apiSlot();
+    const started = Date.now();
+    let res: Response;
+    try {
+      res = await fetch((host === "api" ? API : CDN) + path, {
+        method: "GET",
+        redirect: "manual", // workerd does not support "error"; 3xx is treated as failure
+        signal: AbortSignal.timeout(15_000),
+        headers: {
+          Accept: "application/json", "User-Agent": "Mozilla/5.0",
+          ...(host === "api" ? { Authorization: `Bearer ${token}` } : {}),
+          ...(bypass ? { "X-BetterManga-Key": bypass } : {}),
+        },
+      });
+    } catch {
+      console.log(`[mediocre] ${host} falha de conexão ${Date.now() - started}ms`);
+      return { ok: false, status: 0, error: mediocreErrorFor(0) };
+    }
     console.log(`[mediocre] ${host} ${res.status} ${Date.now() - started}ms`);
+    if (res.status === 429 && attempt < 2) {
+      const wait = Math.min(Number(res.headers.get("retry-after")) * 1000 || 1500 * (attempt + 1), 5000);
+      await sleep(wait + Math.random() * 300);
+      continue;
+    }
     if (res.status >= 300 && res.status < 400) return { ok: false, status: 502, error: mediocreErrorFor(0) };
-    if (res.status === 403 && !(res.headers.get("content-type") ?? "").includes("json")) {
+    const isJson = (res.headers.get("content-type") ?? "").includes("json");
+    if (res.status === 403 && !isJson) {
       return { ok: false, status: 403, error: { code: "BLOCKED", message: "O MediocreScan bloqueou o servidor do site (proteção Cloudflare). O token não é o problema." } };
     }
-    if (!res.ok) return { ok: false, status: res.status, error: mediocreErrorFor(res.status) };
+    if (!res.ok) {
+      const body = (await res.text().catch(() => "")).split(token).join("[removido]").slice(0, 200);
+      if (res.status === 403) {
+        console.log(`[mediocre] 403 corpo: ${body}`);
+        let apiMsg = "";
+        try { apiMsg = String((JSON.parse(body) as { message?: unknown }).message ?? ""); } catch { /* not json */ }
+        return { ok: false, status: 403, error: { code: "FORBIDDEN", message: `A API recusou o acesso${apiMsg ? ` (“${apiMsg.slice(0, 120)}”)` : ""}. Geralmente é bloqueio temporário por excesso de pedidos ou token de outra sessão; aguarde alguns minutos ou gere um token novo.` } };
+      }
+      return { ok: false, status: res.status, error: mediocreErrorFor(res.status) };
+    }
     const raw = await res.text();
     if (raw.length > MAX_BYTES) return { ok: false, status: 502, error: { code: "TOO_LARGE", message: "A resposta da API é grande demais." } };
     const safe = raw.split(token).join("[removido]");
     try { return { ok: true, status: res.status, data: JSON.parse(safe) as unknown, raw: safe }; }
     catch { return { ok: false, status: 502, error: { code: "INVALID_JSON", message: "O formato retornado não foi reconhecido." } }; }
-  } catch {
-    console.log(`[mediocre] ${host} falha de conexão ${Date.now() - started}ms`);
-    return { ok: false, status: 0, error: mediocreErrorFor(0) };
   }
 }
 
