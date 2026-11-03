@@ -223,12 +223,13 @@ function SyncButton() {
 function TokenSettings() {
   const status = useServerFn(getMediocreTokenStatus);
   const save = useServerFn(saveMediocreToken);
+  const qc = useQueryClient();
   const s = useQuery({ queryKey: ["mediocre-token"], queryFn: () => status() });
   const [token, setToken] = useState("");
   const [refresh, setRefresh] = useState("");
   const m = useMutation({
     mutationFn: () => save({ data: { token, refreshToken: refresh } }),
-    onSuccess: () => { setToken(""); setRefresh(""); void s.refetch(); toast.success("Token atualizado."); },
+    onSuccess: () => { setToken(""); setRefresh(""); void s.refetch(); void qc.invalidateQueries({ queryKey: ["mediocre-api"] }); void qc.invalidateQueries({ queryKey: ["mediocre-imported"] }); toast.success("Token atualizado. Cópias salvas apagadas."); },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar."),
   });
   return (
@@ -237,7 +238,7 @@ function TokenSettings() {
       <form className="mt-3 grid gap-2" onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
         <Input type="password" autoComplete="off" placeholder="Novo token (Authorization)" value={token} onChange={(e) => setToken(e.target.value)} />
         <Input type="password" autoComplete="off" placeholder="Refresh token (opcional)" value={refresh} onChange={(e) => setRefresh(e.target.value)} />
-        <p className="text-xs text-muted-foreground">O token fica guardado só no servidor e nunca é mostrado de volta. Se a API falhar, o site usa a última cópia salva.</p>
+        <p className="text-xs text-muted-foreground">O token fica guardado só no servidor e nunca é mostrado de volta. Ao salvar um token novo, todas as cópias salvas da API antiga são apagadas e o site volta a buscar tudo ao vivo.</p>
         <Button type="submit" disabled={!token || m.isPending} className="w-fit">{m.isPending ? "Salvando…" : "Salvar token"}</Button>
       </form>
     </details>
