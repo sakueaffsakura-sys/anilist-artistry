@@ -630,6 +630,45 @@ export type Database = {
         }
         Relationships: []
       }
+      mediocre_cache: {
+        Row: {
+          key: string
+          payload: string
+          updated_at: string
+        }
+        Insert: {
+          key: string
+          payload: string
+          updated_at?: string
+        }
+        Update: {
+          key?: string
+          payload?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mediocre_settings: {
+        Row: {
+          id: number
+          refresh_token: string | null
+          token: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          refresh_token?: string | null
+          token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          refresh_token?: string | null
+          token?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profile_badges: {
         Row: {
           created_at: string
