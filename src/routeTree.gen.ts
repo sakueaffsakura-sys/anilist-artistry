@@ -53,6 +53,7 @@ import { Route as MediocreCapituloIdRouteImport } from './routes/mediocre.capitu
 import { Route as MediocreObraIdRouteImport } from './routes/mediocre.obra.$id'
 import { Route as AuthenticatedObraSlugIndexRouteImport } from './routes/_authenticated/obra/$slug/index'
 import { Route as AuthenticatedObraSlugChapterRouteImport } from './routes/_authenticated/obra/$slug/$chapter'
+import { Route as ApiPublicJobsMediocreQueueRouteImport } from './routes/api/public/jobs/mediocre-queue'
 import { Route as ApiPublicJobsMediocreSyncRouteImport } from './routes/api/public/jobs/mediocre-sync'
 
 const IndexRoute = IndexRouteImport.update({
@@ -286,6 +287,12 @@ const AuthenticatedObraSlugChapterRoute =
     path: '/obra/$slug/$chapter',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicJobsMediocreQueueRoute =
+  ApiPublicJobsMediocreQueueRouteImport.update({
+    id: '/api/public/jobs/mediocre-queue',
+    path: '/api/public/jobs/mediocre-queue',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicJobsMediocreSyncRoute =
   ApiPublicJobsMediocreSyncRouteImport.update({
     id: '/api/public/jobs/mediocre-sync',
@@ -336,6 +343,7 @@ export interface FileRoutesByFullPath {
   '/mediocre/obra/$id': typeof MediocreObraIdRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/obra/$slug/$chapter': typeof AuthenticatedObraSlugChapterRoute
+  '/api/public/jobs/mediocre-queue': typeof ApiPublicJobsMediocreQueueRoute
   '/api/public/jobs/mediocre-sync': typeof ApiPublicJobsMediocreSyncRoute
   '/obra/$slug/': typeof AuthenticatedObraSlugIndexRoute
 }
@@ -382,6 +390,7 @@ export interface FileRoutesByTo {
   '/mediocre/obra/$id': typeof MediocreObraIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/obra/$slug/$chapter': typeof AuthenticatedObraSlugChapterRoute
+  '/api/public/jobs/mediocre-queue': typeof ApiPublicJobsMediocreQueueRoute
   '/api/public/jobs/mediocre-sync': typeof ApiPublicJobsMediocreSyncRoute
   '/obra/$slug': typeof AuthenticatedObraSlugIndexRoute
 }
@@ -430,6 +439,7 @@ export interface FileRoutesById {
   '/mediocre/obra/$id': typeof MediocreObraIdRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/obra/$slug/$chapter': typeof AuthenticatedObraSlugChapterRoute
+  '/api/public/jobs/mediocre-queue': typeof ApiPublicJobsMediocreQueueRoute
   '/api/public/jobs/mediocre-sync': typeof ApiPublicJobsMediocreSyncRoute
   '/_authenticated/obra/$slug/': typeof AuthenticatedObraSlugIndexRoute
 }
@@ -478,6 +488,7 @@ export interface FileRouteTypes {
     | '/mediocre/obra/$id'
     | '/admin/'
     | '/obra/$slug/$chapter'
+    | '/api/public/jobs/mediocre-queue'
     | '/api/public/jobs/mediocre-sync'
     | '/obra/$slug/'
   fileRoutesByTo: FileRoutesByTo
@@ -524,6 +535,7 @@ export interface FileRouteTypes {
     | '/mediocre/obra/$id'
     | '/admin'
     | '/obra/$slug/$chapter'
+    | '/api/public/jobs/mediocre-queue'
     | '/api/public/jobs/mediocre-sync'
     | '/obra/$slug'
   id:
@@ -571,6 +583,7 @@ export interface FileRouteTypes {
     | '/mediocre/obra/$id'
     | '/_authenticated/admin/'
     | '/_authenticated/obra/$slug/$chapter'
+    | '/api/public/jobs/mediocre-queue'
     | '/api/public/jobs/mediocre-sync'
     | '/_authenticated/obra/$slug/'
   fileRoutesById: FileRoutesById
@@ -596,6 +609,7 @@ export interface RootRouteChildren {
   ApiPublicVersionRoute: typeof ApiPublicVersionRoute
   MediocreCapituloIdRoute: typeof MediocreCapituloIdRoute
   MediocreObraIdRoute: typeof MediocreObraIdRoute
+  ApiPublicJobsMediocreQueueRoute: typeof ApiPublicJobsMediocreQueueRoute
   ApiPublicJobsMediocreSyncRoute: typeof ApiPublicJobsMediocreSyncRoute
 }
 
@@ -909,6 +923,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedObraSlugChapterRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/jobs/mediocre-queue': {
+      id: '/api/public/jobs/mediocre-queue'
+      path: '/api/public/jobs/mediocre-queue'
+      fullPath: '/api/public/jobs/mediocre-queue'
+      preLoaderRoute: typeof ApiPublicJobsMediocreQueueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/jobs/mediocre-sync': {
       id: '/api/public/jobs/mediocre-sync'
       path: '/api/public/jobs/mediocre-sync'
@@ -997,6 +1018,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicVersionRoute: ApiPublicVersionRoute,
   MediocreCapituloIdRoute: MediocreCapituloIdRoute,
   MediocreObraIdRoute: MediocreObraIdRoute,
+  ApiPublicJobsMediocreQueueRoute: ApiPublicJobsMediocreQueueRoute,
   ApiPublicJobsMediocreSyncRoute: ApiPublicJobsMediocreSyncRoute,
 }
 export const routeTree = rootRouteImport

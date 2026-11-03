@@ -70,7 +70,7 @@ async function importChapter(admin: Admin, seriesId: string, capId: number, isNo
 }
 
 /** Imports (or continues importing) a MediocreScan work into the catalog. */
-export async function importMediocreWork(admin: Admin, obraId: number, opts: { kind?: string; createdBy: string | null }): Promise<ImportOutcome> {
+export async function importMediocreWork(admin: Admin, obraId: number, opts: { kind?: string; createdBy: string | null; chapterLimit?: number }): Promise<ImportOutcome> {
   const res = await mediocreGet("api", `/obras/${obraId}`);
   if (!res.ok) throw new Error(res.error.message);
   const work = extractWork(res.data);
@@ -115,7 +115,7 @@ export async function importMediocreWork(admin: Admin, obraId: number, opts: { k
   const { data: existing } = await admin.from("chapters").select("number").eq("series_id", series.id).limit(5000);
   const have = new Set((existing ?? []).map((c) => Number(c.number)));
   const todo = chapters.filter((c) => !have.has(Number(c["cap_num"]))).sort((a, b) => Number(a["cap_num"]) - Number(b["cap_num"]));
-  const batch = todo.slice(0, IMPORT_CHAPTER_LIMIT);
+  const batch = todo.slice(0, opts.chapterLimit ?? IMPORT_CHAPTER_LIMIT);
   const isNovel = series.kind === "Novel";
   let added = 0, skipped = 0;
   // One chapter at a time: bursts made the API block the server IP.
@@ -152,6 +152,9 @@ export async function importedMediocreIds(admin: Admin, ids: number[]): Promise<
  * works so it fits the scheduler's time budget, and rotation reaches every work over time.
  */
 export async function syncMediocreChapters(admin: Admin, maxWorks = 2): Promise<{ checked: number; added: number; blocked?: boolean }> {
+  // A fila de publicação tem prioridade: só um trabalho conversa com a API por vez.
+  const { count: queued } = await admin.from("mediocre_queue").select("id", { count: "exact", head: true }).in("status", ["waiting", "running"]);
+  if ((queued ?? 0) > 0) return { checked: 0, added: 0 };
   const { data: cfg } = await admin.from("mediocre_settings").select("blocked_until").eq("id", 1).maybeSingle();
   if (cfg?.blocked_until && new Date(cfg.blocked_until).getTime() > Date.now()) return { checked: 0, added: 0, blocked: true };
   // Teste rápido: bloqueio Cloudflare pausa 1 hora; recusa/limite da API pausa 20 minutos para não piorar o bloqueio.

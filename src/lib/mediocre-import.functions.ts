@@ -66,3 +66,22 @@ export const syncMediocreNow = createServerFn({ method: "POST" })
     const { syncMediocreChapters } = await import("./mediocre-import.server");
     return syncMediocreChapters(supabaseAdmin, 5);
   });
+
+/** Admin: put works at the end of the publish queue (one work, one chapter per minute). */
+export const enqueueMediocreWorks = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { items: { obraId: number; title?: string | null }[] }) => {
+    const items = (Array.isArray(input?.items) ? input.items : [])
+      .filter((i) => Number.isSafeInteger(i?.obraId) && i.obraId > 0)
+      .map((i) => ({ obraId: i.obraId, title: typeof i.title === "string" ? i.title : null }))
+      .slice(0, 200);
+    if (!items.length) throw new Error("Nenhuma obra válida.");
+    return { items };
+  })
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Somente administradores.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { enqueueWorks } = await import("./mediocre-queue.server");
+    return enqueueWorks(supabaseAdmin, data.items, context.userId);
+  });
