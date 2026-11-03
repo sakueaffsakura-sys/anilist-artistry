@@ -67,11 +67,6 @@ export const syncMediocreNow = createServerFn({ method: "POST" })
     return syncMediocreChapters(supabaseAdmin, 5);
   });
 
-async function assertAdmin(context: { supabase: { rpc: (...a: never[]) => unknown }; userId: string }) {
-  const { data } = await (context.supabase as unknown as { rpc: (f: string, a: object) => Promise<{ data: boolean | null }> }).rpc("has_role", { _user_id: context.userId, _role: "admin" });
-  if (!data) throw new Error("Somente administradores.");
-}
-
 /** Admin: put works at the end of the publish queue (one work, one chapter per minute). */
 export const enqueueMediocreWorks = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -84,7 +79,8 @@ export const enqueueMediocreWorks = createServerFn({ method: "POST" })
     return { items };
   })
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const { data: isAdmin } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Somente administradores.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { enqueueWorks } = await import("./mediocre-queue.server");
     return enqueueWorks(supabaseAdmin, data.items, context.userId);
