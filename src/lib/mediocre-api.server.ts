@@ -8,7 +8,7 @@ type Fetched = { ok: true; status: number; data: unknown; raw: string } | { ok: 
 
 /** GET a fixed-host path with the server-only token. Never logs or returns the token. */
 export async function mediocreGet(host: "api" | "cdn", path: string): Promise<Fetched> {
-  const token = process.env["MEDIOCRE_API_TOKEN"];
+  const token = await mediocreToken();
   if (!token) return { ok: false, status: 500, error: { code: "MISSING_TOKEN", message: "O token da API ainda não foi configurado." } };
   if (!path.startsWith("/") || path.includes("..") || path.includes("//")) return { ok: false, status: 400, error: mediocreErrorFor(400) };
   const started = Date.now();
@@ -33,8 +33,37 @@ export async function mediocreGet(host: "api" | "cdn", path: string): Promise<Fe
   }
 }
 
-/** Runs one validated operation; chapter content resolves its CDN path from API metadata. */
+async function admin() {
+  return (await import("@/integrations/supabase/client.server")).supabaseAdmin;
+}
+
+/** Token saved in the panel wins; the env secret is the fallback. */
+async function mediocreToken(): Promise<string | undefined> {
+  try {
+    const { data } = await (await admin()).from("mediocre_settings").select("token").eq("id", 1).maybeSingle();
+    if (data?.token) return data.token;
+  } catch { /* fall back */ }
+  return process.env["MEDIOCRE_API_TOKEN"];
+}
+
+async function cacheWrite(key: string, payload: string) {
+  try { await (await admin()).from("mediocre_cache").upsert({ key, payload, updated_at: new Date().toISOString() }); } catch { /* best effort */ }
+}
+async function cacheRead(key: string): Promise<string | null> {
+  try { const { data } = await (await admin()).from("mediocre_cache").select("payload").eq("key", key).maybeSingle(); return data?.payload ?? null; } catch { return null; }
+}
+
+/** Runs an operation; successful answers are stored so expired tokens fall back to the saved copy. */
 export async function runMediocre(req: MediocreRequest): Promise<MediocreResult> {
+  const key = JSON.stringify([req.operation, req.obraId ?? null, (req as { capituloId?: unknown }).capituloId ?? null, mediocrePath(req)]);
+  const live = await runMediocreLive(req);
+  if (live.ok) { await cacheWrite(key, live.json); return live; }
+  const saved = await cacheRead(key);
+  return saved ? { ok: true, status: 200, json: saved } : live;
+}
+
+/** Runs one validated operation; chapter content resolves its CDN path from API metadata. */
+async function runMediocreLive(req: MediocreRequest): Promise<MediocreResult> {
   if (req.operation === "thumbs_capitulos") {
     const r = await mediocreGet("cdn", mediocrePath(req));
     return r.ok ? { ok: true, status: r.status, json: r.raw } : r;
