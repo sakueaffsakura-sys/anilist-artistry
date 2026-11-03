@@ -69,6 +69,7 @@ function MediocrePanel() {
           <Button variant="outline" size="sm" disabled={q.isFetching || !isAdmin} onClick={() => q.refetch()}><RefreshCw className={`mr-1 h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />Atualizar</Button>
         </header>
 
+        {isAdmin && <BlockBanner />}
         {isAdmin && <TokenSettings />}
         {isAdmin && <SyncButton />}
 
@@ -180,6 +181,11 @@ function PublishableGrid({ rows, showIa }: { rows: Record<string, unknown>[]; sh
         try { await run({ data: { obraId: id } }); ok = true; }
         catch (e) { reason = e instanceof Error ? e.message : "erro"; if (attempt === 0) await new Promise((r) => setTimeout(r, 1500)); }
       }
+      if (!ok && reason.includes("bloqueou o IP")) {
+        fail++; reasons.push(`#${id}: ${reason}`);
+        toast.error(`Publicação interrompida: a MediocreScan bloqueou o IP do servidor.`, { description: `${done} publicadas, ${pending.length - done} ficaram por fazer. ${reason}`, duration: 20000 });
+        setBusy(false); void imported.refetch(); return;
+      }
       if (ok) { done++; qc.setQueryData<number[]>(key, (old) => [...(old ?? []), id]); } else { fail++; reasons.push(`#${id}: ${reason}`); }
       setProg({ done, fail, total: pending.length });
     }
@@ -284,6 +290,26 @@ function TokenSettings() {
       </form>
       <BypassAndTest hasBypass={!!s.data?.hasBypass} onSaved={() => void s.refetch()} />
     </details>
+  );
+}
+
+/** Shows when the API blocked the server IP and the site paused calls. */
+function BlockBanner() {
+  const status = useServerFn(getMediocreTokenStatus);
+  const test = useServerFn(testMediocreConnection);
+  const qc = useQueryClient();
+  const s = useQuery({ queryKey: ["mediocre-block"], queryFn: () => status(), staleTime: 30_000 });
+  const t = useMutation({
+    mutationFn: () => test(),
+    onSuccess: (r) => { r.ok ? toast.success(r.message) : toast.error(r.message); void s.refetch(); void qc.invalidateQueries({ queryKey: ["mediocre-api"] }); },
+  });
+  const until = s.data?.blockedUntil ? new Date(s.data.blockedUntil) : null;
+  if (!until || until.getTime() <= Date.now()) return null;
+  return (
+    <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm">
+      <p><strong>A MediocreScan bloqueou o IP do servidor.</strong> Pedidos pausados até {until.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} para não prolongar o bloqueio. Peça à MediocreScan para liberar o servidor do Better Mangá.</p>
+      <Button size="sm" variant="outline" disabled={t.isPending} onClick={() => t.mutate()}>{t.isPending ? "Testando…" : "Tentar agora"}</Button>
+    </div>
   );
 }
 

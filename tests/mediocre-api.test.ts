@@ -54,3 +54,9 @@ it("recentes paging uses offset of 30 per page with format", () => {
   expect(() => parseMediocreRequest({ operation: "recentes", pagina: 0 })).toThrow();
   expect(() => parseMediocreRequest({ operation: "recentes", formato: 99 })).toThrow();
 });
+
+import { isIpBlockedBody } from "../src/lib/mediocre-api.server";
+it("classifies 'IP bloqueado' as an IP block", () => {
+  expect(isIpBlockedBody('{"message":"IP bloqueado.","statusCode":403}')).toBe(true);
+  expect(isIpBlockedBody('{"message":"Token inválido."}')).toBe(false);
+});

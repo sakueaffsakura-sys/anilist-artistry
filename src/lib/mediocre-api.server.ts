@@ -7,7 +7,13 @@ const MAX_BYTES = 8_000_000;
 type Fetched = { ok: true; status: number; data: unknown; raw: string } | { ok: false; status: number; error: { code: string; message: string } };
 
 // The API answers 429 to bursts and then 403s the token for a while; pace calls per instance.
-const API_GAP_MS = 400;
+const API_GAP_MS = 1000;
+export const IP_BLOCKED_MESSAGE = "A MediocreScan bloqueou o IP do servidor do site.";
+const BLOCK_PAUSE_MS = 30 * 60_000;
+
+/** True when the API body says the server IP was blocked. */
+export function isIpBlockedBody(body: string): boolean { return /ip\s+bloquead/i.test(body); }
+const blockedMsg = (until: string) => `${IP_BLOCKED_MESSAGE} Nova tentativa às ${new Date(until).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}.`;
 let apiChain: Promise<void> = Promise.resolve();
 function apiSlot(): Promise<void> {
   const slot = apiChain.then(() => new Promise<void>((r) => setTimeout(r, API_GAP_MS)));
@@ -18,7 +24,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** GET a fixed-host path with the server-only token. Never logs or returns the token. */
 export async function mediocreGet(host: "api" | "cdn", path: string): Promise<Fetched> {
-  const { token, bypass } = await mediocreAuth();
+  const { token, bypass, blockedUntil } = await mediocreAuth();
+  if (blockedUntil && new Date(blockedUntil).getTime() > Date.now()) return { ok: false, status: 403, error: { code: "IP_BLOCKED", message: blockedMsg(blockedUntil) } };
   if (!token) return { ok: false, status: 500, error: { code: "MISSING_TOKEN", message: "O token da API ainda não foi configurado." } };
   if (!path.startsWith("/") || path.includes("..") || path.includes("//")) return { ok: false, status: 400, error: mediocreErrorFor(400) };
   for (let attempt = 0; ; attempt++) {
@@ -55,6 +62,11 @@ export async function mediocreGet(host: "api" | "cdn", path: string): Promise<Fe
       const body = (await res.text().catch(() => "")).split(token).join("[removido]").slice(0, 200);
       if (res.status === 403) {
         console.log(`[mediocre] 403 corpo: ${body}`);
+        if (isIpBlockedBody(body)) {
+          const until = new Date(Date.now() + BLOCK_PAUSE_MS).toISOString();
+          try { await (await admin()).from("mediocre_settings").update({ blocked_until: until }).eq("id", 1); } catch { /* best effort */ }
+          return { ok: false, status: 403, error: { code: "IP_BLOCKED", message: blockedMsg(until) } };
+        }
         let apiMsg = "";
         try { apiMsg = String((JSON.parse(body) as { message?: unknown }).message ?? ""); } catch { /* not json */ }
         return { ok: false, status: 403, error: { code: "FORBIDDEN", message: `A API recusou o acesso${apiMsg ? ` (“${apiMsg.slice(0, 120)}”)` : ""}. Geralmente é bloqueio temporário por excesso de pedidos ou token de outra sessão; aguarde alguns minutos ou gere um token novo.` } };
@@ -74,11 +86,11 @@ async function admin() {
 }
 
 /** Token saved in the panel wins; the env secret is the fallback. */
-async function mediocreAuth(): Promise<{ token: string | undefined; bypass: string | null }> {
+async function mediocreAuth(): Promise<{ token: string | undefined; bypass: string | null; blockedUntil: string | null }> {
   try {
-    const { data } = await (await admin()).from("mediocre_settings").select("token, bypass_header").eq("id", 1).maybeSingle();
-    return { token: data?.token || process.env["MEDIOCRE_API_TOKEN"], bypass: data?.bypass_header ?? null };
-  } catch { return { token: process.env["MEDIOCRE_API_TOKEN"], bypass: null }; }
+    const { data } = await (await admin()).from("mediocre_settings").select("token, bypass_header, blocked_until").eq("id", 1).maybeSingle();
+    return { token: data?.token || process.env["MEDIOCRE_API_TOKEN"], bypass: data?.bypass_header ?? null, blockedUntil: data?.blocked_until ?? null };
+  } catch { return { token: process.env["MEDIOCRE_API_TOKEN"], bypass: null, blockedUntil: null }; }
 }
 
 async function cacheWrite(key: string, payload: string) {

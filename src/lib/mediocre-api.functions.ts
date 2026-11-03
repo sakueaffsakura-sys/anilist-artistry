@@ -36,8 +36,8 @@ export const getMediocreTokenStatus = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await supabaseAdmin.from("mediocre_settings").select("token, refresh_token, updated_at, bypass_header").eq("id", 1).maybeSingle();
-    return { hasToken: !!data?.token, hasRefresh: !!data?.refresh_token, hasBypass: !!data?.bypass_header, updatedAt: data?.updated_at ?? null };
+    const { data } = await supabaseAdmin.from("mediocre_settings").select("token, refresh_token, updated_at, bypass_header, blocked_until").eq("id", 1).maybeSingle();
+    return { hasToken: !!data?.token, hasRefresh: !!data?.refresh_token, hasBypass: !!data?.bypass_header, blockedUntil: data?.blocked_until ?? null, updatedAt: data?.updated_at ?? null };
   });
 
 export const saveMediocreToken = createServerFn({ method: "POST" })
@@ -85,6 +85,8 @@ export const testMediocreConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context);
+    const { supabaseAdmin: sa } = await import("@/integrations/supabase/client.server");
+    await sa.from("mediocre_settings").update({ blocked_until: null }).eq("id", 1); // one manual try
     const { mediocreGet } = await import("./mediocre-api.server");
     const r = await mediocreGet("api", "/obras/atualizadas-recentes");
     if (r.ok) {
