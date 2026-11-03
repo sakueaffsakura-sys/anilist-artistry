@@ -1027,6 +1027,7 @@ export type Database = {
           id: string
           in_slider: boolean
           kind: string
+          mediocre_synced_at: string | null
           pinned: boolean
           published: boolean
           rating: number
@@ -1054,6 +1055,7 @@ export type Database = {
           id?: string
           in_slider?: boolean
           kind?: string
+          mediocre_synced_at?: string | null
           pinned?: boolean
           published?: boolean
           rating?: number
@@ -1081,6 +1083,7 @@ export type Database = {
           id?: string
           in_slider?: boolean
           kind?: string
+          mediocre_synced_at?: string | null
           pinned?: boolean
           published?: boolean
           rating?: number

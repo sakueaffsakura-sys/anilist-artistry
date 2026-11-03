@@ -43,3 +43,26 @@ export const autoFulfillRequest = createServerFn({ method: "POST" })
       return { added: false };
     }
   });
+
+/** Admin: which of these MediocreScan IDs are already published here. */
+export const getImportedMediocreIds = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { ids: number[] }) => ({ ids: (Array.isArray(input?.ids) ? input.ids : []).filter((n) => Number.isSafeInteger(n) && n > 0).slice(0, 500) }))
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Somente administradores.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { importedMediocreIds } = await import("./mediocre-import.server");
+    return importedMediocreIds(supabaseAdmin, data.ids);
+  });
+
+/** Admin: check imported works for new chapters right now. */
+export const syncMediocreNow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Somente administradores.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { syncMediocreChapters } = await import("./mediocre-import.server");
+    return syncMediocreChapters(supabaseAdmin, 5);
+  });

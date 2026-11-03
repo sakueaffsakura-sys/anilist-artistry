@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Copy, Download, Code2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -28,13 +28,14 @@ function chapterCount(row: Row): string | null {
   return text(pick(row, "total_capitulos", "total_capitulos_ativos", "qtd_capitulos"));
 }
 
-export function WorkCard({ row, showIa }: { row: Row; showIa?: boolean | undefined }) {
+export function WorkCard({ row, showIa, badge }: { row: Row; showIa?: boolean | undefined; badge?: ReactNode }) {
   const img = workImage(row);
   const name = text(pick(row, "obr_nome", "nome", "cap_nome"));
   const tags = tagNames(row["tags"]).slice(0, 4);
   const date = text(pick(row, "data_ultimo_cap", "obr_atualizado_em", "atualizado_em", "cap_lancado_em"));
   return (
-    <article className="flex gap-3 rounded-xl border border-border bg-card p-3">
+    <article className="relative flex gap-3 rounded-xl border border-border bg-card p-3">
+      {badge}
       {img ? <img src={img} alt={name ?? "Capa"} loading="lazy" className="aspect-[2/3] w-20 shrink-0 rounded-lg object-cover" /> : <div className="aspect-[2/3] w-20 shrink-0 rounded-lg bg-muted" />}
       <div className="min-w-0 space-y-1">
         <h3 className="line-clamp-2 font-semibold">{name ?? "Sem título"}</h3>
@@ -52,9 +53,9 @@ export function WorkCard({ row, showIa }: { row: Row; showIa?: boolean | undefin
   );
 }
 
-export function WorkGrid({ rows, showIa }: { rows: Row[]; showIa?: boolean }) {
+export function WorkGrid({ rows, showIa, badgeFor }: { rows: Row[]; showIa?: boolean; badgeFor?: (row: Row) => ReactNode }) {
   if (!rows.length) return <EmptyState />;
-  return <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{rows.map((r, i) => <WorkCard key={String(r["obr_id"] ?? r["cap_id"] ?? i)} row={r} showIa={showIa} />)}</div>;
+  return <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{rows.map((r, i) => <WorkCard key={String(r["obr_id"] ?? r["cap_id"] ?? i)} row={r} showIa={showIa} badge={badgeFor?.(r)} />)}</div>;
 }
 
 const CHAPTER_FIELDS: Array<[string, string]> = [["cap_id", "ID"], ["cap_num", "Número"], ["cap_slug", "Slug"], ["cap_volume", "Volume"], ["cap_tipo", "Tipo"], ["cap_lancado_em", "Lançado"], ["cap_criado_em", "Criado"], ["cap_coment_count", "Comentários"], ["cap_reac_count", "Reações"], ["cap_ia", "IA"]];
