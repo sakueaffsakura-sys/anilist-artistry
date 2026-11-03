@@ -41,6 +41,7 @@ function statusFor(v: unknown): string {
 /** Copies one chapter's pages (or text) into chapters; returns false when content is unavailable. */
 async function importChapter(admin: Admin, seriesId: string, capId: number, isNovel: boolean): Promise<boolean> {
   const meta = await mediocreGet("api", `/capitulos/${capId}`);
+  if (!meta.ok && meta.error.code === "IP_BLOCKED") throw new Error(meta.error.message);
   if (!meta.ok) return false;
   const m = meta.data as Row;
   const num = Number(m["cap_num"]);
@@ -117,10 +118,8 @@ export async function importMediocreWork(admin: Admin, obraId: number, opts: { k
   const batch = todo.slice(0, IMPORT_CHAPTER_LIMIT);
   const isNovel = series.kind === "Novel";
   let added = 0, skipped = 0;
-  for (let i = 0; i < batch.length; i += 4) {
-    const results = await Promise.all(batch.slice(i, i + 4).map((c) => importChapter(admin, series!.id, c["cap_id"] as number, isNovel)));
-    for (const ok of results) ok ? added++ : skipped++;
-  }
+  // One chapter at a time: bursts made the API block the server IP.
+  for (const c of batch) (await importChapter(admin, series!.id, c["cap_id"] as number, isNovel)) ? added++ : skipped++;
   return { seriesId: series.id, slug: series.slug, created, added, skipped, remaining: todo.length - batch.length };
 }
 
@@ -157,6 +156,7 @@ export async function syncMediocreChapters(admin: Admin, maxWorks = 3): Promise<
   if (cfg?.blocked_until && new Date(cfg.blocked_until).getTime() > Date.now()) return { checked: 0, added: 0, blocked: true };
   // Teste rápido: bloqueio Cloudflare pausa 1 hora; recusa/limite da API pausa 20 minutos para não piorar o bloqueio.
   const probe = await mediocreGet("api", "/obras/atualizadas-recentes");
+  if (!probe.ok && probe.error.code === "IP_BLOCKED") return { checked: 0, added: 0, blocked: true };
   if (!probe.ok && (probe.error.code === "BLOCKED" || probe.status === 403 || probe.status === 429)) {
     const ms = probe.error.code === "BLOCKED" ? 3_600_000 : 1_200_000;
     await admin.from("mediocre_settings").update({ blocked_until: new Date(Date.now() + ms).toISOString() }).eq("id", 1);
