@@ -353,3 +353,10 @@
 .admin-workspace :is(input, select, textarea) { max-width: 100%; }
 @media (max-width: 1279px) { .admin-workspace .admin-stat:nth-child(2) { border-right: 0; } .admin-workspace .admin-stat:nth-child(-n+2) { border-bottom: 1px solid var(--border); } }
 @media (max-width: 639px) { .admin-workspace .admin-stat { padding: 18px 14px; } .admin-workspace .admin-page-heading { margin-bottom: 24px; } }
+
+.mediocre-status { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 999px; animation: mediocre-pop .45s cubic-bezier(.34,1.56,.64,1) both; }
+.mediocre-status-ok { background: oklch(0.68 0.17 150); color: oklch(0.98 0 0); box-shadow: 0 0 0 4px oklch(0.68 0.17 150 / .2); }
+.mediocre-status-new { background: oklch(0.62 0.18 250); color: oklch(0.98 0 0); box-shadow: 0 0 0 4px oklch(0.62 0.18 250 / .2); animation: mediocre-pop .45s cubic-bezier(.34,1.56,.64,1) both, mediocre-pulse 2s ease-in-out .5s infinite; }
+@keyframes mediocre-pop { from { transform: scale(0) rotate(-90deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+@keyframes mediocre-pulse { 50% { box-shadow: 0 0 0 7px oklch(0.62 0.18 250 / .05); } }
+@media (prefers-reduced-motion: reduce) { .mediocre-status, .mediocre-status-new { animation: none; } }

@@ -2,9 +2,10 @@ import { useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { importMediocreWorkFn } from "@/lib/mediocre-import.functions";
+import { getImportedMediocreIds, importMediocreWorkFn, syncMediocreNow } from "@/lib/mediocre-import.functions";
 import { useServerFn } from "@tanstack/react-start";
-import { RefreshCw, Search } from "lucide-react";
+import { Check, RefreshCw, Search, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AdminShell } from "@/components/AdminShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +65,7 @@ function MediocrePanel() {
         </header>
 
         {isAdmin && <TokenSettings />}
+        {isAdmin && <SyncButton />}
 
         <nav className="flex gap-2 overflow-x-auto pb-1" aria-label="Consultas">
           {TABS.map((t) => (
@@ -96,7 +98,7 @@ function Result({ tab, data, fileName }: { tab: Tab; data: unknown; fileName: st
   } else {
     const list = extractList(data);
     if (!list) body = <EmptyState message="Não foi possível identificar uma lista. Veja o JSON abaixo (modo diagnóstico)." />;
-    else body = tab === "capitulos_usuario" ? <ChapterList chapters={list} /> : <><ImportAllButton rows={list} /><WorkGrid rows={list} showIa={tab === "recentes_ia"} /></>;
+    else body = tab === "capitulos_usuario" ? <ChapterList chapters={list} /> : <PublishableGrid rows={list} showIa={tab === "recentes_ia"} />;
   }
   return <div className="space-y-4">{body}<JsonViewer data={data} fileName={fileName} /></div>;
 }
@@ -112,26 +114,65 @@ function ImportButton({ obraId }: { obraId: number }) {
   return <Button onClick={() => m.mutate()} disabled={m.isPending}>{m.isPending ? "Adicionando…" : "Adicionar ao Better Mangá"}</Button>;
 }
 
-function ImportAllButton({ rows }: { rows: Record<string, unknown>[] }) {
+const rowId = (r: Record<string, unknown>) => Number(r["obr_id"] ?? r["id"]);
+
+/** Cards marked published (check) or not yet (blue X); "Publicar todas" skips the published ones. */
+function PublishableGrid({ rows, showIa }: { rows: Record<string, unknown>[]; showIa: boolean }) {
+  const ids = [...new Set(rows.map(rowId).filter((n) => Number.isSafeInteger(n) && n > 0))];
+  const check = useServerFn(getImportedMediocreIds);
+  const qc = useQueryClient();
+  const key = ["mediocre-imported", ids.join(",")];
+  const imported = useQuery({ queryKey: key, queryFn: () => check({ data: { ids } }), staleTime: 30_000 });
+  const have = new Set(imported.data ?? []);
   const run = useServerFn(importMediocreWorkFn);
-  const ids = [...new Set(rows.map((r) => Number(r["obr_id"] ?? r["id"])).filter((n) => Number.isSafeInteger(n) && n > 0))];
-  const [prog, setProg] = useState<{ done: number; fail: number } | null>(null);
+  const [prog, setProg] = useState<{ done: number; fail: number; total: number } | null>(null);
   const [busy, setBusy] = useState(false);
+  const pending = ids.filter((id) => !have.has(id));
   const start = async () => {
-    if (!confirm(`Publicar ${ids.length} obras desta página no Better Mangá?`)) return;
-    setBusy(true); let done = 0, fail = 0; setProg({ done, fail });
-    for (const id of ids) {
-      try { await run({ data: { obraId: id } }); done++; } catch { fail++; }
-      setProg({ done, fail });
+    if (!pending.length) { toast.info("Todas desta página já estão publicadas."); return; }
+    if (!confirm(`Publicar ${pending.length} obras novas? ${ids.length - pending.length} já publicadas serão ignoradas.`)) return;
+    setBusy(true); let done = 0, fail = 0; setProg({ done, fail, total: pending.length });
+    for (const id of pending) {
+      try { await run({ data: { obraId: id } }); done++; qc.setQueryData<number[]>(key, (old) => [...(old ?? []), id]); } catch { fail++; }
+      setProg({ done, fail, total: pending.length });
     }
     setBusy(false);
-    toast.success(`${done} obras publicadas/atualizadas${fail ? `, ${fail} com erro` : ""}. Obras longas: clique de novo para continuar capítulos.`);
+    void imported.refetch();
+    toast.success(`${done} obras publicadas${fail ? `, ${fail} com erro` : ""}.`);
   };
-  if (!ids.length) return null;
+  const badgeFor = (r: Record<string, unknown>) => {
+    if (!imported.data) return null;
+    const ok = have.has(rowId(r));
+    return (
+      <span key={String(ok)} className={`mediocre-status ${ok ? "mediocre-status-ok" : "mediocre-status-new"}`} title={ok ? "Já publicada" : "Ainda não publicada"} aria-label={ok ? "Já publicada" : "Ainda não publicada"}>
+        {ok ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+      </span>
+    );
+  };
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <Button onClick={start} disabled={busy}>{busy ? "Publicando…" : `Publicar todas (${ids.length})`}</Button>
-      {prog && <span className="text-sm text-muted-foreground">{prog.done + prog.fail}/{ids.length} · {prog.fail} erros</span>}
+    <>
+      {ids.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={start} disabled={busy || imported.isLoading}>{busy ? "Publicando…" : `Publicar novas (${pending.length})`}</Button>
+          <span className="text-sm text-muted-foreground">{imported.data ? `${ids.length - pending.length} já publicadas` : "Verificando…"}{prog ? ` · ${prog.done + prog.fail}/${prog.total} · ${prog.fail} erros` : ""}</span>
+        </div>
+      )}
+      <WorkGrid rows={rows} showIa={showIa} badgeFor={badgeFor} />
+    </>
+  );
+}
+
+function SyncButton() {
+  const run = useServerFn(syncMediocreNow);
+  const m = useMutation({
+    mutationFn: () => run(),
+    onSuccess: (r) => toast.success(`${r.checked} obras verificadas, ${r.added} capítulos novos.`),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao atualizar."),
+  });
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm">
+      <span className="text-muted-foreground">Capítulos novos são copiados sozinhos a cada 10 minutos para as obras já publicadas.</span>
+      <Button size="sm" variant="outline" onClick={() => m.mutate()} disabled={m.isPending}>{m.isPending ? "Verificando…" : "Verificar agora"}</Button>
     </div>
   );
 }
