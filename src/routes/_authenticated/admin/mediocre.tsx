@@ -132,14 +132,20 @@ function PublishableGrid({ rows, showIa }: { rows: Record<string, unknown>[]; sh
   const start = async () => {
     if (!pending.length) { toast.info("Todas desta página já estão publicadas."); return; }
     if (!confirm(`Publicar ${pending.length} obras novas? ${ids.length - pending.length} já publicadas serão ignoradas.`)) return;
-    setBusy(true); let done = 0, fail = 0; setProg({ done, fail, total: pending.length });
+    setBusy(true); let done = 0, fail = 0; const reasons: string[] = []; setProg({ done, fail, total: pending.length });
     for (const id of pending) {
-      try { await run({ data: { obraId: id } }); done++; qc.setQueryData<number[]>(key, (old) => [...(old ?? []), id]); } catch { fail++; }
+      let ok = false, reason = "";
+      for (let attempt = 0; attempt < 2 && !ok; attempt++) {
+        try { await run({ data: { obraId: id } }); ok = true; }
+        catch (e) { reason = e instanceof Error ? e.message : "erro"; if (attempt === 0) await new Promise((r) => setTimeout(r, 1500)); }
+      }
+      if (ok) { done++; qc.setQueryData<number[]>(key, (old) => [...(old ?? []), id]); } else { fail++; reasons.push(`#${id}: ${reason}`); }
       setProg({ done, fail, total: pending.length });
     }
     setBusy(false);
     void imported.refetch();
-    toast.success(`${done} obras publicadas${fail ? `, ${fail} com erro` : ""}.`);
+    if (fail) toast.error(`${done} obras publicadas, ${fail} com erro.`, { description: reasons.slice(0, 5).join("\n"), duration: 15000 });
+    else toast.success(`${done} obras publicadas.`);
   };
   const [sending, setSending] = useState<Set<number>>(new Set());
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
