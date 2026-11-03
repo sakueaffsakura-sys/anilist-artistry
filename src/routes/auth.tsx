@@ -99,7 +99,7 @@ function AuthPage() {
   const covers = useQuery({
     queryKey: ["auth-covers"],
     queryFn: async () => {
-      const { data } = await supabase.from("series").select("id, cover_url").eq("published", true).not("cover_url", "is", null).order("updated_at", { ascending: false }).limit(20);
+      const { data } = await supabase.from("series").select("id, cover_url").eq("published", true).not("cover_url", "is", null).order("updated_at", { ascending: false }).limit(60);
       return (data ?? []).filter((c): c is { id: string; cover_url: string } => Boolean(c.cover_url));
     },
     staleTime: 10 * 60_000,
@@ -110,9 +110,9 @@ function AuthPage() {
     <div className="grid min-h-screen bg-background lg:grid-cols-[1.35fr_1fr]">
       <aside className="relative hidden overflow-hidden lg:block" aria-hidden="true">
         <div className="absolute -inset-20 grid -rotate-6 grid-cols-5 gap-4 opacity-60">
-          {[...(covers.data ?? []), ...(covers.data ?? [])].slice(0, 25).map((c, i) => (
+          {[...(covers.data ?? []), ...(covers.data ?? [])].slice(0, 60).map((c, i) => (
             <div key={`${c.id}-${i}`} className="aspect-[2/3] w-full overflow-hidden rounded-xl bg-surface">
-              <img src={c.cover_url} alt="" decoding="async" className="h-full w-full object-cover" />
+              <img src={c.cover_url} alt="" decoding="async" onError={(e) => { const tile = e.currentTarget.parentElement; if (tile) tile.style.display = "none"; }} className="h-full w-full object-cover" />
             </div>
           ))}
         </div>
