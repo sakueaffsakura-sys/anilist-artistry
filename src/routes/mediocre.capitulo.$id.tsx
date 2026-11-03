@@ -31,8 +31,8 @@ function ShowcaseChapter() {
     <div className="flex flex-wrap items-center justify-between gap-2">
       {obrId ? <Button asChild variant="outline" size="sm"><Link to="/mediocre/obra/$id" params={{ id: String(obrId) }}><ArrowLeft className="mr-1 h-4 w-4" />Voltar à obra</Link></Button> : <span />}
       <div className="flex gap-2">
-        <Button asChild={Boolean(prev)} variant="outline" size="sm" disabled={!prev}>{prev ? <Link to="/mediocre/capitulo/$id" params={{ id: String(prev["cap_id"]) }}><ChevronLeft className="h-4 w-4" />Anterior</Link> : <span><ChevronLeft className="h-4 w-4" />Anterior</span>}</Button>
-        <Button asChild={Boolean(next)} variant="outline" size="sm" disabled={!next}>{next ? <Link to="/mediocre/capitulo/$id" params={{ id: String(next["cap_id"]) }}>Próximo<ChevronRight className="h-4 w-4" /></Link> : <span>Próximo<ChevronRight className="h-4 w-4" /></span>}</Button>
+        <Button asChild={Boolean(prev)} variant="outline" size="sm" disabled={!prev}>{prev ? <Link to="/mediocre/capitulo/$id" params={{ id: String(prev["cap_id"]) }}><ChevronLeft className="h-4 w-4" />Anterior</Link> : <span className="inline-flex items-center"><ChevronLeft className="h-4 w-4" />Anterior</span>}</Button>
+        <Button asChild={Boolean(next)} variant="outline" size="sm" disabled={!next}>{next ? <Link to="/mediocre/capitulo/$id" params={{ id: String(next["cap_id"]) }}>Próximo<ChevronRight className="h-4 w-4" /></Link> : <span className="inline-flex items-center">Próximo<ChevronRight className="h-4 w-4" /></span>}</Button>
       </div>
     </div>
   );
