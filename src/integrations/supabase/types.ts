@@ -648,6 +648,57 @@ export type Database = {
         }
         Relationships: []
       }
+      mediocre_queue: {
+        Row: {
+          attempts: number
+          chapters_added: number
+          chapters_remaining: number | null
+          created_at: string
+          created_by: string | null
+          finished_at: string | null
+          id: string
+          last_error: string | null
+          next_run_at: string
+          obra_id: number
+          slug: string | null
+          status: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          chapters_added?: number
+          chapters_remaining?: number | null
+          created_at?: string
+          created_by?: string | null
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          next_run_at?: string
+          obra_id: number
+          slug?: string | null
+          status?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          chapters_added?: number
+          chapters_remaining?: number | null
+          created_at?: string
+          created_by?: string | null
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          next_run_at?: string
+          obra_id?: number
+          slug?: string | null
+          status?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       mediocre_settings: {
         Row: {
           blocked_until: string | null
