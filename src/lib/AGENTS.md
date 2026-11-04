@@ -14,3 +14,4 @@
 - MediocreScan publish queue: mediocre_queue holds works in order; a 1-minute schedule hits /api/public/jobs/mediocre-queue, which runs one work at a time and copies one chapter per tick with next_run_at reservations, and chapter sync pauses while the queue has work, so the API never sees parallel requests.
 - MediocreScan API host list in mediocre-api.server.ts (primary api.mediocretoons.net, old host fallback on 52x/network failure), because the API moved hosts once already.
 - MediocreScan chapter sync also repairs: fills missing/skipped chapter numbers (max 5 per work per run) and replaces missing/old-host covers from the already-fetched work data, so repairs cost no AI credits and add no API bursts.
+- MediocreScan relay: optional admin-set relay_url/relay_secret route every mediocreGet through the PHP bridge in public/downloads (fixed host keys, validated path, token in header), falling back to direct once, because MediocreScan blocks the worker IPs.
