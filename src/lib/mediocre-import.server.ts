@@ -78,7 +78,8 @@ export async function importMediocreWork(admin: Admin, obraId: number, opts: { k
   if (!work || !name) throw new Error("O formato retornado não foi reconhecido.");
 
   let created = false;
-  let { data: series } = await admin.from("series").select("id, slug, kind").eq("source_mediocre_id", obraId).maybeSingle();
+  const found = await admin.from("series").select("id, slug, kind, cover_url, banner_url").eq("source_mediocre_id", obraId).maybeSingle();
+  let series: { id: string; slug: string; kind: string; cover_url?: string | null; banner_url?: string | null } | null = found.data;
   if (!series) {
     const alts = Array.isArray(work["obr_titulos_alternativos"]) ? (work["obr_titulos_alternativos"] as unknown[]).filter((t): t is string => typeof t === "string" && Boolean(t.trim())) : [];
     const tags = Array.isArray(work["tags"]) ? (work["tags"] as unknown[]).map((t) => (t && typeof t === "object" ? (t as Row)["tag_nome"] : t)).filter((t): t is string => typeof t === "string" && t !== "+18") : [];
@@ -110,6 +111,16 @@ export async function importMediocreWork(admin: Admin, obraId: number, opts: { k
       created = true;
     }
   }
+
+  // Repair broken/missing images with data already fetched (no extra API call, no AI credits).
+  const broken = (u: string | null | undefined) => !u || u.includes("back2.mediocrescan.com");
+  if (!series) throw new Error("Obra não encontrada.");
+  const s0 = series;
+  const fix: { cover_url?: string; banner_url?: string } = {};
+  const cover = workImage(work), banner = workImage(work, "banner") ?? cover;
+  if (broken(s0.cover_url) && cover) fix.cover_url = cover;
+  if (broken(s0.banner_url) && banner) fix.banner_url = banner;
+  if (Object.keys(fix).length) await admin.from("series").update(fix).eq("id", series.id);
 
   const chapters = (extractList({ capitulos: work["capitulos"] }) ?? []).filter((c) => typeof c["cap_id"] === "number");
   const { data: existing } = await admin.from("chapters").select("number").eq("series_id", series.id).limit(5000);
@@ -177,7 +188,8 @@ export async function syncMediocreChapters(admin: Admin, maxWorks = 2): Promise<
   let added = 0;
   for (const s of data ?? []) {
     await admin.from("series").update({ mediocre_synced_at: new Date().toISOString() }).eq("id", s.id);
-    try { added += (await importMediocreWork(admin, Number(s.source_mediocre_id), { createdBy: null })).added; }
+    // Few chapters per work and run: missing/skipped numbers are filled gradually so the API never sees bursts.
+    try { added += (await importMediocreWork(admin, Number(s.source_mediocre_id), { createdBy: null, chapterLimit: 5 })).added; }
     catch (e) { console.log("[mediocre] sync falhou", s.source_mediocre_id, e instanceof Error ? e.message : "erro"); }
   }
   return { checked: data?.length ?? 0, added };
