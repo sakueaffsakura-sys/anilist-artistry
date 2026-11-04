@@ -31,7 +31,11 @@ export function MediocreJsonImport({ seriesId, onChange }: { seriesId: string; o
 
   const loadFiles = async (files: FileList | null) => {
     if (!files?.length) return;
-    for (const file of files) {
+    // Copy the FileList up front: clearing the input (e.target.value = "") in
+    // Chromium empties the same live FileList, which would stop this loop
+    // after the first file.
+    const list = Array.from(files);
+    for (const file of list) {
       try {
         const content = await file.text();
         if (/\.json$/i.test(file.name)) {
