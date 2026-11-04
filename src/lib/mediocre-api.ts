@@ -58,7 +58,7 @@ export function extractPagination(data: unknown): { page: number; totalPages: nu
   return { page: n(o["currentPage"]) || 1, totalPages: n(o["totalPages"]) || 1, totalItems: n(o["totalItems"]) };
 }
 
-/** Maps an operation to a fixed path on back2.mediocrescan.com. Never accepts URLs. */
+/** Maps an operation to a fixed path on the MediocreScan API host. Never accepts URLs. */
 export function mediocrePath(req: MediocreRequest): string {
   switch (req.operation) {
     case "home": return "/obras/home?formato=1"; // API requires a format id; 1 is the main catalog
@@ -209,7 +209,7 @@ export function tagNames(v: unknown): string[] {
   return v.map((t) => (typeof t === "string" ? t : isRow(t) ? text(t["nome"] ?? t["tag_nome"] ?? t["name"]) : null)).filter((x): x is string => Boolean(x));
 }
 
-const MEDIA = "https://back2.mediocrescan.com/media/obras";
+const MEDIA = "https://cdn.mediocrescan.com/obras";
 /** List endpoints use short keys (id, nome, imagem as bare file name); detail uses obr_*. */
 export function pick(row: Row, ...keys: string[]): unknown {
   for (const k of keys) if (row[k] !== undefined && row[k] !== null && row[k] !== "") return row[k];
@@ -221,5 +221,5 @@ export function workImage(row: Row, kind: "capa" | "banner" = "capa"): string | 
   if (!v) return null;
   if (/^https:\/\//.test(v)) return v;
   if (!id || !/^[\w.-]+$/.test(v)) return null;
-  return `${MEDIA}/${id}/${kind}?f=${encodeURIComponent(v)}`;
+  return `${MEDIA}/${id}/${encodeURIComponent(v)}`;
 }
