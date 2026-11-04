@@ -123,12 +123,13 @@ export async function importMediocreWork(admin: Admin, obraId: number, opts: { k
   return { seriesId: series.id, slug: series.slug, created, added, skipped, remaining: todo.length - batch.length };
 }
 
-/** Finds a single exact-title match in the API's public lists (no search endpoint exists). */
+/** Finds a single exact-title match: name search first, public lists as fallback. */
 export async function findMediocreByTitle(title: string): Promise<number | null> {
   const key = titleKey(title);
   if (!key) return null;
   const ids = new Set<number>();
-  for (const path of ["/obras/home?formato=1", "/obras/atualizadas-recentes", "/obras/atualizadas-recentes-ia"]) {
+  const search = `/obras/buscar?${new URLSearchParams({ string: title.replace(/\s+/g, " ").trim().slice(0, 80) })}`;
+  for (const path of [search, "/obras/home?formato=1", "/obras/atualizadas-recentes", "/obras/atualizadas-recentes-ia"]) {
     const r = await mediocreGet("api", path);
     if (!r.ok) continue;
     for (const row of extractList(r.data) ?? []) {
@@ -136,6 +137,7 @@ export async function findMediocreByTitle(title: string): Promise<number | null>
       const id = row["id"] ?? row["obr_id"];
       if (typeof n === "string" && typeof id === "number" && titleKey(n) === key) ids.add(id);
     }
+    if (path === search && r.ok) break; // the search covers the whole catalog
   }
   return ids.size === 1 ? [...ids][0]! : null;
 }
