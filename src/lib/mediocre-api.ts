@@ -209,7 +209,7 @@ export function tagNames(v: unknown): string[] {
   return v.map((t) => (typeof t === "string" ? t : isRow(t) ? text(t["nome"] ?? t["tag_nome"] ?? t["name"]) : null)).filter((x): x is string => Boolean(x));
 }
 
-const MEDIA = "https://back2.mediocrescan.com/media/obras";
+const MEDIA = "https://api.mediocretoons.net/media/obras";
 /** List endpoints use short keys (id, nome, imagem as bare file name); detail uses obr_*. */
 export function pick(row: Row, ...keys: string[]): unknown {
   for (const k of keys) if (row[k] !== undefined && row[k] !== null && row[k] !== "") return row[k];

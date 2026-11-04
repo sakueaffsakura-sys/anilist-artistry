@@ -1,6 +1,8 @@
 import { chapterContentPath, mediocreErrorFor, mediocrePath, type MediocreRequest, type MediocreResult } from "./mediocre-api";
 
-const API = "https://back2.mediocrescan.com";
+// Primary host first; the old host stays as fallback when the primary is down (530/no answer).
+const API_HOSTS = ["https://api.mediocretoons.net", "https://back2.mediocrescan.com"];
+let apiIdx = 0;
 const CDN = "https://cdn.mediocrescan.com";
 const MAX_BYTES = 8_000_000;
 
@@ -33,7 +35,7 @@ export async function mediocreGet(host: "api" | "cdn", path: string): Promise<Fe
     const started = Date.now();
     let res: Response;
     try {
-      res = await fetch((host === "api" ? API : CDN) + path, {
+      res = await fetch((host === "api" ? API_HOSTS[apiIdx] : CDN) + path, {
         method: "GET",
         redirect: "manual", // workerd does not support "error"; 3xx is treated as failure
         signal: AbortSignal.timeout(15_000),
@@ -45,9 +47,12 @@ export async function mediocreGet(host: "api" | "cdn", path: string): Promise<Fe
       });
     } catch {
       console.log(`[mediocre] ${host} falha de conexão ${Date.now() - started}ms`);
+      if (host === "api" && attempt < API_HOSTS.length - 1) { apiIdx = (apiIdx + 1) % API_HOSTS.length; continue; }
       return { ok: false, status: 0, error: mediocreErrorFor(0) };
     }
     console.log(`[mediocre] ${host} ${res.status} ${Date.now() - started}ms`);
+    if (host === "api" && res.status >= 520 && res.status <= 530 && attempt < API_HOSTS.length - 1) { apiIdx = (apiIdx + 1) % API_HOSTS.length; continue; }
+    if (res.status >= 520 && res.status <= 530) return { ok: false, status: res.status, error: { code: "HOST_DOWN", message: "O servidor da MediocreScan está fora do ar ou mudou de endereço." } };
     if (res.status === 429 && attempt < 2) {
       const wait = Math.min(Number(res.headers.get("retry-after")) * 1000 || 1500 * (attempt + 1), 5000);
       await sleep(wait + Math.random() * 300);
