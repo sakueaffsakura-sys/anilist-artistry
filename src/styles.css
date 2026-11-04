@@ -520,7 +520,7 @@ body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-even
 [data-slot="button"]::after { content: ""; position: absolute; inset: 0; pointer-events: none; transform: translateX(-120%); background: linear-gradient(110deg, transparent 30%, color-mix(in oklab, var(--foreground) 18%, transparent) 50%, transparent 70%); }
 [data-slot="button"]:hover::after { transition: transform .6s; transform: translateX(120%); }
 /* esqueletos */
-.site-content [class*="animate-pulse"], .hero-model [class*="animate-pulse"] { animation: site-shimmer 1.4s linear infinite; background-image: linear-gradient(90deg, var(--surface-2), color-mix(in oklab, var(--surface-2) 70%, var(--foreground)), var(--surface-2)); background-size: 200% 100%; }
+.site-content [class*="animate-pulse"], .hero-model [class*="animate-pulse"] { animation: site-shimmer 1.4s linear infinite; background-image: linear-gradient(90deg, var(--surface-2), color-mix(in oklab, var(--surface-2) 90%, var(--foreground)), var(--surface-2)); background-size: 200% 100%; }
 @keyframes site-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 /* filtros em pílulas e abas */
 .site-content [role="tab"] { transition: background .2s, color .2s, transform .15s; }
