@@ -705,6 +705,8 @@ export type Database = {
           bypass_header: string | null
           id: number
           refresh_token: string | null
+          relay_secret: string | null
+          relay_url: string | null
           token: string | null
           updated_at: string
         }
@@ -713,6 +715,8 @@ export type Database = {
           bypass_header?: string | null
           id?: number
           refresh_token?: string | null
+          relay_secret?: string | null
+          relay_url?: string | null
           token?: string | null
           updated_at?: string
         }
@@ -721,6 +725,8 @@ export type Database = {
           bypass_header?: string | null
           id?: number
           refresh_token?: string | null
+          relay_secret?: string | null
+          relay_url?: string | null
           token?: string | null
           updated_at?: string
         }

@@ -1,0 +1,1 @@
+ALTER TABLE public.mediocre_settings ADD COLUMN IF NOT EXISTS relay_url text, ADD COLUMN IF NOT EXISTS relay_secret text;
