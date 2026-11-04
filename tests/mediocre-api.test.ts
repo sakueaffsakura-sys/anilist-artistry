@@ -61,13 +61,13 @@ it("classifies 'IP bloqueado' as an IP block", () => {
   expect(isIpBlockedBody('{"message":"Token inválido."}')).toBe(false);
 });
 
-import { parseMediocreRequest as parseReq, mediocrePath as pathOf } from "../src/lib/mediocre-api";
-test("busca por nome usa o parâmetro string e limita o texto", () => {
+const parseReq = parseMediocreRequest, pathOf = mediocrePath;
+it("busca por nome usa o parâmetro string e limita o texto", () => {
   expect(pathOf(parseReq({ operation: "buscar", busca: "  Pico   Martial " }))).toBe("/obras/buscar?string=Pico+Martial");
   expect(() => parseReq({ operation: "buscar", busca: "a" })).toThrow();
   expect(() => parseReq({ operation: "buscar", busca: "x".repeat(81) })).toThrow();
 });
-test("adicionadas recentes paginam de 20 em 20", () => {
+it("adicionadas recentes paginam de 20 em 20", () => {
   expect(pathOf(parseReq({ operation: "adicionados", pagina: 3 }))).toBe("/obras/adicionados-recentes?offset=40");
   expect(pathOf(parseReq({ operation: "ranking" }))).toBe("/obras/ranking");
 });
