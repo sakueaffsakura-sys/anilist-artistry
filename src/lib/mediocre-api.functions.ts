@@ -36,8 +36,8 @@ export const getMediocreTokenStatus = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await supabaseAdmin.from("mediocre_settings").select("token, refresh_token, updated_at, bypass_header, blocked_until").eq("id", 1).maybeSingle();
-    return { hasToken: !!data?.token, hasRefresh: !!data?.refresh_token, hasBypass: !!data?.bypass_header, blockedUntil: data?.blocked_until ?? null, updatedAt: data?.updated_at ?? null };
+    const { data } = await supabaseAdmin.from("mediocre_settings").select("token, refresh_token, updated_at, bypass_header, blocked_until, relay_url, relay_secret").eq("id", 1).maybeSingle();
+    return { relayUrl: data?.relay_url ?? null, hasRelaySecret: !!data?.relay_secret, hasToken: !!data?.token, hasRefresh: !!data?.refresh_token, hasBypass: !!data?.bypass_header, blockedUntil: data?.blocked_until ?? null, updatedAt: data?.updated_at ?? null };
   });
 
 export const saveMediocreToken = createServerFn({ method: "POST" })
@@ -95,4 +95,24 @@ export const testMediocreConnection = createServerFn({ method: "POST" })
       return { ok: true, message: "Conexão OK: token e acesso funcionando." };
     }
     return { ok: false, message: r.error.message };
+  });
+
+/** Saves (or clears) the cPanel relay address and its shared key; the key is never returned. */
+export const saveMediocreRelay = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { url: string; secret?: string }) => {
+    const url = typeof input?.url === "string" ? input.url.trim() : "";
+    if (url && !/^https:\/\/[A-Za-z0-9.-]+(:\d{2,5})?\/[A-Za-z0-9._~\/-]*\.php$/.test(url)) throw new Error("Endereço inválido: use https://seusite.com/pasta/mediocre-ponte.php");
+    const secret = typeof input?.secret === "string" ? input.secret.trim() : "";
+    if (secret && !/^[A-Za-z0-9]{32,128}$/.test(secret)) throw new Error("Senha da ponte inválida (32+ letras/números).");
+    return { url, secret };
+  })
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const patch: { relay_url: string | null; relay_secret?: string | null; blocked_until: null } = { relay_url: data.url || null, blocked_until: null };
+    if (data.secret || !data.url) patch.relay_secret = data.secret || null;
+    const { error } = await supabaseAdmin.from("mediocre_settings").update(patch).eq("id", 1);
+    if (error) throw new Error("Não foi possível salvar.");
+    return { ok: true };
   });
