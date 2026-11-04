@@ -26,6 +26,9 @@ const TABS = [
   { id: "home", label: "Início" },
   { id: "recentes", label: "Atualizadas recentemente" },
   { id: "recentes_ia", label: "Atualizadas com IA" },
+  { id: "buscar", label: "Buscar por nome" },
+  { id: "adicionados", label: "Adicionadas recentes" },
+  { id: "ranking", label: "Ranking" },
   { id: "capitulos_usuario", label: "Capítulos do usuário" },
   { id: "obra", label: "Consultar obra por ID" },
 ] as const;
@@ -40,14 +43,19 @@ function MediocrePanel() {
   const call = useServerFn(queryMediocreApi);
   const [formato, setFormato] = useState<number | null>(null);
   const [pagina, setPagina] = useState(1);
+  const [buscaInput, setBuscaInput] = useState("");
+  const [busca, setBusca] = useState("");
+  const [addPagina, setAddPagina] = useState(1);
   const req: MediocreRequest = tab === "obra" || tab === "capitulos_usuario" ? { operation: tab, obraId }
     : tab === "recentes" ? { operation: tab, ...(formato ? { formato } : {}), pagina }
+    : tab === "buscar" ? { operation: tab, busca }
+    : tab === "adicionados" ? { operation: tab, pagina: addPagina }
     : { operation: tab };
 
   // In-memory cache (5 min) keyed by operation; TanStack Query dedupes concurrent calls.
   const q = useQuery({
-    queryKey: ["mediocre-api", req.operation, req.obraId ?? null, req.formato ?? null, req.pagina ?? null],
-    enabled: isAdmin,
+    queryKey: ["mediocre-api", req.operation, req.obraId ?? null, req.formato ?? null, req.pagina ?? null, req.busca ?? null],
+    enabled: isAdmin && (tab !== "buscar" || busca.length >= 2),
     staleTime: 5 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
@@ -88,6 +96,22 @@ function MediocrePanel() {
           </form>
         )}
 
+        {tab === "buscar" && (
+          <form onSubmit={(e) => { e.preventDefault(); const v = buscaInput.replace(/\s+/g, " ").trim(); if (v.length >= 2) setBusca(v.slice(0, 80)); }} className="flex max-w-md gap-2">
+            <Input value={buscaInput} maxLength={80} placeholder="Nome da obra" onChange={(e) => setBuscaInput(e.target.value)} aria-label="Nome da obra" />
+            <Button type="submit" disabled={q.isFetching || buscaInput.trim().length < 2}><Search className="mr-1 h-4 w-4" />Buscar</Button>
+          </form>
+        )}
+        {tab === "buscar" && !busca && <p className="text-sm text-muted-foreground">Digite pelo menos 2 letras do nome e clique em Buscar.</p>}
+
+        {tab === "adicionados" && isAdmin && (
+          <div className="flex items-center gap-2 text-sm">
+            <Button size="sm" variant="outline" disabled={q.isFetching || addPagina <= 1} onClick={() => setAddPagina(addPagina - 1)}>Anterior</Button>
+            <span>Página {addPagina}</span>
+            <Button size="sm" variant="outline" disabled={q.isFetching || addPagina >= 1000} onClick={() => setAddPagina(addPagina + 1)}>Próxima</Button>
+          </div>
+        )}
+
         {tab === "recentes" && isAdmin && (
           <PageControls formato={formato} pagina={pagina} busy={q.isFetching}
             pagination={q.data?.ok ? extractPagination(JSON.parse(q.data.json)) : null}
@@ -98,6 +122,7 @@ function MediocrePanel() {
           : q.isLoading ? <LoadingState />
           : q.error ? <ErrorState message="Não foi possível conectar à API." />
           : q.data && q.data.ok === false ? <ErrorState message={q.data.error.message} />
+          : tab === "buscar" && !busca ? null
           : q.data?.ok ? <Result tab={tab} data={JSON.parse(q.data.json) as unknown} fileName={mediocreFileName(req)} /> : null}
       </div>
     </AdminShell>

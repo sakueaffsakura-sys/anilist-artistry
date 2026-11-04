@@ -1,10 +1,10 @@
 // Browser-safe helpers for the MediocreScan consultation panel and public showcase.
 // The token never appears here: only operation names, validation and display adapters.
 
-export const MEDIOCRE_OPERATIONS = ["home", "recentes_ia", "recentes", "obra", "capitulo", "conteudo_capitulo", "thumbs_capitulos", "capitulos_usuario"] as const;
+export const MEDIOCRE_OPERATIONS = ["home", "recentes_ia", "recentes", "obra", "capitulo", "conteudo_capitulo", "thumbs_capitulos", "capitulos_usuario", "buscar", "adicionados", "ranking"] as const;
 export type MediocreOperation = (typeof MEDIOCRE_OPERATIONS)[number];
 /** Operations visitors may call; personal endpoints stay admin-only. */
-export const PUBLIC_OPERATIONS: readonly MediocreOperation[] = ["home", "recentes_ia", "recentes", "obra", "capitulo", "conteudo_capitulo", "thumbs_capitulos"];
+export const PUBLIC_OPERATIONS: readonly MediocreOperation[] = ["home", "recentes_ia", "recentes", "obra", "capitulo", "conteudo_capitulo", "thumbs_capitulos", "buscar", "adicionados", "ranking"];
 
 export const MEDIOCRE_USER_ID = 156358;
 
@@ -15,9 +15,12 @@ export interface MediocreRequest {
   /** Only for "recentes": API format filter and 1-based page (30 per page, sent as offset). */
   formato?: number;
   pagina?: number;
+  /** Only for "buscar": name search (max 80 chars). */
+  busca?: string;
 }
 
 export const RECENTES_PAGE_SIZE = 30;
+export const ADICIONADOS_PAGE_SIZE = 20;
 
 export type MediocreResult =
   | { ok: true; status: number; json: string }
@@ -32,7 +35,7 @@ function positiveId(value: unknown, label: string): number {
 /** Validates the body sent by the browser; rejects anything outside the allowlist. */
 export function parseMediocreRequest(input: unknown): MediocreRequest {
   if (!input || typeof input !== "object") throw new Error("Requisição inválida.");
-  const { operation, obraId, capituloId, formato, pagina } = input as Record<string, unknown>;
+  const { operation, obraId, capituloId, formato, pagina, busca } = input as Record<string, unknown>;
   if (typeof operation !== "string" || !(MEDIOCRE_OPERATIONS as readonly string[]).includes(operation)) {
     throw new Error("Operação não permitida.");
   }
@@ -43,6 +46,18 @@ export function parseMediocreRequest(input: unknown): MediocreRequest {
   if (op === "recentes") {
     const out: MediocreRequest = { operation: op };
     if (formato !== undefined && formato !== null) { const f = positiveId(formato, "Formato"); if (f > 50) throw new Error("Formato inválido."); out.formato = f; }
+    if (pagina !== undefined && pagina !== null) { const pg = positiveId(pagina, "Página"); if (pg > 1000) throw new Error("Página inválida."); out.pagina = pg; }
+    return out;
+  }
+  if (op === "buscar") {
+    const q = typeof busca === "string" ? busca.replace(/\s+/g, " ").trim() : "";
+    if (q.length < 2 || q.length > 80) throw new Error("Digite de 2 a 80 caracteres para buscar.");
+    const out: MediocreRequest = { operation: op, busca: q };
+    if (pagina !== undefined && pagina !== null) { const pg = positiveId(pagina, "Página"); if (pg > 1000) throw new Error("Página inválida."); out.pagina = pg; }
+    return out;
+  }
+  if (op === "adicionados") {
+    const out: MediocreRequest = { operation: op };
     if (pagina !== undefined && pagina !== null) { const pg = positiveId(pagina, "Página"); if (pg > 1000) throw new Error("Página inválida."); out.pagina = pg; }
     return out;
   }
@@ -73,6 +88,13 @@ export function mediocrePath(req: MediocreRequest): string {
     case "obra": return `/obras/${req.obraId}`;
     case "capitulo": case "conteudo_capitulo": return `/capitulos/${req.capituloId}`;
     case "thumbs_capitulos": return `/obras/${req.obraId}/thumbs-capitulos.json`; // served by the CDN host
+    case "buscar": {
+      const qs = new URLSearchParams({ string: req.busca ?? "" });
+      if (req.pagina && req.pagina > 1) qs.set("pagina", String(req.pagina));
+      return `/obras/buscar?${qs}`;
+    }
+    case "adicionados": return "/obras/adicionados-recentes" + (req.pagina && req.pagina > 1 ? `?offset=${(req.pagina - 1) * ADICIONADOS_PAGE_SIZE}` : "");
+    case "ranking": return "/obras/ranking";
     case "capitulos_usuario": return `/readings/user/${MEDIOCRE_USER_ID}/chapters?obr_id=${req.obraId}`;
   }
 }
@@ -108,6 +130,9 @@ export function mediocreFileName(req: MediocreRequest): string {
     case "capitulo": return `capitulo-${req.capituloId}.json`;
     case "conteudo_capitulo": return `conteudo-capitulo-${req.capituloId}.json`;
     case "thumbs_capitulos": return `thumbs-capitulos-${req.obraId}.json`;
+    case "buscar": return "obras-busca.json";
+    case "adicionados": return "obras-adicionadas.json";
+    case "ranking": return "obras-ranking.json";
     case "capitulos_usuario": return `capitulos-usuario-${MEDIOCRE_USER_ID}-obra-${req.obraId}.json`;
   }
 }
