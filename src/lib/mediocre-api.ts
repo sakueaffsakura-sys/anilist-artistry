@@ -221,5 +221,5 @@ export function workImage(row: Row, kind: "capa" | "banner" = "capa"): string | 
   if (!v) return null;
   if (/^https:\/\//.test(v)) return v;
   if (!id || !/^[\w.-]+$/.test(v)) return null;
-  return `${MEDIA}/${id}/${kind}?f=${encodeURIComponent(v)}`;
+  return `${MEDIA}/${id}/${encodeURIComponent(v)}`;
 }
