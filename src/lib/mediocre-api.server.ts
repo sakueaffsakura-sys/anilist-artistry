@@ -26,16 +26,21 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** GET a fixed-host path with the server-only token. Never logs or returns the token. */
 export async function mediocreGet(host: "api" | "cdn", path: string): Promise<Fetched> {
-  const { token, bypass, blockedUntil } = await mediocreAuth();
+  const { token, bypass, blockedUntil, relayUrl, relaySecret } = await mediocreAuth();
   if (blockedUntil && new Date(blockedUntil).getTime() > Date.now()) return { ok: false, status: 403, error: { code: "IP_BLOCKED", message: blockedMsg(blockedUntil) } };
   if (!token) return { ok: false, status: 500, error: { code: "MISSING_TOKEN", message: "O token da API ainda não foi configurado." } };
   if (!path.startsWith("/") || path.includes("..") || path.includes("//")) return { ok: false, status: 400, error: mediocreErrorFor(400) };
+  let relayFailed = false;
   for (let attempt = 0; ; attempt++) {
     if (host === "api") await apiSlot();
     const started = Date.now();
     let res: Response;
     try {
-      res = await fetch((host === "api" ? API_HOSTS[apiIdx] : CDN) + path, {
+      const useRelay = Boolean(relayUrl && relaySecret) && !relayFailed;
+      const target = useRelay
+        ? `${relayUrl}?${new URLSearchParams({ host: host === "api" ? (apiIdx === 0 ? "api" : "api2") : "cdn", path })}`
+        : (host === "api" ? API_HOSTS[apiIdx] : CDN) + path;
+      res = await fetch(target, {
         method: "GET",
         redirect: "manual", // workerd does not support "error"; 3xx is treated as failure
         signal: AbortSignal.timeout(15_000),
@@ -43,9 +48,15 @@ export async function mediocreGet(host: "api" | "cdn", path: string): Promise<Fe
           Accept: "application/json", "User-Agent": "Mozilla/5.0",
           ...(host === "api" ? { Authorization: `Bearer ${token}` } : {}),
           ...(bypass ? { "X-BetterManga-Key": bypass } : {}),
+          ...(useRelay ? { "X-Relay-Key": relaySecret!, ...(host === "api" ? { "X-Mediocre-Auth": `Bearer ${token}` } : {}) } : {}),
         },
       });
+      if (useRelay && (res.status === 401 && res.headers.get("x-relay") === "denied" || res.status === 502 && res.headers.get("x-relay") === "error")) {
+        console.log(`[mediocre] ponte recusou/falhou ${res.status}; tentando direto`);
+        relayFailed = true; continue;
+      }
     } catch {
+      if (relayUrl && relaySecret && !relayFailed) { console.log("[mediocre] ponte sem resposta; tentando direto"); relayFailed = true; continue; }
       console.log(`[mediocre] ${host} falha de conexão ${Date.now() - started}ms`);
       if (host === "api" && attempt < API_HOSTS.length - 1) { apiIdx = (apiIdx + 1) % API_HOSTS.length; continue; }
       return { ok: false, status: 0, error: mediocreErrorFor(0) };
@@ -91,11 +102,11 @@ async function admin() {
 }
 
 /** Token saved in the panel wins; the env secret is the fallback. */
-async function mediocreAuth(): Promise<{ token: string | undefined; bypass: string | null; blockedUntil: string | null }> {
+async function mediocreAuth(): Promise<{ token: string | undefined; bypass: string | null; blockedUntil: string | null; relayUrl: string | null; relaySecret: string | null }> {
   try {
-    const { data } = await (await admin()).from("mediocre_settings").select("token, bypass_header, blocked_until").eq("id", 1).maybeSingle();
-    return { token: data?.token || process.env["MEDIOCRE_API_TOKEN"], bypass: data?.bypass_header ?? null, blockedUntil: data?.blocked_until ?? null };
-  } catch { return { token: process.env["MEDIOCRE_API_TOKEN"], bypass: null, blockedUntil: null }; }
+    const { data } = await (await admin()).from("mediocre_settings").select("token, bypass_header, blocked_until, relay_url, relay_secret").eq("id", 1).maybeSingle();
+    return { token: data?.token || process.env["MEDIOCRE_API_TOKEN"], bypass: data?.bypass_header ?? null, blockedUntil: data?.blocked_until ?? null, relayUrl: data?.relay_url ?? null, relaySecret: data?.relay_secret ?? null };
+  } catch { return { token: process.env["MEDIOCRE_API_TOKEN"], bypass: null, blockedUntil: null, relayUrl: null, relaySecret: null }; }
 }
 
 async function cacheWrite(key: string, payload: string) {
