@@ -11,7 +11,7 @@ import { AdminShell } from "@/components/AdminShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRoles, useSession } from "@/hooks/useAuth";
-import { getMediocreTokenStatus, queryMediocreApi, saveMediocreBypass, saveMediocreToken, testMediocreConnection } from "@/lib/mediocre-api.functions";
+import { getMediocreTokenStatus, queryMediocreApi, saveMediocreBypass, saveMediocreToken, saveMediocreRelay, testMediocreConnection } from "@/lib/mediocre-api.functions";
 import { extractList, extractPagination, extractWork, mediocreFileName, type MediocreRequest } from "@/lib/mediocre-api";
 import { MediocreQueue, QUEUE_KEY } from "@/components/mediocre/MediocreQueue";
 import { ChapterList, EmptyState, ErrorState, JsonViewer, LoadingState, WorkDetails, WorkGrid } from "@/components/mediocre/MediocreViews";
@@ -302,6 +302,7 @@ function TokenSettings() {
         <Button type="submit" disabled={!token || m.isPending} className="w-fit">{m.isPending ? "Salvando…" : "Salvar token"}</Button>
       </form>
       <BypassAndTest hasBypass={!!s.data?.hasBypass} onSaved={() => void s.refetch()} />
+      <RelaySettings relayUrl={s.data?.relayUrl ?? null} hasSecret={!!s.data?.hasRelaySecret} onSaved={() => void s.refetch()} />
     </details>
   );
 }
@@ -349,6 +350,49 @@ function BypassAndTest({ hasBypass, onSaved }: { hasBypass: boolean; onSaved: ()
         <Button type="submit" variant="outline" disabled={b.isPending}>{b.isPending ? "Salvando…" : "Salvar chave"}</Button>
         <Button type="button" onClick={() => t.mutate()} disabled={t.isPending}>{t.isPending ? "Testando…" : "Testar conexão"}</Button>
       </form>
+    </div>
+  );
+}
+
+/** Ponte no cPanel: os pedidos saem de outro servidor quando a MediocreScan bloqueia o do site. */
+function RelaySettings({ relayUrl, hasSecret, onSaved }: { relayUrl: string | null; hasSecret: boolean; onSaved: () => void }) {
+  const save = useServerFn(saveMediocreRelay);
+  const test = useServerFn(testMediocreConnection);
+  const [url, setUrl] = useState(relayUrl ?? "");
+  const [secret, setSecret] = useState("");
+  const gen = () => {
+    const bytes = crypto.getRandomValues(new Uint8Array(24));
+    setSecret(Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join(""));
+  };
+  const m = useMutation({
+    mutationFn: () => save({ data: { url, secret } }),
+    onSuccess: () => { setSecret(""); onSaved(); toast.success(url ? "Ponte salva." : "Ponte removida."); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Erro ao salvar."),
+  });
+  const t = useMutation({
+    mutationFn: () => test(),
+    onSuccess: (r) => (r.ok ? toast.success(r.message) : toast.error(r.message)),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Falha no teste."),
+  });
+  return (
+    <div className="mt-4 grid gap-2 border-t border-border pt-3">
+      <p className="text-sm font-semibold">Ponte pelo cPanel {relayUrl ? (hasSecret ? "· ativa" : "· falta a senha") : "· desligada"}</p>
+      <ol className="list-decimal space-y-1 pl-5 text-xs text-muted-foreground">
+        <li><a className="text-primary underline" href="/downloads/mediocre-ponte.php" download>Baixe o arquivo da ponte</a> e envie pelo Gerenciador de Arquivos do cPanel (ex.: pasta public_html).</li>
+        <li>Clique em "Gerar senha", copie e cole no topo do arquivo, no lugar de COLE_A_SENHA_AQUI.</li>
+        <li>Cole aqui o endereço do arquivo (ex.: https://seusite.com/mediocre-ponte.php), salve e clique em "Testar ponte".</li>
+      </ol>
+      <Input placeholder="https://seusite.com/mediocre-ponte.php" value={url} onChange={(e) => setUrl(e.target.value)} aria-label="Endereço da ponte" />
+      <div className="flex flex-wrap gap-2">
+        <Input readOnly={false} autoComplete="off" placeholder={hasSecret ? "Senha salva (gere outra para trocar)" : "Senha da ponte"} value={secret} onChange={(e) => setSecret(e.target.value)} className="min-w-0 flex-1" aria-label="Senha da ponte" />
+        <Button type="button" variant="outline" size="sm" onClick={gen}>Gerar senha</Button>
+        {secret && <Button type="button" variant="outline" size="sm" onClick={() => { void navigator.clipboard.writeText(secret); toast.success("Senha copiada."); }}>Copiar</Button>}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" disabled={m.isPending || (!!url && !hasSecret && !secret)} onClick={() => m.mutate()}>{m.isPending ? "Salvando…" : "Salvar ponte"}</Button>
+        <Button type="button" size="sm" variant="outline" disabled={t.isPending || !relayUrl} onClick={() => t.mutate()}>{t.isPending ? "Testando…" : "Testar ponte"}</Button>
+      </div>
+      <p className="text-xs text-muted-foreground">A senha só aparece agora; depois de salva fica guardada no servidor. Se a ponte falhar, o site tenta o caminho direto.</p>
     </div>
   );
 }
