@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { useRoles, useSession } from "@/hooks/useAuth";
 import { getMediocreTokenStatus, queryMediocreApi, saveMediocreBypass, saveMediocreToken, saveMediocreRelay, testMediocreConnection } from "@/lib/mediocre-api.functions";
 import { extractList, extractPagination, extractWork, mediocreFileName, type MediocreRequest } from "@/lib/mediocre-api";
+import { DeviceIngest } from "@/components/mediocre/DeviceIngest";
 import { MediocreQueue, QUEUE_KEY } from "@/components/mediocre/MediocreQueue";
 import { ChapterList, EmptyState, ErrorState, JsonViewer, LoadingState, WorkDetails, WorkGrid } from "@/components/mediocre/MediocreViews";
 
@@ -81,6 +82,7 @@ function MediocrePanel() {
         {isAdmin && <BlockBanner />}
         {isAdmin && <TokenSettings />}
         {isAdmin && <SyncButton />}
+        {isAdmin && <DeviceIngest />}
         {isAdmin && <MediocreQueue />}
 
         <nav className="flex gap-2 overflow-x-auto pb-1" aria-label="Consultas">
