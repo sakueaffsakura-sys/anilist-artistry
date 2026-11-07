@@ -47,6 +47,9 @@ export async function importChapter(admin: Admin, seriesId: string, capId: numbe
   const m = meta.data as Row;
   const num = Number(m["cap_num"]);
   if (!Number.isFinite(num) || num < 0) return false;
+  // Capítulo com esse número já está no site: não busca o conteúdo de novo nem conta como falha.
+  const { data: already } = await admin.from("chapters").select("id").eq("series_id", seriesId).eq("number", num).maybeSingle();
+  if (already) return true;
   const title = typeof m["cap_nome"] === "string" && m["cap_nome"] !== String(num) ? m["cap_nome"] : null;
   const text = typeof m["cap_conteudo_texto"] === "string" && m["cap_conteudo_texto"].trim() ? m["cap_conteudo_texto"] : null;
   let pages: string[] = [];
@@ -68,7 +71,8 @@ export async function importChapter(admin: Admin, seriesId: string, capId: numbe
     pages: isNovel && content ? [] : pages,
     content: isNovel || !pages.length ? content : null,
   });
-  return !error;
+  // 23505 = outro envio salvou o mesmo número ao mesmo tempo; o capítulo está no site.
+  return !error || error.code === "23505";
 }
 
 /** Imports (or continues importing) a MediocreScan work into the catalog. */

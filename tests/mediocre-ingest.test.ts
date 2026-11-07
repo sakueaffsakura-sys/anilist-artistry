@@ -38,6 +38,8 @@ describe("ingest", () => {
     expect(() => parseIngestBody({ action: "site_work", seriesId: "1" })).toThrow();
     expect(() => parseIngestBody({ action: "site_delete", seriesId: id, confirm: "sim" })).toThrow();
     expect(parseIngestBody({ action: "chapter_update", chapterId: id, published: true })).toEqual({ action: "chapter_update", chapterId: id, published: true });
+    expect(parseIngestBody({ action: "chapter_status", obraId: 12 })).toEqual({ action: "chapter_status", obraId: 12 });
+    expect(() => parseIngestBody({ action: "chapter_status", obraId: 0 })).toThrow();
   });
   test("getter only serves supplied data", async () => {
     const g = suppliedGetter({ "/obras/1": { a: 1 } }, null);

@@ -27,6 +27,7 @@ export type IngestBody =
   | { action: "work"; obraId: number; work: unknown; publish: boolean }
   | { action: "chapters"; obraId: number; chapters: { capId: number; meta: unknown; content: unknown }[] }
   | { action: "finish"; obraId: number; added: number; remaining: number }
+  | { action: "chapter_status"; obraId: number }
   | { action: "site_list"; filter: SiteFilter; q: string; page: number; obraId: number | null }
   | { action: "site_work"; seriesId: string }
   | { action: "site_update"; seriesId: string; patch: SitePatch }
@@ -66,6 +67,7 @@ export function parseIngestBody(v: unknown): IngestBody {
     return { action: "site_list", filter, q, page, obraId };
   }
   if (o.action === "site_work") return { action: "site_work", seriesId: uuid(o.seriesId, "Obra") };
+  if (o.action === "chapter_status") return { action: "chapter_status", obraId: workId(o.obraId) };
   if (o.action === "site_update") {
     const p = (o.patch && typeof o.patch === "object" ? o.patch : {}) as Record<string, unknown>;
     const patch: SitePatch = {};
@@ -212,7 +214,16 @@ async function siteWork(admin: Admin, seriesId: string) {
   return { work: withCount(s as SiteRow), chapters: ch ?? [] };
 }
 
+/** Números dos capítulos que a obra da MediocreScan já tem no site (para o app marcar e não reenviar). */
+async function chapterStatus(admin: Admin, obraId: number) {
+  const { data: s } = await admin.from("series").select("id, slug, published").eq("source_mediocre_id", obraId).maybeSingle();
+  if (!s) return { seriesId: null, slug: null, published: false, numbers: [] as number[] };
+  const { data: ch } = await admin.from("chapters").select("number").eq("series_id", s.id).limit(5000);
+  return { seriesId: s.id, slug: s.slug, published: s.published, numbers: (ch ?? []).map((c) => Number(c.number)) };
+}
+
 export async function runIngest(admin: Admin, body: IngestBody, createdBy: string) {
+  if (body.action === "chapter_status") return { ...(await chapterStatus(admin, body.obraId)), added: 0, skipped: 0 };
   if (body.action === "site_list") return { ...(await siteList(admin, body)), added: 0, skipped: 0 };
   if (body.action === "site_work") return { ...(await siteWork(admin, body.seriesId)), added: 0, skipped: 0 };
   if (body.action === "site_update") {
