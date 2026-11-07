@@ -209,7 +209,7 @@ async function discover() {
   const fresh = [];
   for (let i = 0; i < ids.length; i += 100) {
     const r = await send({ action: "check", ids: ids.slice(i, i + 100) });
-    const known = new Set([...(r.imported || []), ...(r.queued || [])]);
+    const known = new Set([...(r.imported || []), ...(r.queued || []), ...(r.failed || [])]);
     fresh.push(...ids.slice(i, i + 100).filter((id) => !known.has(id)));
   }
   const items = fresh.slice(0, 50).map((obraId) => ({ obraId, title: found.get(obraId) }));

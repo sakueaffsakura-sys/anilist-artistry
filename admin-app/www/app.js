@@ -197,8 +197,7 @@
       let works = [], pageable = false;
       if (tab === "fila") {
         const p = await engine.plan(); lastRaw = p;
-        const titles = new Map((p.items || []).map((i) => [i.id, i.title]));
-        works = (p.queue || []).map((id) => ({ id, title: titles.get(id) || `Obra ${id}`, cover: null }));
+        return renderQueue(p.items || []);
       } else if (tab === "inicio" && chip.inicio === "listas") {
         const r = await engine.lists(); lastRaw = r.raw; return renderGroups(r.lists);
       } else if (tab === "inicio" && chip.inicio === "leitura") {
@@ -239,6 +238,42 @@
     rows = lists.flatMap((l) => l.works);
     refreshMarks(rows.map((w) => w.id)).then(updateSendAll);
   }
+  /** Fila do site: capa, capítulos já no site e botão para tirar da fila (ex.: obra já finalizada). */
+  function renderQueue(items) {
+    loading = false;
+    rows = items.map((i) => ({ id: i.id, title: i.title || `Obra ${i.id}`, cover: i.cover }));
+    items.forEach((i) => marks.queued.add(i.id));
+    if (!items.length) { $("list-meta").textContent = ""; empty("A fila do site está vazia."); updateSendAll(); return; }
+    $("list-meta").textContent = `${items.length} obra(s) na fila. Tire da fila as que você já finalizou.`;
+    const clear = el("button", { type: "button", className: "btn ghost small", textContent: "Esvaziar a fila" });
+    clear.onclick = async () => {
+      if (engine.running) { toast("Pare o envio antes de mexer na fila."); return; }
+      if (!confirm(`Tirar as ${items.length} obras da fila? Elas e os capítulos já publicados continuam no site.`)) return;
+      try { const r = await engine.queueClear(); items.forEach((i) => marks.queued.delete(i.id)); toast(`${r.removed} obra(s) tiradas da fila.`); checkQueueDot(); openTab("fila"); }
+      catch (e) { toast(e.message); }
+    };
+    const ul = el("ul", { className: "site-rows" });
+    items.forEach((i) => {
+      const status = i.status === "running" ? "Em andamento" : "Esperando";
+      const info = el("div", { className: "min0" },
+        el("p", { className: "t", textContent: i.title || `Obra ${i.id}` }),
+        el("p", { className: "s", textContent: `${i.chapters_on_site} capítulo(s) no site · ${status}` }),
+        el("div", {}, el("span", { className: `pill ${i.status === "running" ? "hot" : ""}`, textContent: "Fila" })));
+      const open = el("button", { type: "button", className: "site-row queue-open" }, i.cover ? el("img", { src: i.cover, alt: "", loading: "lazy" }) : el("div", { className: "ph" }), info);
+      open.onclick = () => go(`#/obra/${i.id}`);
+      const remove = el("button", { type: "button", className: "chip-btn del", textContent: "Tirar da fila" });
+      remove.onclick = async () => {
+        if (engine.running) { toast("Pare o envio antes de mexer na fila."); return; }
+        remove.disabled = true;
+        try { await engine.queueRemove([i.id]); marks.queued.delete(i.id); toast(`"${i.title || i.id}" saiu da fila.`); checkQueueDot(); openTab("fila"); }
+        catch (e) { toast(e.message); remove.disabled = false; }
+      };
+      ul.append(el("li", { className: "queue-item" }, open, remove));
+    });
+    $("groups").append(el("div", { className: "queue-tools" }, clear), ul);
+    updateSendAll();
+  }
+
   function renderReading(chapters) {
     loading = false; $("list-meta").textContent = `${chapters.length} capítulos lidos`;
     if (!chapters.length) { empty("Nenhuma leitura encontrada."); return; }

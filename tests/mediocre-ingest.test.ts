@@ -40,6 +40,9 @@ describe("ingest", () => {
     expect(parseIngestBody({ action: "chapter_update", chapterId: id, published: true })).toEqual({ action: "chapter_update", chapterId: id, published: true });
     expect(parseIngestBody({ action: "chapter_status", obraId: 12 })).toEqual({ action: "chapter_status", obraId: 12 });
     expect(() => parseIngestBody({ action: "chapter_status", obraId: 0 })).toThrow();
+    expect(parseIngestBody({ action: "queue_remove", obraIds: [5, 5, 6] })).toEqual({ action: "queue_remove", obraIds: [5, 6] });
+    expect(() => parseIngestBody({ action: "queue_remove", obraIds: [] })).toThrow();
+    expect(parseIngestBody({ action: "queue_clear" })).toEqual({ action: "queue_clear" });
   });
   test("getter only serves supplied data", async () => {
     const g = suppliedGetter({ "/obras/1": { a: 1 } }, null);
