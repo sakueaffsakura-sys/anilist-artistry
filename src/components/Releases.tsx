@@ -56,10 +56,7 @@ export function Releases({ rows }: { rows: SeriesRow[] }) {
   return (
     <section aria-label="Lançamentos" className="relative min-w-0 max-w-full py-4 md:py-8">
       <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-          <Sparkles className="h-[18px] w-[18px]" />
-        </div>
-        <h2 className="shrink-0 text-lg font-bold">Lançamentos</h2>
+        <h2 className="section-title shrink-0"><Sparkles className="h-[18px] w-[18px]" />Lançamentos</h2>
         <div className="ml-auto hidden items-center gap-2 md:flex">
           <button
             type="button"
@@ -96,7 +93,7 @@ export function Releases({ rows }: { rows: SeriesRow[] }) {
                   params={{ slug: item.slug }}
                   className="group relative flex h-full flex-col gap-2 text-left no-underline"
                 >
-                  <div className="relative aspect-[2/3] overflow-hidden rounded-[1.35rem] border border-foreground/10 bg-card/55 transition-[transform,box-shadow,border-color] duration-300 ease-out group-hover:-translate-y-0.5 group-hover:border-foreground/20 group-hover:shadow-[0_18px_42px_rgba(0,0,0,0.45)] group-hover:will-change-transform">
+                  <div className="relative aspect-[2/3] overflow-hidden rounded-md border border-foreground/10 bg-card/55 transition-[transform,box-shadow,border-color] duration-200 ease-out group-hover:-translate-y-0.5 group-hover:border-foreground group-hover:shadow-[4px_4px_0_var(--primary)]">
                     <img
                       alt={item.title}
                       loading="lazy"

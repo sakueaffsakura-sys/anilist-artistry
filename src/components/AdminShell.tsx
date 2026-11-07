@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -49,13 +49,6 @@ export function AdminShell({
   const routing = useRouterState({ select: (st) => st.status === "pending" });
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => { setNow(new Date()); const t = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(t); }, []);
-  const onPointerMove = (e: RPointerEvent<HTMLDivElement>) => {
-    const el = (e.target as HTMLElement).closest<HTMLElement>(".admin-stat, .admin-work-row, .admin-body section, .admin-hero");
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    el.style.setProperty("--mx", `${e.clientX - r.left}px`);
-    el.style.setProperty("--my", `${e.clientY - r.top}px`);
-  };
   const { isStaff, isAdmin, isLoading } = useRoles(user?.id);
   const queryClient = useQueryClient();
   const claim = useServerFn(claimFirstAdmin);
@@ -93,9 +86,9 @@ export function AdminShell({
   }
 
   const groups = [
-    { label: "Workspace", paths: ["/admin", "/admin/obras", "/admin/novels", "/admin/nova", "/admin/mediocre"] },
-    { label: "Conteúdo & aparência", paths: ["/admin/home", "/admin/generos", "/admin/imagens", "/admin/molduras", "/admin/selos"] },
-    { label: "Comunidade & sistema", paths: ["/admin/contas", "/admin/pedidos", "/admin/suporte", "/admin/app", "/admin/manutencao"] },
+    { label: "Publicação", paths: ["/admin", "/admin/obras", "/admin/novels", "/admin/nova", "/admin/mediocre"] },
+    { label: "Aparência do site", paths: ["/admin/home", "/admin/generos", "/admin/imagens", "/admin/molduras", "/admin/selos"] },
+    { label: "Comunidade e sistema", paths: ["/admin/contas", "/admin/pedidos", "/admin/suporte", "/admin/app", "/admin/manutencao"] },
   ];
   const visible = NAV.filter((n) => !("adminOnly" in n) || isAdmin);
   const current = [...NAV].sort((a, b) => b.to.length - a.to.length).find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to))) ?? NAV[0];
@@ -110,11 +103,10 @@ export function AdminShell({
   </nav>;
 
   return (
-    <div className="admin-workspace min-h-screen bg-background" data-collapsed={collapsed ? "true" : "false"} onPointerMove={onPointerMove}>
+    <div className="admin-workspace min-h-screen bg-background" data-collapsed={collapsed ? "true" : "false"}>
       <div className="admin-route-bar" data-active={routing ? "true" : "false"} aria-hidden />
-      <div className="admin-ambient" aria-hidden><span /><span /></div>
       <aside className="admin-workspace-sidebar hidden lg:flex">
-        <Link to="/admin" className="admin-workspace-brand"><img src={SITE_LOGO} alt="Better Mangá" className="h-10 w-12 shrink-0 object-contain" />{collapsed ? null : <span className="font-display text-sm font-bold">Better Mangá<span className="mt-1 block font-sans text-[10px] font-semibold uppercase text-primary">Publishing studio</span></span>}</Link>
+        <Link to="/admin" className="admin-workspace-brand"><img src={SITE_LOGO} alt="Better Mangá" className="h-10 w-12 shrink-0 object-contain" />{collapsed ? null : <span className="font-display text-sm font-bold">Better Mangá<span className="mt-1 block font-sans text-[11px] font-semibold text-primary">Estúdio de publicação</span></span>}</Link>
         <div className="flex-1 overflow-y-auto px-3 py-6">{navigation(collapsed)}</div>
         <div className="admin-sidebar-foot">
           {collapsed ? null : <div className="admin-clock"><span className="admin-live-dot" />Online<span className="ml-auto tabular-nums">{now ? now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "--:--"}</span><span className="text-muted-foreground">{now ? now.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : ""}</span></div>}
@@ -125,8 +117,8 @@ export function AdminShell({
       <div className="admin-workspace-main min-w-0">
         <header className="admin-workspace-topbar sticky top-0 z-30 flex h-16 items-center justify-between gap-3 px-4 sm:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <Sheet open={menuOpen} onOpenChange={setMenuOpen}><SheetTrigger asChild><Button variant="ghost" size="icon" className="lg:hidden" aria-label="Abrir menu do painel" title="Menu do painel"><Menu className="h-5 w-5" /></Button></SheetTrigger><SheetContent side="left" className="admin-workspace-drawer overflow-y-auto"><SheetTitle className="mb-8 font-display">Better Mangá Studio</SheetTitle>{navigation(false)}</SheetContent></Sheet>
-            <Link to="/admin" className="hidden text-xs text-muted-foreground hover:text-foreground sm:block">Studio</Link><ChevronRight className="hidden h-3 w-3 text-muted-foreground sm:block" /><span className="truncate text-xs font-semibold">{title}</span>
+            <Sheet open={menuOpen} onOpenChange={setMenuOpen}><SheetTrigger asChild><Button variant="ghost" size="icon" className="lg:hidden" aria-label="Abrir menu do painel" title="Menu do painel"><Menu className="h-5 w-5" /></Button></SheetTrigger><SheetContent side="left" className="admin-workspace-drawer overflow-y-auto"><SheetTitle className="mb-8 font-display">Estúdio Better Mangá</SheetTitle>{navigation(false)}</SheetContent></Sheet>
+            <Link to="/admin" className="hidden text-xs text-muted-foreground hover:text-foreground sm:block">Estúdio</Link><ChevronRight className="hidden h-3 w-3 text-muted-foreground sm:block" /><span className="truncate text-xs font-semibold">{title}</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="admin-quick-search hidden md:block">
@@ -140,13 +132,12 @@ export function AdminShell({
         </header>
         <main className="admin-content admin-workspace-content min-w-0 px-4 py-7 sm:px-8 sm:py-9 xl:px-10">
           <div className="admin-page-heading admin-hero mb-8 flex flex-wrap items-center justify-between gap-5">
-            <span className="admin-hero-grid" aria-hidden /><span className="admin-hero-sweep" aria-hidden />
-            <div className="flex min-w-0 items-center gap-4"><span className="admin-hero-icon"><CurrentIcon className="h-6 w-6" /></span><div className="min-w-0"><p className="mb-1 text-[10px] font-bold uppercase text-primary">Painel editorial · {isAdmin ? "Administração" : "Publicação"}</p><h1 className="font-display text-2xl font-extrabold sm:text-3xl">{title}</h1>{subtitle ? <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">{subtitle}</p> : null}<div className="admin-dashes" aria-hidden><span /><span /><span /><span /><span /></div></div></div>
+            <div className="flex min-w-0 items-center gap-4"><span className="admin-hero-icon"><CurrentIcon className="h-6 w-6" /></span><div className="min-w-0"><h1 className="font-display text-2xl font-extrabold leading-tight sm:text-3xl">{title}</h1>{subtitle ? <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">{subtitle}</p> : null}</div></div>
             {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
           </div>
           <div className="admin-body">{body}</div>
         </main>
-        <footer className="admin-foot"><span>Better Mangá / Studio</span><span>{current.label}</span></footer>
+        <footer className="admin-foot"><span>Estúdio Better Mangá</span><span>{current.label}</span></footer>
       </div>
     </div>
   );

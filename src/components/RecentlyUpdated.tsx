@@ -60,12 +60,12 @@ export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
           return (
             <div
               key={item.id}
-              className="group flex w-[160px] min-w-0 shrink-0 flex-col gap-2 rounded-[1.35rem] bg-card/40 transition-colors duration-200"
+              className="group flex w-[160px] min-w-0 shrink-0 flex-col gap-2 rounded-md bg-card/40 transition-colors duration-200"
             >
               <Link
                 to="/obra/$slug"
                 params={{ slug: item.slug }}
-                className="group/cover relative z-0 block aspect-[2/3] w-full shrink-0 overflow-hidden rounded-[1.35rem] border border-foreground/10 bg-surface-2/55 transition-[transform,box-shadow,border-color] duration-200 ease-out hover:z-20 hover:-translate-y-0.5 hover:border-foreground/25 hover:shadow-[0_18px_44px_rgba(0,0,0,0.5)] hover:will-change-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:translate-y-0 active:shadow-none motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-none"
+                className="group/cover relative z-0 block aspect-[2/3] w-full shrink-0 overflow-hidden rounded-md border border-foreground/10 bg-surface-2/55 transition-[transform,box-shadow,border-color] duration-200 ease-out hover:z-20 hover:-translate-y-0.5 hover:border-foreground/25 hover:shadow-[0_18px_44px_rgba(0,0,0,0.5)] hover:will-change-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:translate-y-0 active:shadow-none motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-none"
               >
                 <img
                   alt={item.title}

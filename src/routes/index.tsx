@@ -172,7 +172,7 @@ function Home() {
           <SectionRow
             icon={<Trophy className="h-5 w-5" />}
             title="Rankings"
-            subtitle="Mais lidas do site"
+            subtitle="As 10 obras mais lidas no Better Mangá"
             action={
               <Button asChild variant="ghost" size="sm" className="text-primary">
                 <Link to="/ranking">Ver todos</Link>
@@ -181,12 +181,12 @@ function Home() {
           >
             <HScroll>
               {(ranking.data ?? []).map((item, index) => (
-                <div key={item.id} className="w-[150px] shrink-0">
-                  <div className="flex items-start gap-1">
-                    <span className="font-display text-2xl font-black text-primary">
+                <div key={item.id} className="w-[178px] shrink-0">
+                  <div className="rank-item">
+                    <span className="rank-number" aria-label={`${index + 1}º lugar`}>
                       {index + 1}
                     </span>
-                    <div className="flex-1">
+                    <div>
                       <SeriesCard
                         slug={item.slug}
                         title={item.title}
