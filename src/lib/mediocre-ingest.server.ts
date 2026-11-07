@@ -17,7 +17,7 @@ export type IngestBody =
 
 /** Validates the helper payload shape; throws a readable message on anything unexpected. */
 export function parseIngestBody(v: unknown): IngestBody {
-  const o = v as Record<string, unknown> | null;
+  const o = v as { obraId?: unknown; action?: unknown; work?: unknown; chapters?: unknown } | null;
   if (!o || typeof o !== "object") throw new Error("Corpo inválido.");
   const obraId = o.obraId;
   if (typeof obraId !== "number" || !Number.isSafeInteger(obraId) || obraId <= 0) throw new Error("ID da obra inválido.");
@@ -28,7 +28,7 @@ export function parseIngestBody(v: unknown): IngestBody {
   if (o.action === "chapters") {
     if (!Array.isArray(o.chapters) || !o.chapters.length || o.chapters.length > INGEST_MAX_CHAPTERS) throw new Error(`Envie de 1 a ${INGEST_MAX_CHAPTERS} capítulos por vez.`);
     const chapters = o.chapters.map((c) => {
-      const r = c as Record<string, unknown>;
+      const r = c as { capId?: unknown; meta?: unknown; content?: unknown } | null;
       if (!r || typeof r.capId !== "number" || !Number.isSafeInteger(r.capId) || r.capId <= 0) throw new Error("Capítulo inválido.");
       if (!r.meta || typeof r.meta !== "object") throw new Error("Dados do capítulo ausentes.");
       return { capId: r.capId, meta: r.meta, content: r.content ?? null };
