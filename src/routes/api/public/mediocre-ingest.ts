@@ -5,6 +5,7 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
 
 /** Receives MediocreScan data fetched by an admin's own device (the API blocks this server's IP). */
 export const Route = createFileRoute("/api/public/mediocre-ingest")({
+  staticData: { sitemap: false },
   server: {
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: CORS }),
