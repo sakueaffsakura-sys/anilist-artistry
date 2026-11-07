@@ -1,0 +1,40 @@
+name: MediocreScan automação
+
+# Busca obras e capítulos na MediocreScan pelos servidores do GitHub e envia ao Better Mangá.
+# Segredos necessários: MEDIOCRE_TOKEN, CODIGO_ENVIO (gerado no painel) e, opcional, SITE.
+on:
+  schedule:
+    - cron: "17 * * * *" # a cada hora
+  workflow_dispatch:
+    inputs:
+      obras:
+        description: "IDs de obras para puxar e publicar agora (separados por espaço). Vazio = fila + capítulos novos."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mediocre-automacao
+  cancel-in-progress: false
+
+jobs:
+  puxar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Puxar da MediocreScan e enviar ao site
+        env:
+          MEDIOCRE_TOKEN: ${{ secrets.MEDIOCRE_TOKEN }}
+          CODIGO_ENVIO: ${{ secrets.CODIGO_ENVIO }}
+          SITE: ${{ secrets.SITE }}
+          OBRAS: ${{ github.event.inputs.obras }}
+          TEMPO_MAXIMO_MIN: "20"
+        run: node scripts/mediocre-actions.mjs
