@@ -1,0 +1,61 @@
+name: Telas do site
+
+# Compila o site, abre no navegador (celular e computador) e guarda as capturas de tela como artefato.
+# Só roda em branches "site-*" (mudanças de visual) ou manualmente; não publica nada.
+on:
+  push:
+    branches: ["site-*"]
+    paths: ["src/**", "public/**", ".github/telas/**", ".github/workflows/site-telas.yml", "package.json", "bun.lock"]
+  workflow_dispatch:
+    inputs:
+      obra:
+        description: "Slug da obra para fotografar"
+        required: false
+        default: "lookism"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-telas-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  telas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - name: Instalar
+        run: bun install
+      - name: Compilar (servidor Node)
+        run: node scripts/build-cpanel.cjs
+      - name: Abrir o site
+        run: |
+          PORT=3000 HOST=127.0.0.1 node .output/server/index.mjs > server.log 2>&1 &
+          for i in $(seq 1 90); do curl -sf -o /dev/null http://127.0.0.1:3000/ && break; sleep 1; done
+          curl -s -o /dev/null -w "início: %{http_code}\n" http://127.0.0.1:3000/
+      - name: Preparar o navegador
+        run: |
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" playwright@1.50.1
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Fotografar
+        env:
+          PW_PATH: ${{ runner.temp }}/pw/node_modules/playwright
+          OBRA: ${{ github.event.inputs.obra || 'lookism' }}
+        run: node .github/telas/telas.mjs
+      - name: Registro do servidor
+        if: always()
+        run: tail -n 60 server.log || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: telas
+          path: |
+            telas/
+            server.log
+          retention-days: 7
