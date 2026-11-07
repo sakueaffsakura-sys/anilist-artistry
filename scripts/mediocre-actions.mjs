@@ -31,7 +31,8 @@ const CHAPTERS_PER_SEND = 2; // capítulos por envio
 const WAIT_BETWEEN_SENDS_MS = 60_000; // 1 minuto antes dos próximos 2 capítulos
 const LOCK_PAUSE_MS = 60_000; // pausa quando a API trava por excesso de pedidos
 const MAX_PAUSES_IN_A_ROW = 5; // depois disso a execução para; a próxima tenta de novo
-const GAP_MS = 1500; // intervalo mínimo entre dois pedidos à API
+const API_GAP_MS = 60_000; // 1 pedido por minuto à API da MediocreScan
+const CDN_GAP_MS = 1500; // páginas no CDN
 const DISCOVER_LISTS = ["/obras/adicionados-recentes", "/obras/atualizadas-recentes"];
 const DISCOVER_PAGES = Math.min(Number(process.env.PAGINAS_DESCOBERTA) || 2, 10);
 const DISCOVER_PAGE_SIZE = { "/obras/adicionados-recentes": 20, "/obras/atualizadas-recentes": 30 };
@@ -43,7 +44,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const short = (path) => path.replace(/\?.*/, "");
 let apiIdx = 0;
 let lastPairAt = null; // início do último par enviado (vale entre obras)
-let lastCall = 0;
+let lastApiCall = 0;
+let lastCdnCall = 0;
 let pauses = 0;
 
 /** Erro que para a execução inteira (token ou código inválido, travamento que não passa). */
@@ -67,9 +69,9 @@ async function lockPause(reason) {
 
 async function mget(kind, path) {
   for (;;) {
-    const wait = lastCall + GAP_MS - Date.now();
+    const wait = (kind === "api" ? lastApiCall + API_GAP_MS : lastCdnCall + CDN_GAP_MS) - Date.now();
     if (wait > 0) await sleep(wait);
-    lastCall = Date.now();
+    if (kind === "api") lastApiCall = Date.now(); else lastCdnCall = Date.now();
     const base = kind === "cdn" ? CDN : API_HOSTS[apiIdx];
     let r;
     try {
