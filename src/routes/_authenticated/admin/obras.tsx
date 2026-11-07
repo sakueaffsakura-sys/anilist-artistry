@@ -18,6 +18,8 @@ import { DuplicateWorksPanel } from "@/components/DuplicateWorksPanel";
 import { Pager } from "@/components/Pager";
 import { ADMIN_PAGE_SIZE, fetchAdminWorks } from "@/lib/admin-lists";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { compactNumber } from "@/lib/format";
+import { kindLabel } from "@/lib/work-categories";
 function CloudinaryKeys() {
   const getS = useServerFn(getMediaSettings);
   const saveS = useServerFn(saveMediaSettings);
@@ -54,7 +56,7 @@ function CloudinaryKeys() {
   };
 
   return (
-    <div className="mb-5 rounded-2xl border border-border bg-surface">
+    <div className="mb-5 rounded-lg border border-border bg-surface">
       <Button variant="ghost"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
@@ -230,7 +232,7 @@ function ObrasAdmin() {
                 <AgeRatingBadge value={r.age_rating} size="sm" />
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {r.kind} · {r.status} · {r.chapters?.[0]?.count ?? 0} capítulos · {r.views} views · {timeAgo(r.updated_at)}
+                {kindLabel(r.kind)} · {r.status} · {(r.chapters?.[0]?.count ?? 0).toLocaleString("pt-BR")} capítulos · {compactNumber(r.views ?? 0)} leituras · {timeAgo(r.updated_at)}
               </p>
             </div>
             <Button

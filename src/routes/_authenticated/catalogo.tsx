@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useGenres } from "@/hooks/use-genres";
+import { usePublicGenres } from "@/hooks/use-genres";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { BookOpen, Clock, Compass, Eye, LayoutGrid, List as ListIcon, Search, SlidersHorizontal, Sparkle, Star, User2, X } from "lucide-react";
+import { BookOpen, Compass, LayoutGrid, List as ListIcon, Search, SlidersHorizontal, Star, User2, X } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
-import { Chips, FORMATS } from "@/components/LibraryBits";
+import { FORMATS, PageTitle } from "@/components/LibraryBits";
+import { SeriesCard } from "@/components/SeriesCard";
+import { compactNumber, formatRating } from "@/lib/format";
+import { kindLabel, kindValues } from "@/lib/work-categories";
 import { supabase } from "@/integrations/supabase/client";
 import { coverUrl, timeAgo } from "@/lib/media";
 import { Pager } from "@/components/Pager";
@@ -25,7 +28,6 @@ const searchSchema = z.object({
   page: fallback(z.number(), 1).default(1),
 });
 
-const compact = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
 const SUGGESTIONS = ["Ação", "Fantasia", "Romance", "Artes Marciais", "Isekai", "Regressão", "Comédia", "Terror"];
 
 /** Destaca no título o trecho buscado. */
@@ -60,13 +62,15 @@ export const Route = createFileRoute("/_authenticated/catalogo")({
 
 const PER_PAGE = 24;
 const SORTS = [
-  { key: "recent", label: "Mais recentes" },
-  { key: "popular", label: "Mais populares" },
-  { key: "alpha", label: "Ordem alfabética" },
+  { key: "recent", label: "Atualizadas" },
+  { key: "novas", label: "Recém-chegadas" },
+  { key: "popular", label: "Mais lidas" },
+  { key: "alpha", label: "A–Z" },
 ];
-const STATUS = ["Em lançamento", "Finalizado", "Hiato", "Cancelado"];
+const STATUS = ["Em andamento", "Finalizado", "Hiato", "Cancelado"];
 const STATUS_DB: Record<string, string[]> = {
-  "Em lançamento": ["Em lançamento", "RELEASING", "Lançando", "Em andamento"],
+  "Em andamento": ["Em andamento", "Em lançamento", "RELEASING", "Lançando"],
+  "Em lançamento": ["Em andamento", "Em lançamento", "RELEASING", "Lançando"],
   Finalizado: ["Finalizado", "Completo", "FINISHED"],
   Hiato: ["Hiato", "HIATUS"],
   Cancelado: ["Cancelado", "CANCELLED"],
@@ -92,7 +96,7 @@ function Pesquisar() {
 
   const isUser = s.q.startsWith("@");
 
-  const tags = useGenres();
+  const tags = usePublicGenres();
 
   const results = useQuery({
     queryKey: ["search", profile.id, profile.kidsMaxAge, s],
@@ -107,7 +111,7 @@ function Pesquisar() {
       const kidsAges = allowedAgeRatings();
       if (kidsAges) q = q.in("age_rating", kidsAges);
       if (s.q) q = q.ilike("title", `%${s.q}%`);
-      if (s.kind !== "Todos") q = q.eq("kind", s.kind);
+      if (s.kind !== "Todos") q = q.in("kind", kindValues(s.kind));
       if (s.status) q = q.in("status", STATUS_DB[s.status] ?? [s.status]);
       if (s.tag) q = q.overlaps("genres", genreAliases(s.tag));
       q =
@@ -115,7 +119,9 @@ function Pesquisar() {
           ? q.order("views", { ascending: false })
           : s.sort === "alpha"
             ? q.order("title")
-            : q.order("updated_at", { ascending: false });
+            : s.sort === "novas"
+              ? q.order("created_at", { ascending: false })
+              : q.order("updated_at", { ascending: false });
       const from = (s.page - 1) * PER_PAGE;
       const { data, count, error } = await q.range(from, from + PER_PAGE - 1);
       if (error) throw error;
@@ -142,182 +148,172 @@ function Pesquisar() {
   const shownTo = Math.min(total, s.page * PER_PAGE);
   const listView = s.view === "lista";
 
+  const rows = results.data?.rows ?? [];
+  const activeFilters = [
+    { value: s.q, label: s.q, patch: { q: "" } },
+    { value: s.kind === "Todos" ? "" : s.kind, label: kindLabel(s.kind), patch: { kind: "Todos" } },
+    { value: s.status, label: s.status, patch: { status: "" } },
+    { value: s.tag, label: s.tag, patch: { tag: "" } },
+  ].filter((f) => f.value);
+  const clearAll = () => { setTerm(""); set({ q: "", kind: "Todos", sort: "recent", status: "", tag: "" }); };
+  const filterLabel = "mb-2 mt-5 text-[13px] font-semibold text-muted-foreground";
+
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <main className="site-content catalog-layout mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="catalog-hero flex flex-wrap items-end justify-between gap-4">
-          <div className="min-w-0">
-            <p className="mb-2 text-xs font-bold uppercase text-primary">Better Mangá / Descoberta</p>
-            <h1 className="flex items-center gap-3 font-display text-2xl font-extrabold sm:text-3xl"><Compass className="h-7 w-7 text-primary" /> Explorar obras</h1>
-            <p className="mt-2 max-w-xl text-sm text-muted-foreground">Busque pelo nome, filtre por gênero, formato e status, ou encontre leitores pelo @nick.</p>
-            {!isUser && results.isSuccess ? <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1 text-xs font-bold"><span className="live-dot" />{total.toLocaleString("pt-BR")} {total === 1 ? "obra encontrada" : "obras encontradas"}</p> : null}
-          </div>
-          <Button asChild variant="outline"><Link to="/biblioteca"><BookOpen className="h-4 w-4" /> Minha coleção</Link></Button>
-        </div>
+      <main className="site-content catalog-layout mx-auto max-w-7xl px-4 py-6 sm:px-6 md:py-8 lg:px-8">
+        <PageTitle
+          icon={<Compass />}
+          title="Catálogo"
+          subtitle="Busque pelo nome, filtre por gênero, formato e status, ou encontre leitores pelo @nick."
+          right={<Button asChild variant="secondary"><Link to="/biblioteca"><BookOpen className="h-4 w-4" /> Biblioteca</Link></Button>}
+        />
 
-        <div className="mt-6 border-b border-border pb-6">
-          <div className="catalog-search">
-            <Search className="h-5 w-5" />
-            <input
-              value={term}
-              onChange={(e) => setTerm(e.target.value)}
-              aria-label="Buscar obras ou leitores"
-              placeholder="Buscar obras ou @leitor..."
-              enterKeyHint="search"
-            />
-            {term ? <button type="button" aria-label="Limpar busca" onClick={() => setTerm("")}><X className="h-4 w-4" /></button> : null}
-          </div>
-          {!term && !s.tag ? (
-            <div className="search-suggest mt-3" aria-label="Sugestões de busca">
-              <span className="self-center text-xs font-semibold text-muted-foreground">Sugestões:</span>
-              {SUGGESTIONS.map((genre) => <button key={genre} type="button" onClick={() => set({ tag: genre })}><Sparkle className="h-3 w-3 text-primary" />{genre}</button>)}
-            </div>
-          ) : null}
+        <div className="catalog-search">
+          <Search className="h-[18px] w-[18px]" />
+          <input
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+            aria-label="Buscar obras ou leitores"
+            placeholder="Buscar obras ou @leitor…"
+            enterKeyHint="search"
+          />
+          {term ? <button type="button" aria-label="Limpar busca" onClick={() => setTerm("")}><X className="h-4 w-4" /></button> : null}
         </div>
+        {!term && !s.tag ? (
+          <div className="chip-row mt-3" aria-label="Sugestões de gênero">
+            {SUGGESTIONS.map((genre) => <button key={genre} type="button" className="chip chip-sm" onClick={() => set({ tag: genre })}>{genre}</button>)}
+          </div>
+        ) : null}
 
         {isUser ? (
-          <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {(users.data ?? []).map((u) => (
               <Link
                 key={u.id}
                 to="/u/$username"
                 params={{ username: u.username }}
-                className="flex items-center gap-3 rounded-xl border border-border bg-surface p-4 hover:border-primary/60"
+                className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3 hover:border-primary/50"
               >
-                <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-surface-2">
+                <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2">
                   {u.avatar_url ? <img loading="lazy" decoding="async" src={u.avatar_url} alt="" className="h-full w-full object-cover" /> : <User2 className="h-5 w-5" />}
                 </span>
-                <span>
-                  <span className="block font-bold">@{u.username}</span>
-                  <span className="text-xs text-muted-foreground">{u.display_name ?? ""} · Nv. {u.level}</span>
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold">@{u.username}</span>
+                  <span className="text-xs text-muted-foreground">{u.display_name ? `${u.display_name} · ` : ""}nível {u.level}</span>
                 </span>
               </Link>
             ))}
-            {users.data?.length === 0 ? <p className="text-sm text-muted-foreground">Nenhum utilizador encontrado.</p> : null}
+            {users.data?.length === 0 ? <p className="text-sm text-muted-foreground">Nenhum leitor encontrado.</p> : null}
           </div>
         ) : (
-          <div className="mt-8 grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-            <aside className="catalog-filters min-w-0 h-fit border-b border-border pb-6 lg:sticky lg:top-20 lg:border-b-0 lg:border-r lg:pr-6">
-              <Button variant="outline" className="mb-3 w-full lg:hidden" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)}><SlidersHorizontal className="h-4 w-4" /> {filtersOpen ? "Fechar filtros" : "Abrir filtros"}</Button>
-              <div className={filtersOpen ? "block" : "hidden lg:block"}>
-              <div className="flex items-center justify-between"><h2 className="flex items-center gap-2 font-display text-lg font-bold"><SlidersHorizontal className="h-4 w-4 text-primary" /> Filtros</h2><Button variant="ghost" size="sm" onClick={() => { setTerm(""); set({ q: "", kind: "Todos", sort: "recent", status: "", tag: "" }); }}>Limpar</Button></div>
-              <p className="mb-2 mt-4 text-sm font-semibold text-muted-foreground">Ordenar</p>
-              <div className="space-y-2">
-                {SORTS.map((o) => (
-                  <Button type="button" variant="ghost"
-                    key={o.key}
-                    onClick={() => set({ sort: o.key })}
-                    className={`block w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold ${
-                      s.sort === o.key ? "bg-primary text-primary-foreground" : "bg-surface-2 hover:bg-surface-2/70"
-                    }`}
-                  >
-                    {o.label}
-                  </Button>
-                ))}
-              </div>
-              <p className="mb-2 mt-5 text-sm font-semibold text-muted-foreground">Status</p>
-              <div className="flex flex-wrap gap-2">
-                {STATUS.map((st) => (
-                  <Button type="button" variant="ghost"
-                    key={st}
-                    onClick={() => set({ status: s.status === st ? "" : st })}
-                    className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
-                      s.status === st ? "bg-primary text-primary-foreground" : "bg-surface-2"
-                    }`}
-                  >
-                    {st}
-                  </Button>
-                ))}
-              </div>
-              <p className="mb-2 mt-5 text-sm font-semibold text-muted-foreground">Gêneros</p>
-              <input aria-label="Buscar gênero" placeholder="Buscar gênero…" value={genreSearch} onChange={(e) => setGenreSearch(e.target.value)} className="mb-3 h-9 w-full rounded-md border border-border bg-surface px-3 text-sm focus-visible:outline-primary" />
-              <div className="flex max-h-64 flex-wrap gap-2 overflow-y-auto pr-1">
-                {(tags.data ?? GENRES).filter((t) => t.toLocaleLowerCase().includes(genreSearch.toLocaleLowerCase())).map((t) => (
-                  <Button type="button" variant="ghost"
-                    key={t}
-                    onClick={() => set({ tag: s.tag === t ? "" : t })}
-                    className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
-                      s.tag === t ? "bg-primary text-primary-foreground" : "bg-surface-2"
-                    }`}
-                  >
-                    {t}
-                  </Button>
-                ))}
-              </div>
+          <div className="mt-6 grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[232px_minmax(0,1fr)]">
+            <aside className="catalog-filters h-fit min-w-0 lg:sticky lg:top-20 lg:border-r lg:border-border lg:pr-6">
+              <Button variant="secondary" className="w-full lg:hidden" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)}>
+                <SlidersHorizontal className="h-4 w-4" /> {filtersOpen ? "Fechar filtros" : `Filtros e ordem${activeFilters.length ? ` (${activeFilters.length})` : ""}`}
+              </Button>
+              <div className={filtersOpen ? "mt-3 block rounded-lg border border-border bg-surface p-3 lg:mt-0 lg:border-0 lg:bg-transparent lg:p-0" : "hidden lg:block"}>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-[15px] font-bold">Filtros</h2>
+                  <Button variant="ghost" size="sm" onClick={clearAll}>Limpar</Button>
+                </div>
+                <p className={filterLabel}>Ordenar por</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {SORTS.map((o) => <button key={o.key} type="button" className="chip chip-sm" aria-pressed={s.sort === o.key} onClick={() => set({ sort: o.key })}>{o.label}</button>)}
+                </div>
+                <p className={filterLabel}>Status</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {STATUS.map((st) => <button key={st} type="button" className="chip chip-sm" aria-pressed={s.status === st} onClick={() => set({ status: s.status === st ? "" : st })}>{st}</button>)}
+                </div>
+                <p className={filterLabel}>Gêneros</p>
+                <input aria-label="Buscar gênero" placeholder="Buscar gênero…" value={genreSearch} onChange={(e) => setGenreSearch(e.target.value)} className="mb-2 h-9 w-full rounded-md border border-border bg-surface-2 px-3 text-[13px] outline-none focus:border-primary" />
+                <div className="flex max-h-64 flex-wrap gap-1.5 overflow-y-auto pr-1">
+                  {(tags.data ?? GENRES).filter((t) => t.toLocaleLowerCase().includes(genreSearch.toLocaleLowerCase())).map((t) => (
+                    <button key={t} type="button" className="chip chip-sm" aria-pressed={s.tag === t} onClick={() => set({ tag: s.tag === t ? "" : t })}>{t}</button>
+                  ))}
+                </div>
               </div>
             </aside>
 
             <section className="min-w-0">
-              <div className="border-b border-border pb-5">
-                <p className="mb-2 text-xs font-bold uppercase text-muted-foreground">Formato</p>
-                <Chips value={s.kind} onChange={(v) => set({ kind: v })} options={FORMATS} />
+              <div className="chip-row" role="group" aria-label="Formato">
+                {FORMATS.map((kind) => <button key={kind} type="button" className="chip chip-sm" aria-pressed={s.kind === kind} onClick={() => set({ kind })}>{kind === "Todos" ? "Todos" : kindLabel(kind)}</button>)}
               </div>
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-                <span><b className="text-foreground">{total.toLocaleString("pt-BR")}</b> resultados{total ? ` · mostrando ${shownFrom}–${shownTo}` : ""}<span className="hidden text-xs sm:inline"> · ordenado por {SORTS.find((o) => o.key === s.sort)?.label.toLowerCase()}</span></span>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-[13px] text-muted-foreground">
+                <span>
+                  <b className="text-foreground">{total.toLocaleString("pt-BR")}</b> {total === 1 ? "obra" : "obras"}
+                  {total > PER_PAGE ? ` · ${shownFrom}–${shownTo}` : ""}
+                  <span className="hidden sm:inline"> · {SORTS.find((o) => o.key === s.sort)?.label.toLowerCase()}</span>
+                </span>
                 <div className="view-toggle" role="group" aria-label="Modo de exibição">
                   <button type="button" aria-pressed={!listView} onClick={() => set({ view: "grade" })}><LayoutGrid className="h-3.5 w-3.5" />Grade</button>
                   <button type="button" aria-pressed={listView} onClick={() => set({ view: "lista" })}><ListIcon className="h-3.5 w-3.5" />Lista</button>
                 </div>
               </div>
-              {(s.tag || s.status || s.kind !== "Todos" || s.q) ? <div className="mt-4 flex flex-wrap gap-2">{([{ value: s.q, patch: { q: "" } }, { value: s.kind === "Todos" ? "" : s.kind, patch: { kind: "Todos" } }, { value: s.status, patch: { status: "" } }, { value: s.tag, patch: { tag: "" } }]).filter((f) => f.value).map((f, i) => <Button key={i} variant="secondary" size="sm" onClick={() => { if ("q" in f.patch) setTerm(""); set(f.patch); }} aria-label={`Remover filtro ${f.value}`}>{f.value}<X className="h-3 w-3" /></Button>)}</div> : null}
-              {listView ? (
-                <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2">
-                  {(results.data?.rows ?? []).map((r) => (
-                    <Link key={r.id} to="/obra/$slug" params={{ slug: r.slug }} className="catalog-list-item group">
-                      <div className="series-cover relative aspect-[2/3] overflow-hidden rounded-[1rem] border border-border">
-                        <img src={coverUrl(r.cover_url)} alt={r.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" />
-                      </div>
-                      <div className="min-w-0 py-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="kind-badge">{r.kind}</span>
-                          {r.status ? <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-300">{r.status}</span> : null}
-                          <AgeRatingBadge value={r.age_rating} size="sm" />
-                        </div>
-                        <p className="mt-2 line-clamp-2 font-display text-base font-bold leading-snug group-hover:text-primary"><Highlight text={r.title} term={s.q} /></p>
-                        {r.genres?.length ? <p className="mt-1 truncate text-xs text-muted-foreground">{normalizeGenres(r.genres).slice(0, 4).join(" · ")}</p> : null}
-                        {r.synopsis ? <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-foreground/70">{r.synopsis.replace(/<[^>]*>/g, "")}</p> : null}
-                        <div className="catalog-meta mt-2">
-                          <span className="inline-flex items-center gap-1"><BookOpen />{r.chapters[0]?.count ?? 0} cap.</span>
-                          <span className="inline-flex items-center gap-1 text-gold"><Star className="fill-gold" />{Number(r.rating).toFixed(1).replace(".", ",")}</span>
-                          {r.views ? <span className="inline-flex items-center gap-1"><Eye />{compact.format(r.views)}</span> : null}
-                          <span className="inline-flex items-center gap-1"><Clock />{timeAgo(r.updated_at)}</span>
-                        </div>
-                      </div>
-                    </Link>
+              {activeFilters.length ? (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {activeFilters.map((f, i) => (
+                    <button key={i} type="button" className="chip chip-sm" data-active="true" onClick={() => { if ("q" in f.patch) setTerm(""); set(f.patch); }} aria-label={`Remover filtro ${f.label}`}>{f.label}<X className="h-3 w-3" /></button>
                   ))}
                 </div>
-              ) : (
-                <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
-                  {(results.data?.rows ?? []).map((r) => (
-                    <Link key={r.id} to="/obra/$slug" params={{ slug: r.slug }} className="catalog-card group">
-                      <div className="series-cover catalog-cover relative overflow-hidden border border-border">
-                        <img src={coverUrl(r.cover_url)} alt={r.title} className="aspect-[2/3] w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" />
-                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
-                        <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
-                          <span className="flex items-center gap-1 rounded-md bg-background/85 px-2 py-0.5 text-[11px] font-bold">
-                            <BookOpen className="h-3 w-3" /> {r.chapters[0]?.count ?? 0} Capítulos
-                          </span>
-                          <span className="rounded-md border border-primary/60 bg-background/85 px-1.5 py-0.5 text-[11px] font-bold text-primary">
-                            {r.kind}
-                          </span>
-                          <AgeRatingBadge value={r.age_rating} size="sm" />
+              ) : null}
+
+              {listView ? (
+                <div className="mt-2 grid grid-cols-1 gap-x-6 xl:grid-cols-2">
+                  {rows.map((r) => {
+                    const chapters = r.chapters[0]?.count ?? 0;
+                    return (
+                      <div key={r.id} className="catalog-list-item">
+                        <Link to="/obra/$slug" params={{ slug: r.slug }} className="series-cover relative block aspect-[2/3] overflow-hidden rounded-md">
+                          <img src={coverUrl(r.cover_url)} alt={r.title} className="h-full w-full object-cover" loading="lazy" decoding="async" />
+                        </Link>
+                        <div className="min-w-0">
+                          <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug">
+                            <Link to="/obra/$slug" params={{ slug: r.slug }} className="hover:text-primary"><Highlight text={r.title} term={s.q} /></Link>
+                          </h3>
+                          <p className="card-meta mt-1">
+                            {Number(r.rating) > 0 ? <span className="inline-flex items-center gap-1 font-semibold text-foreground"><Star className="fill-gold text-gold" />{formatRating(r.rating)}</span> : null}
+                            <span>{chapters.toLocaleString("pt-BR")} cap.</span>
+                            <span>{kindLabel(r.kind)}</span>
+                            {r.status ? <span>{r.status}</span> : null}
+                            {r.views ? <span>{compactNumber(r.views)} leituras</span> : null}
+                            <span>{timeAgo(r.updated_at)}</span>
+                            <AgeRatingBadge value={r.age_rating} size="sm" />
+                          </p>
+                          {r.genres?.length ? <p className="mt-1 truncate text-xs text-muted-foreground">{normalizeGenres(r.genres).slice(0, 4).join(" · ")}</p> : null}
+                          {r.synopsis ? <p className="mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-foreground/75">{r.synopsis.replace(/<[^>]*>/g, "")}</p> : null}
                         </div>
-                        <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-md bg-background/85 px-1.5 py-0.5 text-[11px] font-bold text-gold">
-                          <Star className="h-3 w-3 fill-gold" /> {Number(r.rating).toFixed(1).replace(".", ",")}
-                        </span>
-                        {r.views ? <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-background/85 px-1.5 py-0.5 text-[11px] font-bold"><Eye className="h-3 w-3 text-primary" />{compact.format(r.views)}</span> : null}
                       </div>
-                      <p className="mt-2 line-clamp-2 font-bold group-hover:text-primary"><Highlight text={r.title} term={s.q} /></p>
-                      <p className="catalog-meta"><span className="truncate">{r.status}</span><span className="inline-flex items-center gap-1"><Clock />{timeAgo(r.updated_at)}</span></p>
-                    </Link>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-4 grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 xl:grid-cols-5">
+                  {rows.map((r) => (
+                    <SeriesCard
+                      key={r.id}
+                      slug={r.slug}
+                      title={r.title}
+                      titleNode={<Highlight text={r.title} term={s.q} />}
+                      cover={r.cover_url}
+                      rating={r.rating}
+                      chapters={r.chapters[0]?.count ?? 0}
+                      kind={r.kind}
+                      ageRating={r.age_rating}
+                      seriesId={r.id}
+                    />
                   ))}
                 </div>
               )}
-              {results.isLoading ? <div role="status" className={`mt-4 grid gap-4 ${listView ? "grid-cols-1 xl:grid-cols-2" : "grid-cols-2 sm:grid-cols-3 xl:grid-cols-4"}`}>{Array.from({ length: 8 }, (_, i) => <div key={i} className={`${listView ? "h-40" : "aspect-[2/3]"} animate-pulse rounded-[1.1rem] bg-surface-2`} />)}<span className="sr-only">Carregando obras</span></div> : null}
-              {results.isError ? <div role="alert" className="py-10 text-center"><p className="mb-3 text-muted-foreground">Não foi possível carregar o catálogo.</p><Button variant="outline" onClick={() => void results.refetch()}>Tentar novamente</Button></div> : null}
+              {results.isLoading ? (
+                <div role="status" className={`mt-4 grid ${listView ? "grid-cols-1 gap-3 xl:grid-cols-2" : "grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 xl:grid-cols-5"}`}>
+                  {Array.from({ length: 10 }, (_, i) => <div key={i} className={`${listView ? "h-28" : "aspect-[2/3]"} rounded-md bg-surface-2 motion-safe:animate-pulse`} />)}
+                  <span className="sr-only">Carregando obras</span>
+                </div>
+              ) : null}
+              {results.isError ? <div role="alert" className="py-10 text-center"><p className="mb-3 text-muted-foreground">Não foi possível carregar o catálogo.</p><Button variant="secondary" onClick={() => void results.refetch()}>Tentar novamente</Button></div> : null}
               {!results.isLoading && !results.isError && total === 0 ? (
-                <div className="py-12 text-center"><Compass className="mx-auto mb-4 h-9 w-9 text-primary" /><p className="font-display font-bold">Nenhuma obra encontrada</p><Button className="mt-4" variant="outline" onClick={() => { setTerm(""); set({ q: "", kind: "Todos", status: "", tag: "" }); }}>Limpar filtros</Button></div>
+                <div className="py-12 text-center"><Compass className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><p className="font-semibold">Nenhuma obra encontrada</p><Button className="mt-4" variant="secondary" onClick={clearAll}>Limpar filtros</Button></div>
               ) : null}
               <Pager page={s.page} pages={pages} onChange={(p) => navigate({ to: ".", search: (prev) => ({ ...prev, page: p }) })} />
             </section>

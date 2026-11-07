@@ -77,7 +77,7 @@ export function WorkNotifications() {
   const tabs = [["all", "Todas"], ["chapter", "Capítulos"], ["request", "Pedidos"]] as const;
   return <Popover>
     <PopoverTrigger asChild><Button size="icon" variant="ghost" className="relative shrink-0" aria-label={unread.length ? `Notificações: ${unread.length} não lidas` : "Notificações"} title="Notificações"><Bell className="h-[18px] w-[18px]" />{unread.length ? <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">{unread.length > 9 ? "9+" : unread.length}</span> : null}</Button></PopoverTrigger>
-    <PopoverContent align="end" className="w-[min(380px,calc(100vw-24px))] rounded-2xl p-0">
+    <PopoverContent align="end" className="w-[min(380px,calc(100vw-24px))] rounded-lg p-0">
       <div className="flex items-center justify-between px-4 pt-4"><h2 className="font-display text-lg font-bold">Notificações</h2>
         <div className="flex gap-1">
           {unread.length ? <Button size="sm" variant="ghost" className="h-8 gap-1 text-xs" disabled={read.isPending} onClick={() => read.mutate(undefined)}><CheckCheck className="h-4 w-4" />Marcar tudo lido</Button> : null}
@@ -87,7 +87,7 @@ export function WorkNotifications() {
       <div className="flex gap-1 px-4 py-3">{tabs.map(([k, l]) => <button key={k} onClick={() => setTab(k)} className={cn("rounded-full px-3 py-1 text-xs font-semibold transition-colors", tab === k ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}>{l}</button>)}</div>
       <div className="max-h-96 space-y-1.5 overflow-y-auto px-3 pb-3">
         {query.isPending ? <p className="p-3 text-sm text-muted-foreground">Carregando…</p> : query.isError ? <p role="alert" className="p-3 text-sm text-destructive">Não foi possível carregar os avisos.</p> : !items.length ? <p className="p-3 text-sm text-muted-foreground">Nenhuma notificação por enquanto.</p> : items.map((item) => {
-          const cls = cn("relative flex gap-3 rounded-xl border p-3 text-sm transition-colors", item.read_at ? "border-transparent hover:bg-muted/50" : "border-border bg-muted/40 hover:bg-muted");
+          const cls = cn("relative flex gap-3 rounded-lg border p-3 text-sm transition-colors", item.read_at ? "border-transparent hover:bg-muted/50" : "border-border bg-muted/40 hover:bg-muted");
           const body = <>{!item.read_at ? <span className="absolute left-1.5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-primary" /> : null}
             <div className="ml-1.5 h-14 w-10 shrink-0 overflow-hidden rounded-md bg-muted">{item.cover ? <img src={item.cover} alt="" loading="lazy" className="h-full w-full object-cover" /> : <BookPlus className="m-auto mt-4 h-5 w-5 text-primary" />}</div>
             <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><h4 className="font-semibold">{item.title}</h4><span className="shrink-0 text-[11px] text-muted-foreground">{when(item.created_at)}</span></div><p className="line-clamp-2 text-muted-foreground">{item.text}</p></div></>;

@@ -1,17 +1,21 @@
 name: Telas do site
 
-# Compila o site, abre no navegador (celular e computador) e guarda as capturas de tela como artefato.
+# Compila o site, abre no navegador (celular e computador) e guarda as capturas de tela na prerelease "site-telas".
 # Só roda em branches "site-*" (mudanças de visual) ou manualmente; não publica nada.
 on:
   push:
     branches: ["site-*"]
-    paths: ["src/**", "public/**", ".github/telas/**", ".github/workflows/site-telas.yml", "package.json", "bun.lock"]
+    paths: ["src/**", "public/**", "tests/**", ".github/telas/**", ".github/workflows/site-telas.yml", "package.json", "bun.lock"]
   workflow_dispatch:
     inputs:
       obra:
         description: "Slug da obra para fotografar"
         required: false
         default: "lookism"
+      grupos:
+        description: "Partes para fotografar (leitura, conta, admin)"
+        required: false
+        default: "leitura,conta,admin"
 
 permissions:
   contents: write
@@ -23,7 +27,7 @@ concurrency:
 jobs:
   telas:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -40,6 +44,12 @@ jobs:
           mkdir -p telas
           bunx tsc --noEmit -p tsconfig.json > telas/tipos.txt 2>&1 && echo "Sem erros de tipo." >> telas/tipos.txt || true
           tail -n 40 telas/tipos.txt
+      - name: Testes (não bloqueia)
+        continue-on-error: true
+        run: |
+          mkdir -p telas
+          bun test > telas/testes.txt 2>&1 || true
+          tail -n 25 telas/testes.txt
       - name: Abrir o site
         run: |
           # O servidor lê as variáveis públicas do banco em tempo de execução (as mesmas do .env).
@@ -55,6 +65,7 @@ jobs:
         env:
           PW_PATH: ${{ runner.temp }}/pw/node_modules/playwright
           OBRA: ${{ github.event.inputs.obra || 'lookism' }}
+          GRUPOS: ${{ github.event.inputs.grupos || 'leitura,conta,admin' }}
         run: node .github/telas/telas.mjs
       - name: Registro do servidor
         if: always()

@@ -82,7 +82,7 @@ function MaintenanceAdmin() {
         </div>
         <Button asChild variant="ghost"><a href="/manutencao" target="_blank" rel="noreferrer"><ExternalLink className="mr-2 h-4 w-4" />Abrir tela de manutenção</a></Button>
       </div>
-      <div className="min-w-0"><p className="mb-3 text-xs font-bold uppercase text-muted-foreground">Prévia</p><MaintenanceScreen settings={form} preview /></div>
+      <div className="min-w-0"><p className="mb-3 text-xs font-bold text-muted-foreground">Prévia</p><MaintenanceScreen settings={form} preview /></div>
     </div>
   </AdminShell>;
 }

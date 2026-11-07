@@ -82,7 +82,7 @@ function ImagesAdmin() {
   return (
     <AdminShell adminOnly title="Imagens" subtitle="Guarde imagens no próprio site ou no Cloudinary e pegue os links de todas.">
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-border bg-surface p-5">
+        <div className="rounded-lg border border-border bg-surface p-5">
           <h2 className="mb-3 flex items-center gap-2 font-semibold"><KeyRound className="h-4 w-4" />Chaves do Cloudinary</h2>
           <div className="grid gap-2">
             <Input placeholder="Cloud name" value={cfg.cloud_name} onChange={(e) => setCfg({ ...cfg, cloud_name: e.target.value })} />
@@ -93,7 +93,7 @@ function ImagesAdmin() {
             <p className="text-xs text-muted-foreground">Encontre em console.cloudinary.com → Settings → API Keys. O secret fica guardado só no servidor.</p>
           </div>
         </div>
-        <div className="rounded-2xl border border-border bg-surface p-5">
+        <div className="rounded-lg border border-border bg-surface p-5">
           <h2 className="mb-3 font-semibold">Guardar imagens</h2>
           <div className="mb-3 flex gap-2">
             <Button variant={dest === "site" ? "default" : "outline"} onClick={() => setDest("site")}><HardDrive className="mr-1 h-4 w-4" />Próprio site</Button>
@@ -106,7 +106,7 @@ function ImagesAdmin() {
         </div>
       </div>
       {links.length > 0 && (
-        <div className="mt-6 rounded-2xl border border-border bg-surface p-5">
+        <div className="mt-6 rounded-lg border border-border bg-surface p-5">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-semibold">Links das imagens guardadas ({links.length})</h2>
             <Button size="sm" onClick={copyAll}><Copy className="mr-1 h-4 w-4" />Copiar todos</Button>

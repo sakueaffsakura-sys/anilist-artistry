@@ -364,14 +364,14 @@ function Perfil() {
 
                 <div className="grid items-start gap-6 md:grid-cols-[190px_minmax(0,1fr)]">
                   <aside className="sticky top-24 hidden overflow-hidden rounded-lg border border-border bg-surface/70 p-2 backdrop-blur-xl md:block">
-                    <p className="px-3 pb-1.5 pt-2 text-[10px] font-black uppercase text-muted-foreground">Principal</p>
+                    <p className="px-3 pb-1.5 pt-2 text-xs font-bold text-muted-foreground">Principal</p>
                     {collectionTabs.slice(0, 2).map((item) => (
                       <Button key={item.id} type="button" variant="ghost" onClick={() => setCollectionTab(item.id)} className={`mb-0.5 w-full justify-start ${collectionTab === item.id ? "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary" : "text-muted-foreground"}`}>
                         <item.icon className={`mr-2 h-4 w-4 ${item.id === "favoritos" && collectionTab === item.id ? "fill-current" : ""}`} /> {item.label}
                       </Button>
                     ))}
                     <div className="mx-3 my-2 h-px bg-border" />
-                    <p className="px-3 pb-1.5 pt-1 text-[10px] font-black uppercase text-muted-foreground">Status</p>
+                    <p className="px-3 pb-1.5 pt-1 text-xs font-bold text-muted-foreground">Status</p>
                     {collectionTabs.slice(2).map((item) => (
                       <Button key={item.id} type="button" variant="ghost" onClick={() => setCollectionTab(item.id)} className={`mb-0.5 w-full justify-start ${collectionTab === item.id ? "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary" : "text-muted-foreground"}`}>
                         <item.icon className="mr-2 h-4 w-4" /> {item.label}
@@ -381,7 +381,7 @@ function Perfil() {
 
                   <div className="min-w-0">
                     <div className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-                      <h2 className="truncate font-display text-xl font-extrabold">{collectionTabs.find((item) => item.id === collectionTab)?.label}</h2>
+                      <h2 className="truncate font-display text-xl font-bold">{collectionTabs.find((item) => item.id === collectionTab)?.label}</h2>
                       <span className="text-xs text-muted-foreground">{collectionItems.length} obras</span>
                     </div>
                     <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 xl:grid-cols-4">
@@ -395,12 +395,12 @@ function Perfil() {
                               <div className="relative aspect-[2/3] overflow-hidden rounded-lg border border-border bg-surface shadow-[var(--shadow-card)] transition group-hover:border-primary/60">
                                 <img src={coverUrl(series.cover_url)} alt={series.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" loading="lazy" />
                                 <span className="cover-fade" />
-                                <div className="absolute left-2 top-2 flex items-center gap-1.5 rounded-md bg-background/85 px-2 py-1 text-[11px] font-extrabold">
+                                <div className="absolute left-2 top-2 flex items-center gap-1.5 rounded-md bg-background/85 px-2 py-1 text-[11px] font-bold">
                                   <span className="flex items-center gap-1"><BookOpen className="h-3 w-3 text-primary" />{total}</span>
                                   <span className="h-3 w-px bg-border" />
                                   <span className="flex items-center gap-1 text-gold"><Star className="h-3 w-3 fill-current" />{Number(series.rating || 0).toFixed(1).replace(".", ",")}</span>
                                 </div>
-                                <span className="absolute bottom-2 left-2 rounded-md border border-primary/50 bg-background/85 px-2 py-1 text-[10px] font-extrabold uppercase text-primary">{series.kind || "Mangá"}</span>
+                                <span className="absolute bottom-2 left-2 rounded-md border border-primary/50 bg-background/85 px-2 py-1 text-xs font-bold text-primary">{series.kind || "Mangá"}</span>
                               </div>
                               <h3 className="mt-2 line-clamp-2 text-sm font-bold leading-tight transition group-hover:text-primary">{series.title}</h3>
                               <p className="mt-1 text-xs text-muted-foreground">{latest > 0 ? `Cap. ${latest}` : `${total} capítulos`}</p>
@@ -469,7 +469,7 @@ function Perfil() {
               {(comments.data ?? []).map((c) => (
                 <li
                   key={c.id}
-                  className="flex gap-3 rounded-xl p-3"
+                  className="flex gap-3 rounded-lg p-3"
                   style={p.comment_bg ? { background: p.comment_bg } : undefined}
                 >
                   <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 text-sm font-bold">
@@ -543,16 +543,16 @@ function OwnerProfileHeader({
   const percentage = Math.min(100, Math.round((xpInLevel / xpGoal) * 100));
   return (
     <section className="relative z-10 mx-auto -mt-16 max-w-7xl px-4 sm:-mt-24 sm:px-6">
-      <div className="grid gap-4 rounded-xl border border-border bg-background/85 p-4 shadow-[var(--shadow-hero)] backdrop-blur-2xl sm:p-6 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center">
+      <div className="grid gap-4 rounded-lg border border-border bg-background/85 p-4 shadow-[var(--shadow-hero)] backdrop-blur-2xl sm:p-6 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center">
         <div className="flex justify-center lg:justify-start">
           <div className="relative rounded-full bg-background p-1.5">
             <FramedAvatar src={profile.avatar_url} frame={profile.avatar_frame} size={128} />
-            <span className="absolute -bottom-1 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full border border-primary/40 bg-background px-2.5 py-1 text-[10px] font-extrabold text-primary">Nível {profile.level}</span>
+            <span className="absolute -bottom-1 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full border border-primary/40 bg-background px-2.5 py-1 text-[10px] font-bold text-primary">Nível {profile.level}</span>
           </div>
         </div>
         <div className="min-w-0 text-center lg:text-left">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="truncate font-display text-2xl font-extrabold sm:text-3xl" style={profile.accent_color ? { color: profile.accent_color } : undefined}>{profile.display_name || profile.username}</h1>
+            <h1 className="truncate font-display text-2xl font-bold sm:text-3xl" style={profile.accent_color ? { color: profile.accent_color } : undefined}>{profile.display_name || profile.username}</h1>
             <UserBadges variant="inline" size={26} tier={profile.subscription_tier} badges={badges} isAdmin={isAdmin} />
           </div>
           <p className="mt-1 text-sm text-muted-foreground">@{profile.username}</p>
@@ -564,12 +564,12 @@ function OwnerProfileHeader({
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2 lg:w-52">
-          <div className="rounded-lg border border-border bg-surface/60 p-3 text-center"><b className="block text-lg">{followers}</b><span className="text-[9px] font-bold uppercase text-muted-foreground">Seguidores</span></div>
-          <div className="rounded-lg border border-border bg-surface/60 p-3 text-center"><b className="block text-lg">{following}</b><span className="text-[9px] font-bold uppercase text-muted-foreground">Seguindo</span></div>
+          <div className="rounded-lg border border-border bg-surface/60 p-3 text-center"><b className="block text-lg">{followers}</b><span className="text-[11px] font-bold text-muted-foreground">Seguidores</span></div>
+          <div className="rounded-lg border border-border bg-surface/60 p-3 text-center"><b className="block text-lg">{following}</b><span className="text-[11px] font-bold text-muted-foreground">Seguindo</span></div>
           {action}
         </div>
         <div className="lg:col-start-2 lg:col-span-2">
-          <div className="mb-2 flex justify-between text-[10px] font-bold uppercase text-muted-foreground"><span>{profile.xp.toLocaleString("pt-BR")} XP total</span><span>{percentage}% do nível</span></div>
+          <div className="mb-2 flex justify-between text-xs font-bold text-muted-foreground"><span>{profile.xp.toLocaleString("pt-BR")} XP total</span><span>{percentage}% do nível</span></div>
           <div className="h-2 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${percentage}%` }} /></div>
           <p className="mt-1.5 text-[11px] text-muted-foreground">{xpInLevel.toLocaleString("pt-BR")} / {xpGoal.toLocaleString("pt-BR")} XP para o próximo nível</p>
         </div>
@@ -609,12 +609,12 @@ function OwnerOverview({ isMe = true, collectionCount, readingCount, readCount, 
         </nav> : null}
         <div className="mt-6 grid gap-4 lg:grid-cols-12">
           <div className="lg:col-span-7">
-            <h2 className="mb-4 text-xs font-extrabold uppercase text-muted-foreground">{isMe ? "Sua atividade" : "Atividade"}</h2>
+            <h2 className="mb-4 text-xs font-bold text-muted-foreground">{isMe ? "Sua atividade" : "Atividade"}</h2>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {cards.map((card) => (
               <div key={card.label} className="group flex min-h-32 flex-col justify-between rounded-lg border border-border bg-surface/45 p-4 transition-colors hover:border-primary/40">
                 <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary"><card.icon className="h-4 w-4" /></span>
-                <div><b className="block text-2xl font-black tabular-nums">{card.value}</b><span className="text-[11px] font-semibold uppercase text-muted-foreground">{card.label}</span></div>
+                <div><b className="block text-2xl font-bold tabular-nums">{card.value}</b><span className="text-[11px] font-semibold text-muted-foreground">{card.label}</span></div>
               </div>
             ))}
             </div>
@@ -764,7 +764,7 @@ function EditProfile({
         onOpenChange(v);
       }}
     >
-      <DialogContent className="h-[100dvh] w-screen max-w-none gap-0 overflow-y-auto rounded-none border-0 bg-background p-0 sm:h-[min(92dvh,900px)] sm:w-[min(94vw,1080px)] sm:max-w-5xl sm:rounded-xl sm:border [&>button:last-child]:hidden">
+      <DialogContent className="h-[100dvh] w-screen max-w-none gap-0 overflow-y-auto rounded-none border-0 bg-background p-0 sm:h-[min(92dvh,900px)] sm:w-[min(94vw,1080px)] sm:max-w-5xl sm:rounded-lg sm:border [&>button:last-child]:hidden">
         <DialogHeader className="sr-only">
           <DialogTitle>Editar perfil</DialogTitle>
         </DialogHeader>
@@ -773,8 +773,8 @@ function EditProfile({
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="min-w-0">
-            <h1 className="text-base font-black uppercase">Editar perfil</h1>
-            <p className="hidden text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground sm:block">Avatar · Banner · Moldura · Dados pessoais</p>
+            <h1 className="text-base font-bold">Editar perfil</h1>
+            <p className="hidden text-xs font-bold tracking-[0.2em] text-muted-foreground sm:block">Avatar · Banner · Moldura · Dados pessoais</p>
           </div>
         </header>
 
@@ -782,7 +782,7 @@ function EditProfile({
           <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_1.4fr] lg:gap-6">
             <div className="space-y-4">
               <section className="space-y-4 rounded-lg border border-border bg-card p-5">
-                <h2 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground"><User2 className="h-3 w-3" /> Foto de perfil</h2>
+                <h2 className="flex items-center gap-2 text-xs font-bold tracking-[0.25em] text-muted-foreground"><User2 className="h-3 w-3" /> Foto de perfil</h2>
                 <div className="flex items-center gap-4">
                   <Button variant="ghost" className="relative h-20 w-20 shrink-0 rounded-full p-0" onClick={() => avatarInput.current?.click()} aria-label="Escolher foto de perfil">
                     <FramedAvatar src={form.avatar_url} frame={form.avatar_frame || null} size={80} />
@@ -797,7 +797,7 @@ function EditProfile({
               </section>
 
               <section className="space-y-4 rounded-lg border border-border bg-card p-5">
-                <h2 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground"><ImageIcon className="h-3 w-3" /> Banner</h2>
+                <h2 className="flex items-center gap-2 text-xs font-bold tracking-[0.25em] text-muted-foreground"><ImageIcon className="h-3 w-3" /> Banner</h2>
                 <Button variant="ghost" className="group relative h-32 w-full overflow-hidden rounded-lg bg-surface-2 p-0" onClick={() => bannerInput.current?.click()}>
                   {form.banner_url ? <img src={form.banner_url} alt="Banner atual" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" /> : <ImageIcon className="h-7 w-7 text-muted-foreground" />}
                   <span className="absolute inset-0 grid place-items-center bg-background/60 opacity-0 transition-opacity group-hover:opacity-100"><span className="flex items-center gap-2 text-xs font-bold"><Upload className="h-4 w-4" /> Alterar banner</span></span>
@@ -807,9 +807,9 @@ function EditProfile({
               </section>
 
               <section className="space-y-4 rounded-lg border border-border bg-card p-5">
-                <h2 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground"><Shapes className="h-3 w-3" /> Moldura</h2>
+                <h2 className="flex items-center gap-2 text-xs font-bold tracking-[0.25em] text-muted-foreground"><Shapes className="h-3 w-3" /> Moldura</h2>
                 <div className="flex items-center gap-3">
-                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-surface-2">{form.avatar_frame ? <img src={form.avatar_frame} alt="Moldura atual" className="h-14 w-14 object-contain" /> : <span className="text-[9px] font-bold uppercase text-muted-foreground">Nenhuma</span>}</div>
+                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-surface-2">{form.avatar_frame ? <img src={form.avatar_frame} alt="Moldura atual" className="h-14 w-14 object-contain" /> : <span className="text-[11px] font-bold text-muted-foreground">Nenhuma</span>}</div>
                   <p className="min-w-0 flex-1 text-xs text-muted-foreground">Abra a galeria, escolha e salve.</p>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => setShowFrames((value) => !value)}>Galeria</Button>
@@ -827,14 +827,14 @@ function EditProfile({
             </div>
 
             <section className="space-y-5 rounded-lg border border-border bg-card p-5">
-              <h2 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground"><Pencil className="h-3 w-3" /> Dados pessoais</h2>
-              <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Nome
+              <h2 className="flex items-center gap-2 text-xs font-bold tracking-[0.25em] text-muted-foreground"><Pencil className="h-3 w-3" /> Dados pessoais</h2>
+              <label className="block text-xs font-bold tracking-[0.2em] text-muted-foreground">Nome
                 <Input className="mt-2 h-11 text-sm font-medium normal-case tracking-normal" maxLength={50} placeholder="O seu nome" value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} />
               </label>
-              <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Nickname
+              <label className="block text-xs font-bold tracking-[0.2em] text-muted-foreground">Nickname
                 <Input className="mt-2 h-11 text-sm font-medium normal-case tracking-normal" maxLength={30} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value.replace(/[^a-zA-Z0-9_.-]/g, "") })} />
               </label>
-              <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Biografia
+              <label className="block text-xs font-bold tracking-[0.2em] text-muted-foreground">Biografia
                 <Textarea className="mt-2 min-h-28 resize-none text-sm font-medium normal-case tracking-normal" maxLength={500} placeholder="Conte um pouco sobre você" value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} />
                 <span className="mt-1 block text-right text-[10px] font-medium normal-case tracking-normal">{form.bio.length}/500</span>
               </label>
@@ -845,7 +845,7 @@ function EditProfile({
               </div>
 
               <div className="space-y-3 border-t border-border pt-5">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Cor do perfil</p>
+                <p className="text-xs font-bold tracking-[0.2em] text-muted-foreground">Cor do perfil</p>
                 <div className="flex flex-wrap gap-2">
                   {ACCENT_COLORS.map((color) => (
                     <Button key={color} variant="ghost" size="icon" className={`h-8 w-8 rounded-full border-2 p-1 ${form.accent_color === color ? "border-foreground" : "border-transparent"}`} onClick={() => setForm({ ...form, accent_color: color })} aria-label={`Escolher cor ${color}`}><span className="h-full w-full rounded-full" style={{ backgroundColor: color }} /></Button>
@@ -854,7 +854,7 @@ function EditProfile({
               </div>
 
               <div className="space-y-3 border-t border-border pt-5">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Fundo nos comentários</p>
+                <p className="text-xs font-bold tracking-[0.2em] text-muted-foreground">Fundo nos comentários</p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {COMMENT_BGS.map((background) => (
                     <Button key={background.id} variant="outline" className={`h-14 justify-start ${form.comment_bg === background.value ? "border-primary" : ""}`} onClick={() => setForm({ ...form, comment_bg: background.value })}><span className="h-7 w-9 rounded bg-surface-2" style={background.value ? { background: background.value } : undefined} /><span className="truncate text-xs">{background.label}</span></Button>
@@ -862,7 +862,7 @@ function EditProfile({
                 </div>
               </div>
 
-              <Button className="h-11 w-full text-xs font-black uppercase tracking-widest" disabled={save.isPending || uploading !== null || !form.username.trim()} onClick={() => save.mutate({}, { onSuccess: () => onOpenChange(false) })}>
+              <Button className="h-11 w-full text-xs font-bold" disabled={save.isPending || uploading !== null || !form.username.trim()} onClick={() => save.mutate({}, { onSuccess: () => onOpenChange(false) })}>
                 <Check className="h-4 w-4" /> {save.isPending ? "Salvando…" : "Salvar dados"}
               </Button>
             </section>

@@ -57,8 +57,8 @@ export function UserBadges({
           title="Administrador"
           className={
             inline
-              ? "inline-flex h-5 shrink-0 cursor-help items-center rounded-md border border-primary/40 bg-primary/15 px-1.5 text-[9px] font-extrabold uppercase leading-none text-primary"
-              : "inline-flex h-8 shrink-0 cursor-help items-center rounded-md border border-primary/40 bg-primary/15 px-2.5 text-[10px] font-extrabold uppercase leading-none text-primary shadow-[var(--shadow-card)]"
+              ? "inline-flex h-5 shrink-0 cursor-help items-center rounded-md border border-primary/40 bg-primary/15 px-1.5 text-[11px] font-bold leading-none text-primary"
+              : "inline-flex h-8 shrink-0 cursor-help items-center rounded-md border border-primary/40 bg-primary/15 px-2.5 text-xs font-bold leading-none text-primary shadow-[var(--shadow-card)]"
           }
         >
           Admin

@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { BookPlus, BookMarked, Headset, LogOut, Search, Shield, User2 } from "lucide-react";
+import { BookPlus, BookMarked, Headset, History, LogOut, Search, Shield, User2 } from "lucide-react";
 import { WorkNotifications } from "@/components/WorkNotifications";
 import { supabase } from "@/integrations/supabase/client";
 import { MobileNav } from "@/components/MobileNav";
@@ -19,12 +19,12 @@ import {
 
 const NAV = [
   { to: "/catalogo", label: "Catálogo" },
-  { to: "/reels", label: "Reels" },
   { to: "/ranking", label: "Ranking" },
-  { to: "/biblioteca", label: "Coleções" },
+  { to: "/biblioteca", label: "Biblioteca" },
+  { to: "/historico", label: "Histórico" },
   { to: "/listas", label: "Listas" },
   { to: "/ranking-leitores", label: "Leitores" },
-  { to: "/historico", label: "Histórico" },
+  { to: "/reels", label: "Reels" },
 ] as const;
 
 export function SiteHeader() {
@@ -44,57 +44,37 @@ export function SiteHeader() {
 
   return (
     <>
-      <header
-        className="site-header sticky top-0 z-40 border-b border-border/60 bg-background/85"
-      >
-        <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-8">
-          <Link to="/" className="flex shrink-0 items-center" aria-label="Better Mangá — início">
-            <img
-              src="https://cdn.mediocrescan.com/usuarios/156358/056c603c2288529c82b19ad4906b02c7f5a67be8.webp"
-              alt="Better Mangá"
-              className="h-14 w-auto max-w-36 object-contain sm:max-w-40"
-            />
+      <header className="site-header sticky top-0 z-40 border-b border-border">
+        <div className="mx-auto flex h-14 max-w-7xl items-center gap-1.5 px-4 sm:gap-2 sm:px-6 lg:px-8">
+          <Link to="/" className="mr-2 flex shrink-0 items-center" aria-label="Better Mangá — início">
+            <img src={SITE_LOGO} alt="Better Mangá" className="h-10 w-auto max-w-32 object-contain" />
           </Link>
 
-          <div className="min-w-0 flex-1 lg:hidden" />
-
-          <nav aria-label="Navegação principal" className="hidden items-center gap-0.5 text-xs font-semibold lg:flex xl:text-sm">
+          <nav aria-label="Navegação principal" className="hidden items-center gap-0.5 text-[13px] font-semibold lg:flex">
             {NAV.map((item) => (
               <Link
                 key={item.to}
                 to={item.to}
                 activeOptions={{ exact: false }}
-                className="site-nav-link group relative flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-2"
-                activeProps={{ className: "bg-primary/10 text-primary" }}
-                inactiveProps={{ className: "text-muted-foreground hover:bg-foreground/5 hover:text-foreground" }}
+                className="site-nav-link whitespace-nowrap rounded-md px-2.5 py-1.5"
+                activeProps={{ className: "bg-surface-2 text-foreground" }}
+                inactiveProps={{ className: "text-muted-foreground hover:text-foreground" }}
               >
-                {({ isActive }) => (
-                  <>
-                    <span
-                      className={`h-1.5 w-1.5 shrink-0 rounded-full transition-colors ${
-                        isActive ? "bg-primary shadow-[var(--shadow-glow)]" : "bg-transparent group-hover:bg-foreground/25"
-                      }`}
-                    />
-                    {item.label}
-                  </>
-                )}
+                {item.label}
               </Link>
             ))}
           </nav>
 
-          <div className="hidden min-w-0 flex-1 lg:block" />
+          <div className="min-w-0 flex-1" />
 
-          <Button
-            asChild
-            variant="ghost"
-            className="hidden h-9 w-32 shrink-0 gap-2 rounded-md border border-border bg-surface px-3 text-muted-foreground lg:flex xl:w-44"
+          <Link
+            to="/catalogo"
+            search={{ q: "", kind: "Todos" }}
+            className="hidden h-9 w-40 shrink-0 items-center gap-2 rounded-md bg-surface-2 px-3 text-[13px] text-muted-foreground hover:text-foreground lg:flex xl:w-56"
           >
-            <Link to="/catalogo" search={{ q: "", kind: "Todos" }}>
-              <Search className="h-3.5 w-3.5 shrink-0" />
-              <span className="flex-1 text-left text-[13px]">Buscar...</span>
-            </Link>
-          </Button>
-
+            <Search className="h-4 w-4 shrink-0" />
+            <span className="flex-1 truncate">Buscar obras…</span>
+          </Link>
 
           <Button asChild size="icon" variant="ghost" title="Pedir uma obra" className="shrink-0"><Link to="/pedidos" aria-label="Pedir uma obra"><BookPlus className="h-[18px] w-[18px]" /></Link></Button>
           <WorkNotifications />
@@ -102,25 +82,18 @@ export function SiteHeader() {
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="shrink-0" aria-label="Conta">
-                  <span className="relative shrink-0 pb-2">
-                    <span className="relative z-10 flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-foreground/10 bg-surface-2">
-                      {profile?.avatar_url ? (
-                        <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <User2 className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </span>
-                    <span className="absolute -bottom-1 left-1/2 z-30 min-w-max -translate-x-1/2">
-                      <span className="inline-flex h-[18px] items-center justify-center gap-1 rounded-full border border-foreground/10 bg-foreground/[0.07] px-1.5 text-[10px] font-semibold tracking-wide text-muted-foreground backdrop-blur-sm">
-                        <span className="h-1 w-1 shrink-0 rounded-full bg-primary" />
-                        <span className="tabular-nums leading-none">{profile?.level ?? 1}</span>
-                      </span>
-                    </span>
+                <Button variant="ghost" size="icon" className="shrink-0 rounded-full" aria-label="Conta">
+                  <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-surface-2">
+                    {profile?.avatar_url ? (
+                      <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <User2 className="h-4 w-4 text-muted-foreground" />
+                    )}
                   </span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuContent align="end" className="w-56">
+                {profile ? <p className="px-2 pb-1.5 pt-1 text-xs text-muted-foreground"><span className="font-semibold text-foreground">@{profile.username}</span> · nível {profile.level ?? 1}</p> : null}
                 <DropdownMenuItem asChild>
                   <Link to="/perfis" className="flex items-center gap-2">
                     <ProfileAvatar profile={activeProfile} size="sm" /> <span className="truncate">{activeProfile.name}</span>
@@ -135,9 +108,10 @@ export function SiteHeader() {
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/biblioteca" className="flex items-center gap-2">
-                    <BookMarked className="h-4 w-4" /> Minha biblioteca
+                    <BookMarked className="h-4 w-4" /> Biblioteca
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to="/historico" className="flex items-center gap-2"><History className="h-4 w-4" /> Histórico</Link></DropdownMenuItem>
                 <DropdownMenuItem asChild><Link to="/pedidos" className="flex items-center gap-2"><BookPlus className="h-4 w-4" /> Meus pedidos</Link></DropdownMenuItem>
                 {isStaff ? (
                   <DropdownMenuItem asChild>
@@ -153,7 +127,7 @@ export function SiteHeader() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button asChild size="sm" className="font-semibold">
+            <Button asChild size="sm" className="ml-1">
               <Link to="/auth">Entrar</Link>
             </Button>
           )}
@@ -169,179 +143,46 @@ export const SITE_LOGO =
 
 export function SiteFooter() {
   const year = new Date().getFullYear();
+  const link = "w-fit text-sm text-muted-foreground hover:text-foreground";
   return (
-    <footer className="site-footer hidden border-t border-border/70 bg-surface lg:block">
-      <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 md:px-8">
-        <div className="mb-8 grid grid-cols-1 gap-8 md:grid-cols-4">
-          <div className="space-y-4">
-            <Link to="/" className="group flex w-fit items-center gap-3">
-              <img
-                src={SITE_LOGO}
-                alt="Better Mangá"
-                className="h-20 w-auto object-contain drop-shadow-[0_0_14px_color-mix(in_oklab,var(--primary)_45%,transparent)] transition-transform duration-200 group-hover:scale-105 sm:h-28"
-              />
-            </Link>
-            <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
-              Organize sua coleção e acompanhe o que você curte — leia mangás,
-              manhwas e comics num só lugar.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-foreground">
-              Navegação
-            </h3>
-            <nav className="flex flex-col gap-2.5">
-              <Link to="/pedidos" className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary">Pedir uma obra</Link>
-              <Link
-                to="/"
-                className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary"
-              >
-                Início
-              </Link>
-              <Link
-                to="/catalogo"
-                search={{ q: "", kind: "Todos" }}
-                className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary"
-              >
-                Pesquisar
-              </Link>
-              <Link
-                to="/biblioteca"
-                className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary"
-              >
-                Minha Coleção
-              </Link>
-              <Link
-                to="/listas"
-                className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary"
-              >
-                Listas
-              </Link>
-            </nav>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-foreground">
-              Comunidade
-            </h3>
-            <nav className="flex flex-col gap-2.5">
-              <Link
-                to="/ranking"
-                className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary"
-              >
-                Ranking de obras
-              </Link>
-              <Link
-                to="/ranking-leitores"
-                className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary"
-              >
-                Ranking de leitores
-              </Link>
-              <Link
-                to="/historico"
-                className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary"
-              >
-                Histórico
-              </Link>
-              <Link
-                to="/catalogo"
-                search={{ q: "", kind: "Todos" }}
-                className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary"
-              >
-                Explorar obras
-              </Link>
-            </nav>
-          </div>
-
-          <div className="space-y-3">
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-foreground">
-              Redes Sociais
-            </h3>
-            <div className="flex flex-wrap gap-3">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={openSupportChat}
-                className="border border-border"
-              >
-                <Headset className="h-4 w-4" />
-                Suporte
-              </Button>
-            </div>
-            <nav className="flex flex-col gap-2.5 pt-2">
-              <Link
-                to="/auth"
-                className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary"
-              >
-                Entrar / Criar conta
-              </Link>
-              <Link
-                to="/biblioteca"
-                className="w-fit text-sm text-muted-foreground transition-colors hover:text-primary"
-              >
-                Continuar lendo
-              </Link>
-            </nav>
-          </div>
+    <footer className="site-footer hidden border-t border-border bg-surface lg:block">
+      <div className="mx-auto grid max-w-7xl grid-cols-4 gap-8 px-8 py-10">
+        <div className="space-y-3">
+          <Link to="/" className="flex w-fit items-center" aria-label="Better Mangá — início">
+            <img src={SITE_LOGO} alt="Better Mangá" className="h-14 w-auto object-contain" />
+          </Link>
+          <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
+            Mangás, manhwas, manhuas e comics em português, com capítulos novos todos os dias.
+          </p>
         </div>
-
-        <div className="relative border-t border-border/70 pt-6">
-          <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-            <p className="text-xs font-bold text-muted-foreground">
-              © {year} Better Mangá. Todos os direitos reservados.
-            </p>
-            <div className="flex flex-wrap items-center justify-end gap-4 text-xs font-semibold text-muted-foreground">
-              <Link
-                to="/catalogo"
-                search={{ q: "", kind: "Todos" }}
-                className="transition-colors hover:text-primary"
-              >
-                Catálogo
-              </Link>
-              <Link
-                to="/ranking"
-                className="transition-colors hover:text-primary"
-              >
-                Obras
-              </Link>
-              <Link
-                to="/ranking-leitores"
-                className="transition-colors hover:text-primary"
-              >
-                Leitores
-              </Link>
-              <Link
-                to="/listas"
-                className="transition-colors hover:text-primary"
-              >
-                Listas
-              </Link>
-              <Link
-                to="/privacidade"
-                className="transition-colors hover:text-primary"
-              >
-                Privacidade
-              </Link>
-              <Link
-                to="/excluir-conta"
-                className="transition-colors hover:text-primary"
-              >
-                Excluir conta
-              </Link>
-            </div>
-          </div>
-          <div
-            aria-hidden
-            className="pointer-events-none absolute bottom-0 right-0 opacity-10"
-          >
-            <img
-              src={SITE_LOGO}
-              alt=""
-              className="h-[200px] w-[200px] object-contain"
-            />
-          </div>
+        <nav className="flex flex-col gap-2.5" aria-label="Navegação">
+          <h3 className="mb-1 text-sm font-semibold">Navegação</h3>
+          <Link to="/" className={link}>Início</Link>
+          <Link to="/catalogo" search={{ q: "", kind: "Todos" }} className={link}>Catálogo</Link>
+          <Link to="/biblioteca" className={link}>Biblioteca</Link>
+          <Link to="/historico" className={link}>Histórico</Link>
+          <Link to="/pedidos" className={link}>Pedir uma obra</Link>
+        </nav>
+        <nav className="flex flex-col gap-2.5" aria-label="Comunidade">
+          <h3 className="mb-1 text-sm font-semibold">Comunidade</h3>
+          <Link to="/ranking" className={link}>Ranking de obras</Link>
+          <Link to="/ranking-leitores" className={link}>Ranking de leitores</Link>
+          <Link to="/listas" className={link}>Listas</Link>
+          <Link to="/reels" className={link}>Reels</Link>
+        </nav>
+        <div className="flex flex-col gap-2.5">
+          <h3 className="mb-1 text-sm font-semibold">Ajuda</h3>
+          <Button type="button" variant="secondary" size="sm" onClick={openSupportChat} className="w-fit">
+            <Headset className="h-4 w-4" />
+            Falar com o suporte
+          </Button>
+          <Link to="/auth" className={link}>Entrar ou criar conta</Link>
+          <Link to="/privacidade" className={link}>Privacidade</Link>
+          <Link to="/excluir-conta" className={link}>Excluir conta</Link>
         </div>
+      </div>
+      <div className="border-t border-border">
+        <p className="mx-auto max-w-7xl px-8 py-4 text-xs text-muted-foreground">© {year} Better Mangá. Todos os direitos reservados.</p>
       </div>
     </footer>
   );

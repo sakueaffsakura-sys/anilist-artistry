@@ -7,13 +7,13 @@ import { hasIaFlag, pick, tagNames, text, workImage } from "@/lib/mediocre-api";
 type Row = Record<string, unknown>;
 
 export function LoadingState() {
-  return <p className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground" role="status">Carregando dados…</p>;
+  return <p className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground" role="status">Carregando dados…</p>;
 }
 export function ErrorState({ message }: { message: string }) {
-  return <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive" role="alert">{message}</p>;
+  return <p className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive" role="alert">{message}</p>;
 }
 export function EmptyState({ message = "Nenhum item encontrado." }: { message?: string }) {
-  return <p className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">{message}</p>;
+  return <p className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">{message}</p>;
 }
 
 function Field({ label, value }: { label: string; value: unknown }) {
@@ -34,9 +34,9 @@ export function WorkCard({ row, showIa, badge, onSelect }: { row: Row; showIa?: 
   const tags = tagNames(row["tags"]).slice(0, 4);
   const date = text(pick(row, "data_ultimo_cap", "obr_atualizado_em", "atualizado_em", "cap_lancado_em"));
   return (
-    <article className="relative flex gap-3 rounded-xl border border-border bg-card p-3">
+    <article className="relative flex gap-3 rounded-lg border border-border bg-card p-3">
       {badge}
-      {onSelect && <button type="button" onClick={() => onSelect(row)} className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Opções de ${name ?? "obra"}`} />}
+      {onSelect && <button type="button" onClick={() => onSelect(row)} className="absolute inset-0 z-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Opções de ${name ?? "obra"}`} />}
       {img ? <img src={img} alt={name ?? "Capa"} loading="lazy" decoding="async" className="aspect-[2/3] w-20 shrink-0 rounded-lg object-cover" /> : <div className="aspect-[2/3] w-20 shrink-0 rounded-lg bg-muted" />}
       <div className="min-w-0 space-y-1">
         <h3 className="line-clamp-2 font-semibold">{name ?? "Sem título"}</h3>
@@ -66,7 +66,7 @@ export function ChapterList({ chapters }: { chapters: Row[] }) {
   return (
     <div className="space-y-2">
       <p className="text-xs text-muted-foreground">Este endpoint retornou apenas os dados do capítulo. O conteúdo completo não está disponível nesta resposta.</p>
-      <ul className="max-h-[480px] divide-y divide-border overflow-auto rounded-xl border border-border bg-card">
+      <ul className="max-h-[480px] divide-y divide-border overflow-auto rounded-lg border border-border bg-card">
         {chapters.map((c, i) => (
           <li key={String(c["cap_id"] ?? i)} className="space-y-1 p-3">
             <p className="text-sm font-semibold">{text(c["cap_nome"]) ?? text(c["obr_nome"]) ?? `Capítulo ${text(c["cap_num"]) ?? ""}`}</p>
@@ -88,9 +88,9 @@ export function WorkDetails({ work }: { work: Row }) {
   const chapters = Array.isArray(work["capitulos"]) ? (work["capitulos"] as unknown[]).filter((c): c is Row => Boolean(c) && typeof c === "object") : null;
   return (
     <section className="space-y-4">
-      {banner && <img src={banner} alt="" className="h-32 w-full rounded-xl object-cover md:h-48" />}
+      {banner && <img src={banner} alt="" className="h-32 w-full rounded-lg object-cover md:h-48" />}
       <div className="flex flex-col gap-4 md:flex-row">
-        {img && <img src={img} alt={text(work["obr_nome"]) ?? "Capa"} className="aspect-[2/3] w-32 rounded-xl object-cover" />}
+        {img && <img src={img} alt={text(work["obr_nome"]) ?? "Capa"} className="aspect-[2/3] w-32 rounded-lg object-cover" />}
         <div className="min-w-0 space-y-2">
           <h2 className="text-xl font-bold">{text(work["obr_nome"]) ?? "Sem título"}</h2>
           {alts.length > 0 && <p className="text-xs text-muted-foreground">{alts.join(" · ")}</p>}
@@ -120,7 +120,7 @@ export function JsonViewer({ data, fileName }: { data: unknown; fileName: string
         <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(json()).then(() => toast.success("JSON copiado."), () => toast.error("Não foi possível copiar."))}><Copy className="mr-1 h-4 w-4" />Copiar JSON</Button>
         <Button size="sm" variant="outline" onClick={download}><Download className="mr-1 h-4 w-4" />Baixar JSON</Button>
       </div>
-      {open && <pre className="max-h-[480px] overflow-auto rounded-xl border border-border bg-muted p-3 text-[11px]">{json()}</pre>}
+      {open && <pre className="max-h-[480px] overflow-auto rounded-lg border border-border bg-muted p-3 text-[11px]">{json()}</pre>}
     </div>
   );
 }

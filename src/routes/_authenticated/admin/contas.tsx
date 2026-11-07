@@ -71,7 +71,7 @@ function Contas() {
       {accounts.isError ? <div role="alert" className="mt-4 text-sm text-destructive">Não foi possível carregar as contas. <Button variant="outline" onClick={() => void accounts.refetch()}>Tentar novamente</Button></div> : null}
       <div aria-busy={accounts.isFetching} className="mt-5 grid gap-3 md:grid-cols-2">
         {rows.map((a) => (
-          <div key={a.id} className={`flex items-center gap-4 rounded-2xl border bg-surface p-4 ${a.banned ? "border-destructive/50" : "border-border"}`}>
+          <div key={a.id} className={`flex items-center gap-4 rounded-lg border bg-surface p-4 ${a.banned ? "border-destructive/50" : "border-border"}`}>
             <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 text-lg font-bold text-primary ring-2 ring-border">
               {a.avatar_url ? <img src={a.avatar_url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : a.username.slice(0, 2).toUpperCase()}
             </div>
@@ -82,7 +82,7 @@ function Contas() {
                 </Link>
                 <span className="rounded border border-border px-1.5 text-[10px] font-bold text-muted-foreground">Nv. {a.level}</span>
                 {a.roles.map((r) => (
-                  <span key={r} className="flex items-center gap-0.5 rounded bg-primary/15 px-1.5 text-[10px] font-bold uppercase text-primary">
+                  <span key={r} className="flex items-center gap-0.5 rounded bg-primary/15 px-1.5 text-xs font-bold text-primary">
                     {r === "admin" ? <Shield className="h-2.5 w-2.5" /> : <UploadIcon className="h-2.5 w-2.5" />} {r}
                   </span>
                 ))}
@@ -254,7 +254,7 @@ function AccountDialog({ account, selfId, onClose }: { account: Account | null; 
           <Label>XP (nível = 1 + XP ÷ 1000)</Label>
           <Input type="number" min={0} value={f.xp} onChange={(e) => setF({ ...f, xp: e.target.value })} />
         </div>
-        <div className="space-y-2 rounded-xl border border-border p-3">
+        <div className="space-y-2 rounded-lg border border-border p-3">
           <p className="text-sm font-bold">Selo de assinatura</p>
           <div className="grid grid-cols-5 gap-2">
             {(["none", "bronze", "prata", "ouro", "diamante"] as const).map((tier) => {
@@ -280,7 +280,7 @@ function AccountDialog({ account, selfId, onClose }: { account: Account | null; 
             })}
           </div>
         </div>
-        <div className="space-y-2 rounded-xl border border-border p-3">
+        <div className="space-y-2 rounded-lg border border-border p-3">
           <p className="text-sm font-bold">Selos do perfil</p>
           <p className="text-xs text-muted-foreground">Envie um selo cadastrado ou remova os que este usuário já possui.</p>
           <div className="flex flex-wrap gap-2">
@@ -301,7 +301,7 @@ function AccountDialog({ account, selfId, onClose }: { account: Account | null; 
             {badges.data?.length === 0 ? <span className="text-xs text-muted-foreground">Nenhum selo recebido.</span> : null}
           </div>
           <div className="border-t border-border pt-3">
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase text-muted-foreground">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
               <Award className="h-3.5 w-3.5" /> Catálogo de selos
             </p>
             <div className="grid max-h-56 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3">
@@ -332,7 +332,7 @@ function AccountDialog({ account, selfId, onClose }: { account: Account | null; 
             {badgeEvents.data?.length === 0 ? <p className="py-3 text-xs text-muted-foreground">Nenhum selo cadastrado.</p> : null}
           </div>
         </div>
-        <div className="space-y-2 rounded-xl border border-border p-3">
+        <div className="space-y-2 rounded-lg border border-border p-3">
           <p className="text-sm font-bold">Cargos</p>
           {ROLES.map((r) => (
             <label key={r.key} className="flex items-center justify-between text-sm">
@@ -347,7 +347,7 @@ function AccountDialog({ account, selfId, onClose }: { account: Account | null; 
             </label>
           ))}
         </div>
-        <label className="flex items-center justify-between rounded-xl border border-destructive/40 p-3 text-sm">
+        <label className="flex items-center justify-between rounded-lg border border-destructive/40 p-3 text-sm">
           <span>
             <span className="font-semibold text-destructive">Bloquear conta</span>
             <span className="block text-xs text-muted-foreground">Impede de comentar no site.</span>

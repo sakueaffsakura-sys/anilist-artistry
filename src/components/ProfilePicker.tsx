@@ -18,7 +18,7 @@ const KIDS_LABEL: Record<KidsMaxAge, string> = { L: "Só Livre", "10": "Até 10 
 
 export function ProfileAvatar({ profile, size = "lg" }: { profile: Pick<AccountProfile, "name" | "color" | "kidsMaxAge">; size?: "sm" | "lg" }) {
   return (
-    <span className={cn("relative inline-flex items-center justify-center rounded-2xl font-display font-extrabold text-primary-foreground shadow-lg",
+    <span className={cn("relative inline-flex items-center justify-center rounded-lg font-display font-bold text-primary-foreground shadow-lg",
       COLOR_CLASS[profile.color] ?? "bg-primary", size === "lg" ? "h-24 w-24 text-4xl sm:h-28 sm:w-28" : "h-7 w-7 rounded-lg text-xs")}>
       {profile.name.trim().charAt(0).toUpperCase()}
       {profile.kidsMaxAge && size === "lg" ? <Baby className="absolute -bottom-2 -right-2 h-7 w-7 rounded-full bg-background p-1 text-primary" /> : null}
@@ -57,12 +57,12 @@ export function ProfilePicker({ onDone }: { onDone?: () => void }) {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col items-center gap-10 px-4 py-12 text-center">
-      <h1 className="font-display text-3xl font-extrabold sm:text-4xl">{manage ? "Gerenciar perfis" : "Quem está lendo?"}</h1>
+      <h1 className="font-display text-3xl font-bold sm:text-4xl">{manage ? "Gerenciar perfis" : "Quem está lendo?"}</h1>
       <div className="flex flex-wrap justify-center gap-6 sm:gap-8">
         {profiles.map((profile) => (
           <div key={profile.id} className="flex w-28 flex-col items-center gap-3">
             <button type="button" onClick={() => manage ? void changePin(profile) : void choose(profile)}
-              className={cn("rounded-2xl ring-offset-4 ring-offset-background transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", active.id === profile.id && !manage && "ring-2 ring-primary")}
+              className={cn("rounded-lg ring-offset-4 ring-offset-background transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", active.id === profile.id && !manage && "ring-2 ring-primary")}
               aria-label={manage ? `Definir PIN de ${profile.name}` : `Entrar como ${profile.name}`}>
               <ProfileAvatar profile={profile} />
             </button>
@@ -76,7 +76,7 @@ export function ProfilePicker({ onDone }: { onDone?: () => void }) {
         {profiles.length < MAX_PROFILES && !manage ? (
           <div className="flex w-28 flex-col items-center gap-3">
             <button type="button" onClick={() => setCreating(true)} aria-label="Adicionar perfil"
-              className="flex h-24 w-24 items-center justify-center rounded-2xl border-2 border-dashed border-border text-muted-foreground transition hover:border-primary hover:text-primary sm:h-28 sm:w-28">
+              className="flex h-24 w-24 items-center justify-center rounded-lg border-2 border-dashed border-border text-muted-foreground transition hover:border-primary hover:text-primary sm:h-28 sm:w-28">
               <Plus className="h-10 w-10" />
             </button>
             <span className="text-sm text-muted-foreground">Adicionar</span>
@@ -89,7 +89,7 @@ export function ProfilePicker({ onDone }: { onDone?: () => void }) {
 
       {pinFor ? (
         <form className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur" onSubmit={(e) => { e.preventDefault(); void choose(pinFor, pin); }}>
-          <div className="w-full max-w-xs space-y-4 rounded-2xl border border-border bg-card p-6">
+          <div className="w-full max-w-xs space-y-4 rounded-lg border border-border bg-card p-6">
             <div className="flex items-center justify-between"><h2 className="font-display text-lg font-bold">PIN de {pinFor.name}</h2>
               <button type="button" aria-label="Fechar" onClick={() => setPinFor(null)}><X className="h-4 w-4" /></button></div>
             <Input autoFocus inputMode="numeric" maxLength={4} type="password" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} aria-label="PIN" className="text-center text-2xl tracking-[0.5em]" />
@@ -125,13 +125,13 @@ function CreateProfile({ onClose, onCreated }: { onClose: () => void; onCreated:
   };
   return (
     <div className="mx-auto max-w-md space-y-6 px-4 py-12">
-      <h1 className="font-display text-3xl font-extrabold">Novo perfil</h1>
+      <h1 className="font-display text-3xl font-bold">Novo perfil</h1>
       <div className="flex justify-center"><ProfileAvatar profile={{ name: name || "?", color, kidsMaxAge: kids ? maxAge : null }} /></div>
       <Input autoFocus maxLength={30} placeholder="Nome do perfil" value={name} onChange={(e) => setName(e.target.value)} aria-label="Nome do perfil" />
       <div className="flex justify-center gap-3">
         {COLORS.map((c) => <button key={c} type="button" aria-label={`Cor ${c}`} onClick={() => setColor(c)} className={cn("h-9 w-9 rounded-full", COLOR_CLASS[c], color === c && "ring-2 ring-foreground ring-offset-2 ring-offset-background")} />)}
       </div>
-      <fieldset className="space-y-3 rounded-2xl border border-border p-4">
+      <fieldset className="space-y-3 rounded-lg border border-border p-4">
         <legend className="px-1 font-display font-bold">Quer que seja um perfil infantil?</legend>
         <div className="grid grid-cols-2 gap-2">
           <Button type="button" variant={kids === true ? "default" : "outline"} onClick={() => setKids(true)}><Baby className="mr-2 h-4 w-4" /> Sim, infantil</Button>

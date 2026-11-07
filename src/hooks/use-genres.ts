@@ -20,3 +20,20 @@ export function useGenres() {
     staleTime: 1000 * 60 * 60, // 1 hour
   });
 }
+
+/**
+ * Gêneros para os filtros públicos: a lista oficial em português e os criados no painel, sem os
+ * rótulos soltos que vieram de importações ("+1", frases inteiras, nomes em inglês).
+ */
+export function usePublicGenres() {
+  return useQuery({
+    queryKey: ["public-genres"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("custom_genres").select("name").order("name");
+      if (error) throw error;
+      return normalizeGenres([...GENRES, ...(data ?? []).map((r) => r.name)]).sort((a, b) => a.localeCompare(b, "pt-BR"));
+    },
+    staleTime: 1000 * 60 * 60,
+  });
+}
+

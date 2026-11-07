@@ -31,3 +31,31 @@ describe("Work categories", () => {
     expect(suggestWorkKind({ format: "ONE_SHOT" })).toBe("One-shot");
   });
 });
+describe("Work category labels", () => {
+  it("shows legacy names as the main category and English in Portuguese", async () => {
+    const { kindLabel, kindValues, PUBLIC_KINDS, sameKind } = await import("../src/lib/work-categories");
+    expect(kindLabel("Comic2")).toBe("Comic");
+    expect(kindLabel("Shoujo2")).toBe("Shoujo");
+    expect(kindLabel("English")).toBe("Em inglês");
+    expect(kindLabel("Manhwa")).toBe("Manhwa");
+    expect(PUBLIC_KINDS).not.toContain("Comic2");
+    expect(PUBLIC_KINDS).not.toContain("Shoujo2");
+    expect(kindValues("Comic")).toEqual(["Comic", "Comic2"]);
+    expect(kindValues("Manga")).toEqual(["Manga"]);
+    expect(sameKind("Shoujo2", "Shoujo")).toBe(true);
+  });
+});
+
+describe("Chapter subtitle", () => {
+  it("hides titles that only repeat the chapter number", async () => {
+    const { chapterSubtitle, formatRating } = await import("../src/lib/format");
+    expect(chapterSubtitle("Capítulo 43", 43)).toBeNull();
+    expect(chapterSubtitle("Cap. 14", "14")).toBeNull();
+    expect(chapterSubtitle("Chapter 7.5", 7.5)).toBeNull();
+    expect(chapterSubtitle("", 3)).toBeNull();
+    expect(chapterSubtitle("O retorno do herói", 12)).toBe("O retorno do herói");
+    expect(chapterSubtitle("Capítulo 2: a fuga", 2)).toBe("Capítulo 2: a fuga");
+    expect(formatRating(7.56)).toBe("7,6");
+    expect(formatRating(null)).toBe("0,0");
+  });
+});

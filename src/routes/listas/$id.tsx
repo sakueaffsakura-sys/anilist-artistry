@@ -64,9 +64,13 @@ function ListaPage() {
   const { user } = useSession();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  // Dados que o servidor já usou para montar a página: a primeira renderização no navegador fica igual
+  // (sem isso o navegador mostrava "Carregando…" por cima da lista pronta e o React acusava diferença).
+  const loaded = Route.useLoaderData();
 
   const list = useQuery({
     queryKey: ["list", id],
+    initialData: loaded ?? undefined,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("lists")
@@ -127,40 +131,42 @@ function ListaPage() {
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <main className="mx-auto max-w-7xl px-4 py-10">
+      <main className="site-content mx-auto max-w-7xl px-4 py-6 sm:px-6 md:py-8 lg:px-8">
         {!data ? (
           <p className="text-muted-foreground">{list.isLoading ? "Carregando…" : "Lista não encontrada."}</p>
         ) : (
           <>
             <PageTitle
-              icon={<ListOrdered className="h-7 w-7" />}
+              icon={<ListOrdered />}
               title={data.title}
-              subtitle={data.description ?? `${data.list_items.length} obras`}
+              subtitle={`${data.description ? `${data.description} · ` : ""}${data.list_items.length.toLocaleString("pt-BR")} ${data.list_items.length === 1 ? "obra" : "obras"}`}
               right={
                 isOwner ? (
-                  <Button variant="outline" onClick={() => deleteList.mutate()}>
-                    <Trash2 className="mr-2 h-4 w-4" /> Excluir lista
+                  <Button variant="secondary" size="sm" onClick={() => deleteList.mutate()}>
+                    <Trash2 className="h-4 w-4" /> Excluir lista
                   </Button>
                 ) : user ? (
-                  <Button variant={following.data ? "default" : "outline"} onClick={() => toggleFollow.mutate()}>
-                    <Bookmark className={`mr-2 h-4 w-4 ${following.data ? "fill-current" : ""}`} />
+                  <Button size="sm" variant={following.data ? "secondary" : "default"} aria-pressed={Boolean(following.data)} onClick={() => toggleFollow.mutate()}>
+                    <Bookmark className={`h-4 w-4 ${following.data ? "fill-current" : ""}`} />
                     {following.data ? "Seguindo" : "Seguir lista"}
                   </Button>
                 ) : (
-                  <Button asChild variant="outline"><Link to="/auth">Entre para seguir</Link></Button>
+                  <Button asChild size="sm" variant="secondary"><Link to="/auth">Entre para seguir</Link></Button>
                 )
               }
             />
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
+            <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
               {data.list_items.map((i) =>
                 i.series ? (
                   <div key={i.series.id} className="relative">
                     <SeriesCard slug={i.series.slug} title={i.series.title} cover={i.series.cover_url} rating={i.series.rating} seriesId={i.series.id} ageRating={i.series.age_rating} />
                     {isOwner ? (
                       <button
+                        type="button"
                         onClick={() => removeItem.mutate(i.series!.id)}
-                        className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-background/85 hover:text-destructive"
-                        aria-label="Remover da lista"
+                        className="absolute right-[2.375rem] top-1.5 z-[5] grid h-7 w-7 place-items-center rounded-full bg-cover-overlay text-cover-foreground hover:text-destructive"
+                        aria-label={`Tirar ${i.series.title} da lista`}
+                        title="Tirar da lista"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

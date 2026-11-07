@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, BookOpenText, Compass, Eye, RotateCw, Sparkle, Trophy } from "lucide-react";
+import { ArrowRight, BookOpenText, RotateCw, Trophy } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
 import { SeriesCard } from "@/components/SeriesCard";
 import { HeroCarousel } from "@/components/HeroCarousel";
@@ -9,7 +9,7 @@ import { ContinueReading } from "@/components/ContinueReading";
 import { FavoritesUpdated } from "@/components/FavoritesUpdated";
 import { Releases } from "@/components/Releases";
 import { RecentlyUpdated } from "@/components/RecentlyUpdated";
-import { HScroll, SectionRow } from "@/components/SectionRow";
+import { HScroll, SectionRow, shelfItem } from "@/components/SectionRow";
 import { Button } from "@/components/ui/button";
 import { fetchFavorites, fetchHistory, fetchSeries } from "@/lib/queries";
 import { useSession } from "@/hooks/useAuth";
@@ -17,10 +17,12 @@ import { EventBadges } from "@/components/EventBadges";
 import { HomeDiscovery } from "@/components/HomeDiscovery";
 import { fetchHomeSections } from "@/lib/home-section-queries";
 import { RECENT_UPDATES_LIMIT } from "@/lib/recent-updates";
+import { coverUrl, formatChapter } from "@/lib/media";
+import { compactNumber } from "@/lib/format";
+import { kindLabel } from "@/lib/work-categories";
 
 /** Atalhos da home para o catálogo filtrado (os gêneros mais procurados no site). */
 const GENRE_SHORTCUTS = ["Ação", "Fantasia", "Romance", "Artes Marciais", "Murim", "Isekai", "Regressão", "Sistema", "Comédia", "Drama", "Sobrenatural", "Terror", "Escolar", "Aventura"];
-const compact = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
 
 export const Route = createFileRoute("/")({
   staticData: { sitemap: true },
@@ -106,20 +108,19 @@ function Home() {
     <div className="min-h-screen">
       <SiteHeader />
       {heroLoading ? (
-        <section aria-label="Carregando destaques" aria-busy="true" className="pb-6 md:pb-8">
-          <div className="hero-model-layout mx-auto grid max-w-[1400px] grid-cols-[110px_minmax(0,1fr)] items-start gap-5 px-4 py-7 md:grid-cols-[220px_minmax(0,1fr)] md:items-center md:gap-10 md:px-10 md:py-12 lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-12">
-            <div className="aspect-[2/3] rounded-lg bg-muted motion-safe:animate-pulse" />
-            <div className="space-y-5" aria-hidden="true">
-              <div className="h-4 w-24 rounded bg-muted motion-safe:animate-pulse" />
-              <div className="h-9 w-4/5 rounded bg-muted motion-safe:animate-pulse" />
-              <div className="h-6 w-2/3 rounded bg-muted motion-safe:animate-pulse" />
-              <div className="hidden h-20 w-full rounded bg-muted motion-safe:animate-pulse md:block" />
-              <div className="h-12 w-3/4 rounded-full bg-muted motion-safe:animate-pulse" />
+        <section aria-label="Carregando destaques" aria-busy="true" className="home-banner">
+          <div className="mx-auto grid max-w-7xl grid-cols-[96px_minmax(0,1fr)] gap-4 px-4 py-5 sm:grid-cols-[150px_minmax(0,1fr)] sm:px-6 md:grid-cols-[190px_minmax(0,1fr)] md:gap-7 md:py-9 lg:px-8">
+            <div className="aspect-[2/3] rounded-md bg-surface-2 motion-safe:animate-pulse" />
+            <div className="space-y-3" aria-hidden="true">
+              <div className="h-3 w-20 rounded bg-surface-2 motion-safe:animate-pulse" />
+              <div className="h-7 w-4/5 rounded bg-surface-2 motion-safe:animate-pulse" />
+              <div className="h-4 w-2/3 rounded bg-surface-2 motion-safe:animate-pulse" />
+              <div className="hidden h-16 w-full rounded bg-surface-2 motion-safe:animate-pulse md:block" />
             </div>
           </div>
         </section>
       ) : <HeroCarousel items={heroItems} favoriteIds={favoriteIds} />}
-      <main className="site-content mx-auto min-h-[60vh] max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="site-content mx-auto min-h-[60vh] max-w-7xl px-4 py-6 sm:px-6 md:py-8 lg:px-8">
         <h1 className="sr-only">Better Mangá — ler mangás, manhwas e comics online</h1>
         {catalogFailed ? (
           <div role="alert" className="mb-8 flex flex-wrap items-center justify-between gap-4 border-y border-border py-5">
@@ -128,8 +129,8 @@ function Home() {
           </div>
         ) : null}
         {empty ? (
-          <div className="rounded-2xl border border-border bg-surface p-10 text-center">
-            <h1 className="font-display text-2xl font-extrabold">Nenhuma obra publicada ainda</h1>
+          <div className="rounded-lg border border-border bg-surface p-10 text-center">
+            <h1 className="font-display text-2xl font-bold">Nenhuma obra publicada ainda</h1>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
               Entre com sua conta, abra o painel e publique a primeira obra buscando os dados
               automaticamente no AniList.
@@ -148,72 +149,70 @@ function Home() {
           <FavoritesUpdated rows={favorites.data ?? []} />
         ) : null}
 
+        {updated.isPending ? <LoadingShelf label="Carregando atualizações" /> : null}
+        {(updated.data?.length ?? 0) > 0 ? <RecentlyUpdated rows={updated.data ?? []} /> : null}
+
+        {releases.isPending ? <LoadingShelf label="Carregando lançamentos" /> : null}
+        {(releases.data?.length ?? 0) > 0 ? <Releases rows={releases.data ?? []} favoriteIds={favoriteIds} /> : null}
+
         <section aria-labelledby="genre-shortcuts" className="mb-8">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 id="genre-shortcuts" className="flex items-center gap-2 font-display text-base font-bold"><Compass className="h-4 w-4 text-primary" />Explorar por gênero</h2>
+          <div className="mb-2.5 flex items-center justify-between gap-3">
+            <h2 id="genre-shortcuts" className="text-[15px] font-bold">Explorar por gênero</h2>
             <Link to="/catalogo" search={{ q: "", kind: "Todos" }} className="see-all">Catálogo <ArrowRight className="h-3.5 w-3.5" /></Link>
           </div>
-          <div className="genre-strip">
+          <div className="chip-row -mx-4 px-4 sm:mx-0 sm:flex-wrap sm:px-0">
             {GENRE_SHORTCUTS.map((genre) => (
-              <Link key={genre} to="/catalogo" search={{ tag: genre }} className="genre-chip"><Sparkle className="h-3.5 w-3.5" /><span>{genre}</span></Link>
+              <Link key={genre} to="/catalogo" search={{ tag: genre }} className="chip">{genre}</Link>
             ))}
           </div>
         </section>
-
-        {releases.isPending ? <LoadingShelf label="Carregando lançamentos" /> : null}
-        {(releases.data?.length ?? 0) > 0 ? <Releases rows={releases.data ?? []} /> : null}
-
-        {updated.isPending ? <LoadingShelf label="Carregando atualizações" /> : null}
-        {(updated.data?.length ?? 0) > 0 ? <RecentlyUpdated rows={updated.data ?? []} /> : null}
 
         {discovery.isPending ? <LoadingShelf label="Carregando obras populares" /> : null}
         {discovery.data ? <HomeDiscovery sections={discovery.data} favoriteIds={favoriteIds} /> : null}
 
         {novels.isPending ? <LoadingShelf label="Carregando novels" /> : null}
-        {novels.isSuccess ? <div className="cv-auto">{(
-          <SectionRow icon={<BookOpenText className="h-5 w-5" />} title="Novels" count={novels.data.length}
-            subtitle="Últimos capítulos em texto"
+        {novels.isSuccess ? (
+          <SectionRow icon={<BookOpenText />} title="Novels" count={novels.data.length}
+            subtitle="Capítulos em texto, atualizados por último"
             action={<Link to="/catalogo" search={{ kind: "Novel" }} className="see-all">Ver todas <ArrowRight className="h-3.5 w-3.5" /></Link>}>
             {novels.data.length ? <HScroll>
-              {novels.data.map((item) => <div key={item.id} className="w-[160px] shrink-0">
+              {novels.data.map((item) => <div key={item.id} className={shelfItem}>
                 <SeriesCard slug={item.slug} title={item.title} cover={item.cover_url} rating={item.rating}
-                  favorite={favoriteIds.has(item.id)} seriesId={item.id} ageRating={item.age_rating} />
+                  chapters={item.chapter_count ?? null} favorite={favoriteIds.has(item.id)} seriesId={item.id} ageRating={item.age_rating} />
               </div>)}
             </HScroll> : <p className="py-6 text-sm text-muted-foreground">Nenhuma novel publicada ainda.</p>}
           </SectionRow>
-        )}</div> : null}
+        ) : null}
 
-        {ranking.isPending ? <LoadingShelf label="Carregando ranking" /> : null}
-        {(ranking.data?.length ?? 0) > 0 ? (
+        {ranking.isPending ? <LoadingShelf label="Carregando as mais lidas" /> : null}
+        {(ranking.data?.[0]?.views ?? 0) > 0 ? (
           <SectionRow
-            icon={<Trophy className="h-5 w-5" />}
-            title="Rankings"
-            subtitle="As 10 obras mais lidas no Better Mangá"
-            action={<Link to="/ranking" className="see-all">Ver ranking completo <ArrowRight className="h-3.5 w-3.5" /></Link>}
+            icon={<Trophy />}
+            title="Mais lidas"
+            subtitle="As 10 obras com mais leituras no Better Mangá"
+            action={<Link to="/ranking" className="see-all">Ranking completo <ArrowRight className="h-3.5 w-3.5" /></Link>}
           >
-            <HScroll>
-              {(ranking.data ?? []).map((item, index) => (
-                <div key={item.id} className="w-[178px] shrink-0">
-                  <div className="rank-item" data-rank={index + 1}>
-                    <span className="rank-number" aria-label={`${index + 1}º lugar`}>
-                      {index + 1}
-                    </span>
-                    <div>
-                      <SeriesCard
-                        slug={item.slug}
-                        title={item.title}
-                        cover={item.cover_url}
-                        rating={item.rating}
-                        favorite={favoriteIds.has(item.id)}
-                        seriesId={item.id}
-                        ageRating={item.age_rating}
-                      />
-                      {item.views > 0 ? <span className="rank-views" title={`${item.views.toLocaleString("pt-BR")} leituras`}><Eye className="h-3 w-3" />{compact.format(item.views)} leituras</span> : null}
+            <ol className="rank-list">
+              {(ranking.data ?? []).map((item, index) => {
+                const latest = item.chapters[0];
+                return (
+                  <li key={item.id} className="rank-row max-md:[&:nth-child(n+6)]:hidden" data-rank={index + 1}>
+                    <span className="rank-pos" aria-label={`${index + 1}º lugar`}>{index + 1}</span>
+                    <Link to="/obra/$slug" params={{ slug: item.slug }} tabIndex={-1} aria-hidden="true">
+                      <img src={coverUrl(item.cover_url)} alt="" loading="lazy" decoding="async" />
+                    </Link>
+                    <div className="min-w-0">
+                      <h3 className="line-clamp-2"><Link to="/obra/$slug" params={{ slug: item.slug }}>{item.title}</Link></h3>
+                      <p className="card-meta mt-0.5">
+                        {item.views > 0 ? <span title={`${item.views.toLocaleString("pt-BR")} leituras`}>{compactNumber(item.views)} leituras</span> : null}
+                        <span>{kindLabel(item.kind)}</span>
+                        {latest ? <span>Cap. {formatChapter(latest.number)}</span> : null}
+                      </p>
                     </div>
-                  </div>
-                </div>
-              ))}
-            </HScroll>
+                  </li>
+                );
+              })}
+            </ol>
           </SectionRow>
         ) : null}
         <EventBadges />
@@ -226,13 +225,13 @@ function Home() {
 
 function LoadingShelf({ label }: { label: string }) {
   return (
-    <section aria-label={label} aria-busy="true" className="overflow-hidden pb-8">
-      <div aria-hidden="true" className="mb-5 h-7 w-48 rounded bg-muted motion-safe:animate-pulse" />
-      <div aria-hidden="true" className="flex gap-4 sm:gap-6">
+    <section aria-label={label} aria-busy="true" className="mb-9 overflow-hidden">
+      <div aria-hidden="true" className="mb-3 h-5 w-40 rounded bg-surface-2 motion-safe:animate-pulse" />
+      <div aria-hidden="true" className="flex gap-3 sm:gap-4">
         {Array.from({ length: 7 }, (_, index) => (
-          <div key={index} className="w-[160px] shrink-0 space-y-3">
-            <div className="aspect-[2/3] rounded-lg bg-muted motion-safe:animate-pulse" />
-            <div className="h-4 w-4/5 rounded bg-muted motion-safe:animate-pulse" />
+          <div key={index} className={`${shelfItem} space-y-2`}>
+            <div className="aspect-[2/3] rounded-md bg-surface-2 motion-safe:animate-pulse" />
+            <div className="h-3.5 w-4/5 rounded bg-surface-2 motion-safe:animate-pulse" />
           </div>
         ))}
       </div>

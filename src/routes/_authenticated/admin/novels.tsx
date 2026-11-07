@@ -134,11 +134,11 @@ function AdminNovels() {
         <aside className="min-w-0 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-lg border border-border bg-surface p-4">
-              <p className="text-[10px] font-bold uppercase text-muted-foreground">Novels</p>
+              <p className="text-xs font-bold text-muted-foreground">Novels</p>
               <p className="mt-1 font-display text-2xl font-bold text-primary">{novelList.length}</p>
             </div>
             <div className="rounded-lg border border-border bg-surface p-4">
-              <p className="text-[10px] font-bold uppercase text-muted-foreground">Publicados</p>
+              <p className="text-xs font-bold text-muted-foreground">Publicados</p>
               <p className="mt-1 font-display text-2xl font-bold text-primary">{publishedTotal}<span className="text-sm text-muted-foreground">/{chapterTotal}</span></p>
             </div>
           </div>
@@ -504,7 +504,7 @@ function ChapterForm({ novel }: { novel: NovelRow }) {
                 <button type="button" title={chapter.published ? "Clique para voltar a rascunho" : "Clique para publicar"} onClick={async () => {
                   const { error } = await supabase.from("chapters").update({ published: !chapter.published }).eq("id", chapter.id).eq("series_id", novel.id);
                   if (error) toast.error(error.message); else { toast.success(chapter.published ? "Voltou para rascunho" : "Capítulo publicado!"); refresh(); }
-                }} className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${chapter.published ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground hover:bg-primary/20"}`}>
+                }} className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold ${chapter.published ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground hover:bg-primary/20"}`}>
                   {chapter.published ? "Publicado" : "Rascunho · Publicar"}
                 </button>
               </div>

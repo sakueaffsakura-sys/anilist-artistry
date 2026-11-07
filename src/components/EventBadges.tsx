@@ -53,7 +53,7 @@ export function EventBadges() {
 
   if (!events.data?.length) return null;
   return (
-    <section className="rounded-xl border border-primary/30 bg-card/60 p-4">
+    <section className="rounded-lg border border-primary/30 bg-card/60 p-4">
       <h2 className="mb-3 flex items-center gap-2 text-lg font-bold">
         <Award className="h-5 w-5 text-primary" /> Evento de selos
       </h2>

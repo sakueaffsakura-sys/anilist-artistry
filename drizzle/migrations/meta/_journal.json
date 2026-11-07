@@ -400,6 +400,20 @@
       "when": 1794061756886,
       "tag": "0056_series_shelf_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1794091779054,
+      "tag": "0057_rls_initplan_series_chapters",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1794092465875,
+      "tag": "0058_series_touch_ignore_views",
+      "breakpoints": true
     }
   ]
 }

@@ -100,7 +100,7 @@ function Privacidade() {
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-4 py-8 md:px-6 md:py-12">
         <div className="mb-8 flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-primary/30 bg-primary/10">
+          <span className="flex h-11 w-11 items-center justify-center rounded-lg border border-primary/30 bg-primary/10">
             <ScrollText className="h-5 w-5 text-primary" aria-hidden="true" />
           </span>
           <div>
@@ -111,7 +111,7 @@ function Privacidade() {
 
         <div className="space-y-6">
           {SECTIONS.map((section) => (
-            <section key={section.title} className="rounded-xl border border-foreground/10 bg-surface-2/60 p-5 md:p-6">
+            <section key={section.title} className="rounded-lg border border-foreground/10 bg-surface-2/60 p-5 md:p-6">
               <h2 className="mb-3 text-base font-semibold text-foreground md:text-lg">{section.title}</h2>
               <div className="space-y-2.5">
                 {section.paragraphs.map((paragraph, index) => (
@@ -124,7 +124,7 @@ function Privacidade() {
           ))}
         </div>
 
-        <div className="mt-8 rounded-xl border border-primary/25 bg-primary/5 p-5 text-center md:p-6">
+        <div className="mt-8 rounded-lg border border-primary/25 bg-primary/5 p-5 text-center md:p-6">
           <p className="text-sm text-muted-foreground">
             Dúvidas sobre privacidade ou pedidos sobre seus dados?{" "}
             <button

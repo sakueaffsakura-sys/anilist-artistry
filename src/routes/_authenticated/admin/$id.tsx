@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Cloud, ExternalLink, FileImage, Link2, Pencil, Save, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/AdminShell";
+import { kindLabel } from "@/lib/work-categories";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,7 +96,7 @@ function DropZone({ files, setFiles, disabled = false }: { files: File[]; setFil
         setOver(false);
         void handle(Array.from(e.dataTransfer.files));
       }}
-      className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 text-center transition-colors ${
+      className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
         over ? "border-primary bg-primary/10" : "border-border bg-background hover:border-primary/60"
       }`}
     >
@@ -177,53 +178,53 @@ function SeriesEditor() {
   return (
     <AdminShell
       title={obra?.title ?? "Carregando…"}
-      subtitle={obra ? `${obra.kind} · ${chapters.length} capítulos` : undefined}
+      subtitle={obra ? `${kindLabel(obra.kind)} · ${chapters.length.toLocaleString("pt-BR")} capítulos` : undefined}
       actions={
-        <div className="flex gap-2">
-          <Button asChild variant="ghost" size="sm">
+        <>
+          <Button asChild variant="secondary" size="sm">
             <Link to="/admin/obras">
-              <ArrowLeft className="mr-1.5 h-4 w-4" /> Obras
+              <ArrowLeft className="h-4 w-4" /> Obras
             </Link>
           </Button>
           {obra ? (
-            <Button asChild variant="outline" size="sm">
+            <Button asChild variant="secondary" size="sm">
               <Link to="/obra/$slug" params={{ slug: obra.slug }}>
-                <ExternalLink className="mr-1.5 h-4 w-4" /> Ver no site
+                <ExternalLink className="h-4 w-4" /> Ver no site
               </Link>
             </Button>
           ) : null}
           {isAdmin && obra ? (
             <ConfirmDelete title={`Apagar "${obra.title}"?`} description="A obra e todos os capítulos serão apagados permanentemente." onConfirm={() => removeSeries.mutate()}>
-              <Button variant="outline" size="sm" className="border-destructive/50 text-destructive">
-                <Trash2 className="mr-1.5 h-4 w-4" /> Apagar obra
+              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                <Trash2 className="h-4 w-4" /> Apagar obra
               </Button>
             </ConfirmDelete>
           ) : null}
-        </div>
+        </>
       }
     >
       {obra ? (
         <>
-          <div className="relative mb-6 overflow-hidden rounded-2xl border border-border">
-            <img src={coverUrl(obra.banner_url ?? obra.cover_url)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-25 blur-sm" />
-            <div className="relative flex items-center gap-5 bg-gradient-to-r from-background via-background/80 to-transparent p-5">
-              <img src={coverUrl(obra.cover_url)} alt={obra.title} className="h-36 w-24 rounded-xl object-cover shadow-lg" />
+          <div className="relative isolate mb-5 overflow-hidden rounded-lg border border-border bg-surface">
+            <img src={coverUrl(obra.banner_url ?? obra.cover_url)} alt="" aria-hidden="true" className="absolute inset-0 -z-10 h-full w-full scale-110 object-cover opacity-30 blur-2xl" />
+            <div className="flex items-center gap-4 bg-background/55 p-4 sm:p-5">
+              <img src={coverUrl(obra.cover_url)} alt={obra.title} className="h-28 w-[75px] shrink-0 rounded-md object-cover sm:h-36 sm:w-24" />
               <div className="min-w-0">
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${obra.published ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
+                <span className={`kind-badge ${obra.published ? "text-new" : ""}`}>
                   {obra.published ? "Publicada" : "Rascunho"}
                 </span>
-                <h2 className="mt-2 font-display text-2xl font-extrabold">{obra.title}</h2>
-                <p className="mt-1 line-clamp-2 max-w-xl text-sm text-muted-foreground">{obra.synopsis}</p>
+                <h2 className="mt-2 line-clamp-2 font-display text-lg font-bold sm:text-2xl">{obra.title}</h2>
+                <p className="mt-1 line-clamp-2 max-w-xl text-[13px] text-muted-foreground">{obra.synopsis}</p>
               </div>
             </div>
           </div>
 
-          <div className="mb-5 inline-flex rounded-xl border border-border bg-surface p-1">
+          <div className="mb-5 flex gap-1.5" role="tablist" aria-label="Seções da obra">
             {([
               ["chapters", "Capítulos"],
               ["info", "Editar obra"],
             ] as const).map(([k, l]) => (
-              <button key={k} onClick={() => setTab(k)} className={`rounded-lg px-5 py-2 text-sm font-semibold ${tab === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+              <button key={k} type="button" role="tab" aria-selected={tab === k} aria-pressed={tab === k} onClick={() => setTab(k)} className="chip">
                 {l}
               </button>
             ))}
@@ -293,7 +294,7 @@ function InfoForm({ obra, onSaved }: { obra: Obra; onSaved: () => void }) {
       }}
       className="grid gap-6 lg:grid-cols-[1fr_280px]"
     >
-      <div className="space-y-4 rounded-2xl border border-border bg-surface p-5">
+      <div className="space-y-4 rounded-lg border border-border bg-surface p-5">
         <div className="grid gap-4 sm:grid-cols-2">
           {field("Título", "title")}
           {field("Slug (URL)", "slug")}
@@ -337,11 +338,11 @@ function InfoForm({ obra, onSaved }: { obra: Obra; onSaved: () => void }) {
       </div>
 
       <div className="space-y-4">
-        <div className="rounded-2xl border border-border bg-surface p-5">
+        <div className="rounded-lg border border-border bg-surface p-5">
           <p className="text-sm font-bold">Capa</p>
-          <img src={coverUrl(f.cover_url)} alt="" className="mt-3 aspect-[2/3] w-full rounded-xl object-cover" />
+          <img src={coverUrl(f.cover_url)} alt="" className="mt-3 aspect-[2/3] w-full rounded-lg object-cover" />
         </div>
-        <div className="space-y-4 rounded-2xl border border-border bg-surface p-5">
+        <div className="space-y-4 rounded-lg border border-border bg-surface p-5">
           <label className="flex items-center justify-between text-sm font-semibold">
             Publicada <Switch checked={f.published} onCheckedChange={(v) => set("published", v)} />
           </label>
@@ -469,9 +470,9 @@ function ChaptersPanel({ seriesId, chapters, onChange, isAdmin }: { seriesId: st
           if (cloudBusy || publish.isPending) return;
           publish.mutate();
         }}
-        className="h-fit space-y-4 rounded-2xl border border-border bg-surface p-5"
+        className="h-fit space-y-4 rounded-lg border border-border bg-surface p-5"
       >
-        <h3 className="flex items-center gap-2 font-display text-lg font-extrabold">
+        <h3 className="flex items-center gap-2 font-display text-lg font-bold">
           <Upload className="h-5 w-5 text-primary" /> Novo capítulo
         </h3>
         <div className="grid grid-cols-3 gap-3">
@@ -508,9 +509,9 @@ function ChaptersPanel({ seriesId, chapters, onChange, isAdmin }: { seriesId: st
         </Button>
       </form>
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+      <div className="overflow-hidden rounded-lg border border-border bg-surface">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <h3 className="font-display text-lg font-extrabold">Capítulos</h3>
+          <h3 className="font-display text-lg font-bold">Capítulos</h3>
           <span className="text-xs text-muted-foreground">{chapters.length} no total</span>
         </div>
         <div className="max-h-[640px] overflow-y-auto">
