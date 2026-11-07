@@ -52,6 +52,11 @@
         // Renova a sessão antes de expirar; se o site recusar, tenta renovar uma vez.
         return refreshSession();
       },
+      moved: (origin) => {
+        state.site = origin; save();
+        $("site-url").value = origin;
+        if (state.session && !$("main").hidden) $("who").textContent = state.session.mode === "code" ? `Código do painel · ${host(origin)}` : `${state.session.email} · ${host(origin)}`;
+      },
     },
     onEvent: onEngineEvent,
   });
