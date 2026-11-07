@@ -48,6 +48,7 @@ import { Route as AuthenticatedAdminSelosRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminSuporteRouteImport } from './routes/_authenticated/admin/suporte'
 import { Route as ApiAdminClassificarObrasRouteImport } from './routes/api/admin/classificar-obras'
 import { Route as ApiPublicMaintenanceRouteImport } from './routes/api/public/maintenance'
+import { Route as ApiPublicMediocreIngestRouteImport } from './routes/api/public/mediocre-ingest'
 import { Route as ApiPublicVersionRouteImport } from './routes/api/public/version'
 import { Route as MediocreCapituloIdRouteImport } from './routes/mediocre.capitulo.$id'
 import { Route as MediocreObraIdRouteImport } from './routes/mediocre.obra.$id'
@@ -260,6 +261,11 @@ const ApiPublicMaintenanceRoute = ApiPublicMaintenanceRouteImport.update({
   path: '/api/public/maintenance',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicMediocreIngestRoute = ApiPublicMediocreIngestRouteImport.update({
+  id: '/api/public/mediocre-ingest',
+  path: '/api/public/mediocre-ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicVersionRoute = ApiPublicVersionRouteImport.update({
   id: '/api/public/version',
   path: '/api/public/version',
@@ -338,6 +344,7 @@ export interface FileRoutesByFullPath {
   '/admin/suporte': typeof AuthenticatedAdminSuporteRoute
   '/api/admin/classificar-obras': typeof ApiAdminClassificarObrasRoute
   '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
+  '/api/public/mediocre-ingest': typeof ApiPublicMediocreIngestRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/mediocre/capitulo/$id': typeof MediocreCapituloIdRoute
   '/mediocre/obra/$id': typeof MediocreObraIdRoute
@@ -385,6 +392,7 @@ export interface FileRoutesByTo {
   '/admin/suporte': typeof AuthenticatedAdminSuporteRoute
   '/api/admin/classificar-obras': typeof ApiAdminClassificarObrasRoute
   '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
+  '/api/public/mediocre-ingest': typeof ApiPublicMediocreIngestRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/mediocre/capitulo/$id': typeof MediocreCapituloIdRoute
   '/mediocre/obra/$id': typeof MediocreObraIdRoute
@@ -434,6 +442,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/suporte': typeof AuthenticatedAdminSuporteRoute
   '/api/admin/classificar-obras': typeof ApiAdminClassificarObrasRoute
   '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
+  '/api/public/mediocre-ingest': typeof ApiPublicMediocreIngestRoute
   '/api/public/version': typeof ApiPublicVersionRoute
   '/mediocre/capitulo/$id': typeof MediocreCapituloIdRoute
   '/mediocre/obra/$id': typeof MediocreObraIdRoute
@@ -483,6 +492,7 @@ export interface FileRouteTypes {
     | '/admin/suporte'
     | '/api/admin/classificar-obras'
     | '/api/public/maintenance'
+    | '/api/public/mediocre-ingest'
     | '/api/public/version'
     | '/mediocre/capitulo/$id'
     | '/mediocre/obra/$id'
@@ -530,6 +540,7 @@ export interface FileRouteTypes {
     | '/admin/suporte'
     | '/api/admin/classificar-obras'
     | '/api/public/maintenance'
+    | '/api/public/mediocre-ingest'
     | '/api/public/version'
     | '/mediocre/capitulo/$id'
     | '/mediocre/obra/$id'
@@ -578,6 +589,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/suporte'
     | '/api/admin/classificar-obras'
     | '/api/public/maintenance'
+    | '/api/public/mediocre-ingest'
     | '/api/public/version'
     | '/mediocre/capitulo/$id'
     | '/mediocre/obra/$id'
@@ -606,6 +618,7 @@ export interface RootRouteChildren {
   MediocreIndexRoute: typeof MediocreIndexRoute
   ApiAdminClassificarObrasRoute: typeof ApiAdminClassificarObrasRoute
   ApiPublicMaintenanceRoute: typeof ApiPublicMaintenanceRoute
+  ApiPublicMediocreIngestRoute: typeof ApiPublicMediocreIngestRoute
   ApiPublicVersionRoute: typeof ApiPublicVersionRoute
   MediocreCapituloIdRoute: typeof MediocreCapituloIdRoute
   MediocreObraIdRoute: typeof MediocreObraIdRoute
@@ -888,6 +901,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMaintenanceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/mediocre-ingest': {
+      id: '/api/public/mediocre-ingest'
+      path: '/api/public/mediocre-ingest'
+      fullPath: '/api/public/mediocre-ingest'
+      preLoaderRoute: typeof ApiPublicMediocreIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/version': {
       id: '/api/public/version'
       path: '/api/public/version'
@@ -1015,6 +1035,7 @@ const rootRouteChildren: RootRouteChildren = {
   MediocreIndexRoute: MediocreIndexRoute,
   ApiAdminClassificarObrasRoute: ApiAdminClassificarObrasRoute,
   ApiPublicMaintenanceRoute: ApiPublicMaintenanceRoute,
+  ApiPublicMediocreIngestRoute: ApiPublicMediocreIngestRoute,
   ApiPublicVersionRoute: ApiPublicVersionRoute,
   MediocreCapituloIdRoute: MediocreCapituloIdRoute,
   MediocreObraIdRoute: MediocreObraIdRoute,

@@ -8,6 +8,7 @@ import { slugify } from "./media";
 
 type Admin = SupabaseClient<Database>;
 type Row = Record<string, unknown>;
+export type MediocreGetter = typeof mediocreGet;
 
 /** Chapters copied per call, to stay inside the worker time budget; the admin can run again to continue. */
 export const IMPORT_CHAPTER_LIMIT = 20;
@@ -24,7 +25,7 @@ async function findExistingByTitle(admin: Admin, names: string[]): Promise<{ id:
   return null;
 }
 
-export interface ImportOutcome { seriesId: string; slug: string; created: boolean; added: number; skipped: number; remaining: number }
+export interface ImportOutcome { seriesId: string; slug: string; kind: string; created: boolean; added: number; skipped: number; remaining: number; pendingCapIds: number[] }
 
 function kindFor(work: Row, fallback?: string): string {
   const f = work["formato"];
@@ -39,8 +40,8 @@ function statusFor(v: unknown): string {
 }
 
 /** Copies one chapter's pages (or text) into chapters; returns false when content is unavailable. */
-async function importChapter(admin: Admin, seriesId: string, capId: number, isNovel: boolean): Promise<boolean> {
-  const meta = await mediocreGet("api", `/capitulos/${capId}`);
+export async function importChapter(admin: Admin, seriesId: string, capId: number, isNovel: boolean, get: MediocreGetter = mediocreGet): Promise<boolean> {
+  const meta = await get("api", `/capitulos/${capId}`);
   if (!meta.ok && meta.error.code === "IP_BLOCKED") throw new Error(meta.error.message);
   if (!meta.ok) return false;
   const m = meta.data as Row;
@@ -52,7 +53,7 @@ async function importChapter(admin: Admin, seriesId: string, capId: number, isNo
   let content: string | null = text;
   const path = chapterContentPath(m);
   if (path) {
-    const c = await mediocreGet("cdn", path);
+    const c = await get("cdn", path);
     if (!c.ok && c.error.code === "IP_BLOCKED") throw new Error(c.error.message);
     if (c.ok) {
       const blocks = normalizeChapterContent(c.data);
@@ -71,8 +72,9 @@ async function importChapter(admin: Admin, seriesId: string, capId: number, isNo
 }
 
 /** Imports (or continues importing) a MediocreScan work into the catalog. */
-export async function importMediocreWork(admin: Admin, obraId: number, opts: { kind?: string; createdBy: string | null; chapterLimit?: number }): Promise<ImportOutcome> {
-  const res = await mediocreGet("api", `/obras/${obraId}`);
+export async function importMediocreWork(admin: Admin, obraId: number, opts: { kind?: string; createdBy: string | null; chapterLimit?: number; get?: MediocreGetter; draft?: boolean }): Promise<ImportOutcome> {
+  const get = opts.get ?? mediocreGet;
+  const res = await get("api", `/obras/${obraId}`);
   if (!res.ok) throw new Error(res.error.message);
   const work = extractWork(res.data);
   const name = work && typeof work["obr_nome"] === "string" ? work["obr_nome"].trim() : "";
@@ -96,7 +98,7 @@ export async function importMediocreWork(admin: Admin, obraId: number, opts: { k
       kind: kindFor(work, opts.kind),
       status: statusFor(work["obr_status"]),
       genres: normalizeGenres(tags),
-      published: true,
+      published: !opts.draft,
       created_by: opts.createdBy,
       source_mediocre_id: obraId,
     }).select("id, slug, kind").single();
@@ -131,8 +133,8 @@ export async function importMediocreWork(admin: Admin, obraId: number, opts: { k
   const isNovel = series.kind === "Novel";
   let added = 0, skipped = 0;
   // One chapter at a time: bursts made the API block the server IP.
-  for (const c of batch) (await importChapter(admin, series.id, c["cap_id"] as number, isNovel)) ? added++ : skipped++;
-  return { seriesId: series.id, slug: series.slug, created, added, skipped, remaining: todo.length - added };
+  for (const c of batch) (await importChapter(admin, series.id, c["cap_id"] as number, isNovel, get)) ? added++ : skipped++;
+  return { seriesId: series.id, slug: series.slug, kind: series.kind, pendingCapIds: todo.slice(added + skipped).map((c) => c["cap_id"] as number).slice(0, 2000), created, added, skipped, remaining: todo.length - added };
 }
 
 /** Finds a single exact-title match: name search first, public lists as fallback. */
