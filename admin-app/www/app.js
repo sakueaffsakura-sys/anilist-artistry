@@ -46,6 +46,10 @@
     // Sem resposta em tempo: conta como falha de conexão e tenta de novo (antes um pedido travado parava o envio para sempre).
     fetch: (url, init) => withTimeout(fetch(url, init), /mediocre-ingest/.test(String(url)) ? 120000 : 45000),
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+    pace: {
+      load: () => { try { return JSON.parse(localStorage.getItem("bm-estudio-pace") || "null"); } catch (_) { return null; } },
+      save: (v) => { try { localStorage.setItem("bm-estudio-pace", JSON.stringify(v)); } catch (_) { /* ok */ } },
+    },
     now: () => Date.now(),
     mediocreToken: () => state.token,
     site: {
@@ -632,6 +636,9 @@
   /** Marca que um envio está rodando; se o app reabrir com a marca, o envio foi cortado no meio. */
   const RUN_KEY = "bm-estudio-run";
   const markRun = (what) => { try { localStorage.setItem(RUN_KEY, JSON.stringify({ what, at: Date.now() })); } catch (_) { /* ok */ } };
+  /** Sinal de vida do envio: se o app reiniciar logo depois, ele continua sozinho. */
+  const beatRun = () => { try { const r = JSON.parse(localStorage.getItem(RUN_KEY) || "null"); if (r) { r.at = Date.now(); localStorage.setItem(RUN_KEY, JSON.stringify(r)); } } catch (_) { /* ok */ } };
+  const AUTO_RESUME_MS = 15 * 60_000;
   const clearRun = () => { try { localStorage.removeItem(RUN_KEY); } catch (_) { /* ok */ } };
   function interruptedRun() { try { return JSON.parse(localStorage.getItem(RUN_KEY) || "null"); } catch (_) { return null; } }
   $("open-history").onclick = () => {
@@ -655,11 +662,11 @@
         if (!e.total) setStatus("Nenhum capítulo novo.");
         break;
       case "sending":
-        clearInterval(countdown); setStatus(`Enviando capítulos ${e.from}${e.to > e.from ? ` e ${e.to}` : ""} de ${e.total}…`);
+        beatRun(); clearInterval(countdown); setStatus(`Enviando capítulos ${e.from}${e.to > e.from ? ` e ${e.to}` : ""} de ${e.total}…`);
         log(`${note.work || "Envio"}: buscando capítulos ${e.from}${e.to > e.from ? `–${e.to}` : ""} de ${e.total}.`);
         break;
       case "progress":
-        setBar(e.done, e.total); note.done = e.done;
+        beatRun(); setBar(e.done, e.total); note.done = e.done;
         $("run-queue").textContent = `${e.done} de ${e.total} capítulos · ${queueLeft} obra(s) na vez`;
         log(`${note.work || "Envio"}: ${e.done} de ${e.total} prontos (+${e.added} no site${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}).`);
         native.update(note.work, `${e.done} de ${e.total} capítulos · ${queueLeft} obra(s) na vez`, e.done, e.total); break;
@@ -747,8 +754,17 @@
       $("resume-text").append(el("strong", { textContent: cut ? "O envio parou no meio." : `${n} obra(s) esperando na fila do site.` }),
         document.createTextNode(cut ? ` O app foi fechado ou atualizado durante o envio. ${n} obra(s) continuam na fila, começando por ${list[0].title}. Os capítulos que já foram não são enviados de novo.` : ` Começando por ${list[0].title}. Os capítulos que já estão no site não são enviados de novo.`));
       $("resume-card").hidden = false;
-      $("resume-go").onclick = () => { $("resume-card").hidden = true; startRun(list); };
-      $("resume-dismiss").onclick = () => { $("resume-card").hidden = true; };
+      let auto = null; $("resume-go").textContent = "Continuar envio";
+      const go = () => { clearInterval(auto); $("resume-card").hidden = true; if (!engine.running) startRun(list); };
+      $("resume-go").onclick = go;
+      $("resume-dismiss").onclick = () => { clearInterval(auto); $("resume-card").hidden = true; $("resume-go").textContent = "Continuar envio"; };
+      // Cortado há pouco (o Android reiniciou o app): continua sozinho, sem precisar tocar.
+      if (cut && Date.now() - cut.at < AUTO_RESUME_MS) {
+        log("O app reiniciou durante o envio. Continuando sozinho…");
+        let left = 8;
+        const tick = () => { $("resume-go").textContent = `Continuando em ${left} s`; if (left-- <= 0) go(); };
+        tick(); auto = setInterval(tick, 1000);
+      }
     } catch (_) { /* sem aviso */ }
   }
 
