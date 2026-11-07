@@ -18,7 +18,15 @@ A chave de assinatura (`keystore/estudio.jks`) fica no repositório para que cad
 cima da anterior. O repositório é privado; se um dia ficar público, gere uma chave nova e guarde-a como
 segredo do GitHub.
 
+## Painel
+Baseado no MediocreScan Reader: abas Início, Recentes (todas / com IA), Novas, Para você (recomendações,
+listas e leitura) e Buscar (nome ou ID); página da obra com selos IA/Oficial/Novel só quando a API confirma,
+gêneros, sinopse e capítulos; leitor de imagens, texto de novel (A−/A+) e blocos mistos; visualizador de JSON
+com a chave trocada por [REDACTED]. Cada obra mostra se já está publicada no site ou na fila, e pode ser
+publicada ou atualizada dali.
+
 ## Arquivos
-- `www/engine.js` — busca, fila e ritmo de envio (testável sem celular).
+- `www/parse.js` — leitura tolerante das respostas (mesmos casos dos testes do MediocreScan Reader).
+- `www/engine.js` — consultas, fila e ritmo de envio (testável sem celular).
 - `www/app.js`, `www/index.html`, `www/style.css` — telas.
 - `scripts/patch-android.mjs` — versão do app e tela acesa durante o uso.
