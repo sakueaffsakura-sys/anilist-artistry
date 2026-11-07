@@ -32,13 +32,24 @@ jobs:
           java-version: 21
       - name: Instalar o Capacitor
         run: npm install --no-audit --no-fund
+      - name: Copiar o Capacitor para o app
+        run: |
+          f=$(ls node_modules/@capacitor/core/dist/capacitor.js 2>/dev/null || true)
+          if [ -z "$f" ]; then echo "::error::capacitor.js não encontrado em @capacitor/core/dist: $(ls node_modules/@capacitor/core/dist | tr '\n' ' ')"; exit 1; fi
+          cp "$f" www/capacitor.js
       - name: Gerar o projeto Android
         env:
           BUILD_NUMBER: ${{ github.run_number }}
         run: npx cap add android && node scripts/patch-android.mjs && npx cap sync android
       - name: Compilar
         working-directory: admin-app/android
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease --no-daemon 2>&1 | tee ../build.log
+      - name: Mostrar erros de compilação
+        if: failure()
+        run: |
+          grep -E "error:|\.java:[0-9]+|FAILURE|What went wrong" -A2 build.log | head -40 | while IFS= read -r line; do echo "::error::$line"; done || true
       - name: Assinar
         env:
           KS_PASS: estudio-bm-2026

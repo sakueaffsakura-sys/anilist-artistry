@@ -34,6 +34,12 @@ aceita administradores.
 
 A API da MediocreScan é chamada só em `https://api.mediocretoons.net` (mesmos caminhos de antes).
 
+## Envio em segundo plano
+Durante um envio o app liga um serviço do Android com notificação fixa (obra atual, barra de capítulos e
+botão **Parar**), segura o processo acordado e mantém o app trabalhando minimizado ou com a tela apagada.
+Na primeira vez ele pede para ignorar a economia de bateria; sem isso alguns celulares param o envio com a
+tela apagada. Código em `android-src/` (copiado pelo `scripts/patch-android.mjs`).
+
 ## Arquivos
 - `www/parse.js` — leitura tolerante das respostas (mesmos casos dos testes do MediocreScan Reader).
 - `www/engine.js` — consultas, fila e ritmo de envio (testável sem celular).

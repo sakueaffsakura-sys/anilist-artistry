@@ -50,6 +50,31 @@
     onEvent: onEngineEvent,
   });
 
+  /* ---------- envio em segundo plano (notificação do Android) ---------- */
+  const Native = (() => {
+    const C = window.Capacitor;
+    if (!C || typeof C.isNativePlatform !== "function" || !C.isNativePlatform()) return null;
+    const reg = (window.capacitorExports && window.capacitorExports.registerPlugin) || C.registerPlugin;
+    try { return reg ? reg("Estudio") : (C.Plugins && C.Plugins.Estudio) || null; } catch (_) { return (C.Plugins && C.Plugins.Estudio) || null; }
+  })();
+  const native = {
+    start: (title, text) => Native ? Native.start({ title, text }).catch(() => {}) : Promise.resolve(),
+    update: (title, text, progress, max) => Native ? Native.update({ title, text, progress: progress ?? -1, max: max ?? 0 }).catch(() => {}) : Promise.resolve(),
+    stop: () => Native ? Native.stop().catch(() => {}) : Promise.resolve(),
+  };
+  if (Native && Native.addListener) { try { Native.addListener("stopRequested", () => { engine.stop(); setStatus("Parando depois do passo atual…"); }); } catch (_) { /* sem botão na notificação */ } }
+  /** Pede uma vez para o Android não "economizar bateria" no app, senão o envio para com a tela apagada. */
+  async function askBattery() {
+    if (!Native || state.batteryAsked) return;
+    try {
+      const r = await Native.batteryStatus();
+      if (r && r.ignoring) return;
+      state.batteryAsked = true; save();
+      if (confirm("Para o envio continuar com a tela apagada, permita que o BM Estúdio ignore a economia de bateria. Abrir a configuração agora?")) await Native.requestBatteryExemption();
+    } catch (_) { /* segue sem a permissão */ }
+  }
+  let note = { work: "", total: 0, done: 0 };
+
   /* ---------- utilidades ---------- */
   function toast(text) { const t = $("toast"); t.textContent = text; t.hidden = false; clearTimeout(toast.timer); toast.timer = setTimeout(() => { t.hidden = true; }, 3800); }
   function show(screen) { $("login").hidden = screen !== "login"; $("main").hidden = screen !== "main"; }
@@ -466,7 +491,7 @@
   }
   $("send-all").onclick = () => {
     const list = pendingRows(); if (!list.length) return;
-    if (!confirm(`Enviar ${list.length} obra(s), uma de cada vez? Cada obra vai até o último capítulo antes da próxima. Deixe o app aberto.`)) return;
+    if (!confirm(`Enviar ${list.length} obra(s), uma de cada vez? Cada obra vai até o último capítulo antes da próxima. Pode minimizar o app: o envio continua e aparece na notificação.`)) return;
     startRun(list);
   };
   let queueLeft = 0, countdown = null;
@@ -481,9 +506,12 @@
       if (fresh.length) { await engine.enqueue(fresh); fresh.forEach((w) => marks.queued.add(w.id)); }
     } catch (e) { log(`Fila: ${e.message}`); }
     repaint();
+    await askBattery();
     await keepAwake(true);
+    await native.start("Enviando obras", `${list.length} obra(s) na vez`);
     await engine.run(list);
     keepAwake(false);
+    native.stop();
   }
   $("stop").onclick = () => { engine.stop(); setStatus("Parando depois do passo atual…"); };
   function repaint() {
@@ -499,15 +527,17 @@
     switch (e.type) {
       case "run-start": $("run-queue").textContent = `${e.count} obra(s) na vez`; break;
       case "work-start":
+        note = { work: e.name, total: e.total, done: 0 };
+        native.update(e.name, `${e.total} capítulo(s) para enviar · ${queueLeft} obra(s) na vez`, 0, e.total);
         setBar(0, e.total); $("run-work").textContent = e.name;
         $("run-queue").textContent = `${queueLeft} obra(s) na vez · ${e.total} capítulo(s) nesta`;
         log(`${e.name}: ${e.created ? "criada no site" : "já estava no site"}, ${e.total} capítulo(s) para enviar.`);
         if (!e.total) setStatus("Nenhum capítulo novo.");
         break;
       case "sending": clearInterval(countdown); setStatus(`Enviando capítulos ${e.from}${e.to > e.from ? ` e ${e.to}` : ""} de ${e.total}…`); break;
-      case "progress": setBar(e.done, e.total); break;
+      case "progress": setBar(e.done, e.total); note.done = e.done; native.update(note.work, `${e.done} de ${e.total} capítulos · ${queueLeft} obra(s) na vez`, e.done, e.total); break;
       case "waiting": count(e.ms, (s) => setStatus(`Próximo envio em ${s} s`)); break;
-      case "pause": log(`A MediocreScan travou (${e.reason}). Pausa ${e.count}/${e.max}.`); count(e.ms, (s) => setStatus(`A MediocreScan travou por excesso de pedidos. Voltando em ${s} s.`, true)); break;
+      case "pause": native.update(note.work, "A MediocreScan travou. Voltando em 1 minuto…", note.done, note.total); log(`A MediocreScan travou (${e.reason}). Pausa ${e.count}/${e.max}.`); count(e.ms, (s) => setStatus(`A MediocreScan travou por excesso de pedidos. Voltando em ${s} s.`, true)); break;
       case "resume": clearInterval(countdown); setStatus("Continuando…"); break;
       case "work-done":
         queueLeft = Math.max(0, queueLeft - 1); marks.imported.add(e.id); marks.queued.delete(e.id); repaint();
@@ -520,6 +550,7 @@
     }
   }
   function finishRun(text, isError) {
+    native.stop();
     clearInterval(countdown); setStatus(text, isError); log(text); toast(text);
     setTimeout(() => { if (!engine.running) { $("sender-run").hidden = true; $("sender-idle").hidden = false; repaint(); } }, 6000);
     repaint(); checkQueueDot();
