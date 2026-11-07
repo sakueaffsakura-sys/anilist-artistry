@@ -34,8 +34,10 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.WindowManager;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.WebViewListener;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -45,6 +47,27 @@ public class MainActivity extends BridgeActivity {
         // Tela acesa enquanto o app está aberto na frente.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         clearCacheAfterUpdate();
+        protectRenderer();
+    }
+
+    /**
+     * Em celulares com pouca memória (ex.: Galaxy A07) o Android mata a parte do WebView que roda o
+     * envio quando o app vai para trás, e o app inteiro reinicia. Aqui: o WebView fica com prioridade
+     * alta mesmo fora da tela e, se ainda assim for encerrado, a tela é recriada em vez de fechar o app
+     * (o envio continua sozinho de onde parou).
+     */
+    private void protectRenderer() {
+        if (getBridge() == null || getBridge().getWebView() == null) return;
+        if (Build.VERSION.SDK_INT >= 26) {
+            try { getBridge().getWebView().setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false); } catch (Exception ignored) { }
+        }
+        getBridge().addWebViewListener(new WebViewListener() {
+            @Override
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                runOnUiThread(() -> recreate());
+                return true;
+            }
+        });
     }
 
     /** Depois de instalar uma versão nova, apaga o cache do WebView para não rodar os arquivos antigos. */

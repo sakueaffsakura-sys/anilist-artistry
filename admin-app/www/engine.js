@@ -52,6 +52,13 @@
     const emit = (e) => { try { deps.onEvent && deps.onEvent(e); } catch (_) { /* tela não deve parar o envio */ } };
     // lastPairAt vale para o app inteiro: entre lotes, entre obras e entre envios seguidos.
     let apiIdx = 0, lastApiCall = null, lastCdnCall = null, locksInRow = 0, stopFlag = false, running = false, lastLockEnd = null, lastPairAt = null;
+    // Horários guardados no celular: se o app reiniciar, a espera de 1 minuto continua valendo.
+    try {
+      const saved = deps.pace && deps.pace.load ? deps.pace.load() : null;
+      const fresh = (v) => (Number.isFinite(v) && v <= deps.now() && deps.now() - v < 10 * 60_000 ? v : null);
+      if (saved) { lastApiCall = fresh(saved.api); lastPairAt = fresh(saved.pair); lastLockEnd = fresh(saved.lock); }
+    } catch (_) { /* sem horários guardados */ }
+    const savePace = () => { try { if (deps.pace && deps.pace.save) deps.pace.save({ api: lastApiCall, pair: lastPairAt, lock: lastLockEnd }); } catch (_) { /* ok */ } };
 
     function checkStop() { if (stopFlag) throw new Stopped(); }
     /** Espera em pedaços curtos para o botão "Parar" responder rápido. */
@@ -83,7 +90,7 @@
       if (locksInRow > PACE.maxLocksInRow) throw new Fatal(`A MediocreScan continua travada (${reason}). Tente de novo mais tarde.`);
       emit({ type: "pause", ms: PACE.lockMs, reason, count: locksInRow, max: PACE.maxLocksInRow });
       await wait(PACE.lockMs);
-      lastLockEnd = deps.now();
+      lastLockEnd = deps.now(); savePace();
       emit({ type: "resume" });
     }
 
@@ -104,7 +111,7 @@
           if (kind === "api" && gap > 2000) emit({ type: "api-wait", ms: gap });
           await wait(gap);
         }
-        if (kind === "api") lastApiCall = deps.now(); else lastCdnCall = deps.now();
+        if (kind === "api") { lastApiCall = deps.now(); savePace(); } else lastCdnCall = deps.now();
         let r;
         try {
           r = await deps.fetch((kind === "cdn" ? CDN : API_HOSTS[apiIdx]) + path, {
@@ -306,7 +313,7 @@
             added += r.added || 0;
             skipped += r.skipped || 0;
           }
-          lastPairAt = deps.now(); // o próximo par só sai 1 minuto depois deste terminar
+          lastPairAt = deps.now(); savePace(); // o próximo par só sai 1 minuto depois deste terminar
           emit({ type: "progress", id, done: Math.min(tried, total), total, added, skipped });
         }
       } finally {
@@ -363,7 +370,7 @@
             // O site responde em conjunto; quem falhou aparece na conferência do fim.
             chapters.forEach((c) => emit({ type: "chapter-state", id, capId: c.capId, state: r.skipped ? "check" : "site" }));
           }
-          lastPairAt = deps.now(); // o próximo par só sai 1 minuto depois deste terminar
+          lastPairAt = deps.now(); savePace(); // o próximo par só sai 1 minuto depois deste terminar
           emit({ type: "progress", id, done: Math.min(i + group.length, todo.length), total: todo.length, added, skipped });
         }
         emit({ type: "chapters-done", id, name, added, skipped, already });
