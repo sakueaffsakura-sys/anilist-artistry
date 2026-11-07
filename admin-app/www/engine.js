@@ -260,6 +260,57 @@
       stopFlag = was;
     }
 
+    /**
+     * Envia só os capítulos escolhidos de uma obra (botão ao lado de cada capítulo).
+     * Os que já estão no site são pulados sem buscar nada; o resto vai de 2 em 2 com a mesma espera.
+     */
+    async function sendChapters(id, capIds, name) {
+      if (running) throw new Error("Já existe um envio em andamento.");
+      running = true; stopFlag = false; locksInRow = 0;
+      let added = 0, skipped = 0, already = 0;
+      emit({ type: "chapters-start", id, name, count: capIds.length });
+      try {
+        const work = await mediocre("api", `/obras/${id}`);
+        if (!work) throw new Fatal("Obra não encontrada na MediocreScan.");
+        const w = await site({ action: "work", obraId: id, work, publish: true });
+        const pending = new Set(Array.isArray(w.pendingCapIds) ? w.pendingCapIds : []);
+        const todo = capIds.filter((c) => pending.has(c));
+        capIds.filter((c) => !pending.has(c)).forEach((c) => { already++; emit({ type: "chapter-state", id, capId: c, state: "site" }); });
+        for (let i = 0; i < todo.length; i += PACE.perSend) {
+          if (i > 0) { emit({ type: "waiting", ms: PACE.waitMs }); await wait(PACE.waitMs); }
+          const group = todo.slice(i, i + PACE.perSend);
+          group.forEach((c) => emit({ type: "chapter-state", id, capId: c, state: "sending" }));
+          emit({ type: "sending", from: i + 1, to: i + group.length, total: todo.length });
+          const chapters = [];
+          for (const capId of group) {
+            try {
+              const meta = unwrap(await mediocre("api", `/capitulos/${capId}`));
+              if (!meta || typeof meta !== "object") { emit({ type: "chapter-state", id, capId, state: "fail" }); skipped++; continue; }
+              const path = contentPath(meta);
+              let content = null;
+              if (path) { try { content = await mediocre("cdn", path); } catch (e) { if (e instanceof Stopped || e instanceof Fatal) throw e; } }
+              chapters.push({ capId, meta, content });
+            } catch (e) {
+              if (e instanceof Stopped || e instanceof Fatal) throw e;
+              emit({ type: "chapter-state", id, capId, state: "fail" }); skipped++;
+              emit({ type: "log", text: `Capítulo ${capId}: ${e.message}` });
+            }
+          }
+          if (chapters.length) {
+            const r = await site({ action: "chapters", obraId: id, chapters });
+            added += r.added || 0; skipped += r.skipped || 0;
+            // O site responde em conjunto; quem falhou aparece na conferência do fim.
+            chapters.forEach((c) => emit({ type: "chapter-state", id, capId: c.capId, state: r.skipped ? "check" : "site" }));
+          }
+          emit({ type: "progress", id, done: Math.min(i + group.length, todo.length), total: todo.length, added, skipped });
+        }
+        emit({ type: "chapters-done", id, name, added, skipped, already });
+      } catch (e) {
+        if (e instanceof Stopped) emit({ type: "run-stopped", works: 0, added });
+        else emit({ type: "run-error", message: e.message, works: 0, added });
+      } finally { running = false; stopFlag = false; }
+    }
+
     /** Envia as obras em ordem, uma de cada vez, até o fim de cada uma. */
     async function run(works) {
       if (running) throw new Error("Já existe um envio em andamento.");
@@ -283,7 +334,8 @@
     }
 
     return {
-      list, search, lists, reading, work, chapter, thumbs, status, plan, enqueue, run,
+      list, search, lists, reading, work, chapter, thumbs, status, plan, enqueue, run, sendChapters,
+      chapterStatus: (obraId) => site({ action: "chapter_status", obraId }),
       // Obras que já estão no site (gerenciamento).
       siteList: (filter, q, page, obraId) => site({ action: "site_list", filter, q: q || "", page: page || 1, obraId: obraId || null }),
       siteWork: (seriesId) => site({ action: "site_work", seriesId }),

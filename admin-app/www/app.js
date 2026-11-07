@@ -253,10 +253,24 @@
 
   /* ---------- obra ---------- */
   let work = null, workRaw = null, order = "desc", thumbsMap = {};
+  // Capítulos desta obra que já estão no site (por número) e o estado de cada envio individual.
+  let siteNums = new Set(), siteSeries = null, capState = {};
+  const capQueue = [];
+  let chapterJob = null; // obra cujo envio de capítulos soltos está rodando
+  async function refreshChapterMarks(id) {
+    try {
+      const r = await engine.chapterStatus(id);
+      if (!work || work.id !== id) return;
+      siteNums = new Set((r.numbers || []).map(Number)); siteSeries = r.seriesId || null;
+      Object.keys(capState).forEach((k) => { if (capState[k] === "check" || capState[k] === "site") delete capState[k]; });
+      renderChapters(); renderSiteStatus();
+    } catch (_) { /* marcações são extras */ }
+  }
+  const onSite = (c) => siteNums.has(Number(c.number));
   async function openWork(id) {
     setView("work", "Obra", true);
     if (!work || work.id !== id) {
-      work = null; $("w-title").textContent = "Carregando…"; $("w-chapters").innerHTML = ""; $("w-tags").innerHTML = ""; $("w-badges").innerHTML = "";
+      work = null; siteNums = new Set(); siteSeries = null; capState = {}; $("w-title").textContent = "Carregando…"; $("w-chapters").innerHTML = ""; $("w-tags").innerHTML = ""; $("w-badges").innerHTML = "";
       $("w-desc").textContent = ""; $("w-alt").textContent = ""; $("w-meta").textContent = ""; $("w-site").textContent = ""; $("w-cover").removeAttribute("src"); $("w-banner").style.backgroundImage = "";
       try {
         const r = await engine.work(id); work = r.work; workRaw = r.raw;
@@ -267,6 +281,7 @@
     }
     renderWork();
     await refreshMarks([id]); renderSiteStatus();
+    refreshChapterMarks(id);
   }
   function renderWork() {
     const w = work;
@@ -294,7 +309,41 @@
     const ul = $("w-chapters"); ul.innerHTML = "";
     const list = sortedChapters();
     $("w-empty").hidden = list.length > 0;
-    list.forEach((c) => ul.append(el("li", {}, chapterButton(c, work.id))));
+    list.forEach((c) => ul.append(workChapterRow(c)));
+  }
+  /** Linha do capítulo na obra: abrir no leitor + botão de envio individual ao lado. */
+  function workChapterRow(c) {
+    const li = el("li", { className: "cap-row" }, chapterButton(c, work.id));
+    const st = onSite(c) ? "site" : capState[c.id] || "new";
+    const labels = { site: "No site ✓", queued: "Na vez", sending: "Enviando…", fail: "Tentar de novo", check: "Conferindo…", new: "Enviar" };
+    const b = el("button", { type: "button", className: `cap-send ${st}`, textContent: labels[st] || "Enviar" });
+    b.setAttribute("aria-label", `${labels[st] || "Enviar"}: capítulo ${c.number}`);
+    b.disabled = st === "site" || st === "queued" || st === "sending" || st === "check" || !c.id;
+    b.onclick = () => queueChapter(c);
+    li.append(b);
+    return li;
+  }
+  function queueChapter(c) {
+    if (!work || !c.id || onSite(c)) return;
+    if (!state.token) { toast("Cole a chave da MediocreScan primeiro."); return; }
+    if (engine.running && chapterJob === null) { toast("Espere o envio atual terminar para enviar capítulos soltos."); return; }
+    capState[c.id] = "queued"; capQueue.push({ workId: work.id, title: work.title, capId: c.id });
+    renderChapters(); pumpChapters();
+  }
+  /** Envia os capítulos escolhidos, por obra, um lote de cada vez (mesmo ritmo do envio completo). */
+  async function pumpChapters() {
+    if (engine.running || !capQueue.length) return;
+    const wid = capQueue[0].workId, title = capQueue[0].title;
+    const ids = []; for (let i = capQueue.length - 1; i >= 0; i--) if (capQueue[i].workId === wid) ids.unshift(capQueue.splice(i, 1)[0].capId);
+    chapterJob = wid;
+    $("sender").hidden = false; $("sender-idle").hidden = true; $("sender-run").hidden = false; $("log").innerHTML = "";
+    $("run-work").textContent = title; $("run-queue").textContent = `${ids.length} capítulo(s) escolhido(s)`; setBar(0, ids.length); setStatus("Preparando…");
+    await askBattery(); await keepAwake(true);
+    await native.start(title, `${ids.length} capítulo(s) escolhido(s)`);
+    await engine.sendChapters(wid, ids, title);
+    keepAwake(false); native.stop(); chapterJob = null;
+    if (work && work.id === wid) await refreshChapterMarks(wid);
+    if (capQueue.length) pumpChapters();
   }
   function chapterButton(c, workId) {
     const thumb = thumbsMap[String(c.id)] || thumbsMap[`n${c.number}`];
@@ -308,9 +357,12 @@
     if (!work) return;
     const s = statusOf(work.id), b = $("w-publish");
     b.disabled = engine.running;
-    b.textContent = s === "ok" ? "Atualizar capítulos no site" : s === "queue" ? "Continuar envio" : "Publicar no site";
+    b.textContent = s === "ok" ? "Enviar o que falta" : s === "queue" ? "Continuar envio" : "Publicar no site";
     $("w-manage").hidden = s === "new";
-    $("w-site").textContent = s === "ok" ? "Esta obra já está no Better Mangá. Atualizar envia só os capítulos que faltam." : s === "queue" ? "Esta obra está na fila do site e ainda tem capítulos para enviar." : "Esta obra ainda não está no Better Mangá.";
+    const total = work.chapters.length, have = work.chapters.filter(onSite).length;
+    $("w-site").textContent = s === "new" && !have
+      ? "Esta obra ainda não está no Better Mangá. Publique tudo ou envie capítulos soltos pelo botão de cada um."
+      : `${have} de ${total} capítulos já estão no site${have < total ? `; faltam ${total - have}. Os que já estão não são enviados de novo.` : ". Está em dia."}`;
   }
   $("w-publish").onclick = () => { if (work) startRun([work]); };
   $("w-manage").onclick = async () => {
@@ -539,6 +591,16 @@
       case "waiting": count(e.ms, (s) => setStatus(`Próximo envio em ${s} s`)); break;
       case "pause": native.update(note.work, "A MediocreScan travou. Voltando em 1 minuto…", note.done, note.total); log(`A MediocreScan travou (${e.reason}). Pausa ${e.count}/${e.max}.`); count(e.ms, (s) => setStatus(`A MediocreScan travou por excesso de pedidos. Voltando em ${s} s.`, true)); break;
       case "resume": clearInterval(countdown); setStatus("Continuando…"); break;
+      case "chapters-start":
+        note = { work: e.name, total: e.count, done: 0 };
+        log(`${e.name}: ${e.count} capítulo(s) escolhido(s).`);
+        break;
+      case "chapter-state":
+        if (work && work.id === e.id) { capState[e.capId] = e.state; renderChapters(); }
+        break;
+      case "chapters-done":
+        finishRun(`${e.name}: +${e.added} capítulo(s)${e.already ? `, ${e.already} já estavam no site` : ""}${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}.`);
+        break;
       case "work-done":
         queueLeft = Math.max(0, queueLeft - 1); marks.imported.add(e.id); marks.queued.delete(e.id); repaint();
         log(`${e.name}: ${e.note ? e.note : `+${e.added} capítulo(s)${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}`}.`);
@@ -551,6 +613,7 @@
   }
   function finishRun(text, isError) {
     native.stop();
+    if (work && !$("view-work").hidden && chapterJob === null) refreshChapterMarks(work.id);
     clearInterval(countdown); setStatus(text, isError); log(text); toast(text);
     setTimeout(() => { if (!engine.running) { $("sender-run").hidden = true; $("sender-idle").hidden = false; repaint(); } }, 6000);
     repaint(); checkQueueDot();

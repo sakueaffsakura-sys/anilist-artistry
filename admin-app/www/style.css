@@ -225,3 +225,14 @@ select { min-height: 40px; padding: 0 10px; border-radius: 10px; border: 1px sol
 .chapters.manage .chip-btn { display: inline-flex; align-items: center; width: auto; min-height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; grid-template-columns: none; }
 .chapters.manage .chip-btn.del { border-color: color-mix(in oklab, var(--danger) 45%, transparent); }
 .chapters.manage li { gap: 8px; padding: 10px 12px; }
+
+/* envio por capítulo */
+.chapters li.cap-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px; padding-right: 10px; }
+.chapters li.cap-row > button:first-child { grid-template-columns: 46px 1fr; }
+.chapters li.cap-row > button:first-child > span.muted { display: none; }
+.chapters .cap-send { display: inline-flex; align-items: center; justify-content: center; width: auto; white-space: nowrap; grid-template-columns: none; flex-shrink: 0; min-height: 36px; min-width: 84px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--primary); background: transparent; color: var(--primary); font-size: 12.5px; font-weight: 800; }
+.chapters .cap-send.site { border-color: color-mix(in oklab, var(--ok) 45%, transparent); color: var(--ok); }
+.chapters .cap-send.queued, .chapters .cap-send.sending, .chapters .cap-send.check { border-color: var(--border); color: var(--muted); }
+.chapters .cap-send.fail { border-color: color-mix(in oklab, var(--danger) 50%, transparent); color: #ff8f92; }
+.chapters .cap-send:disabled { opacity: 1; }
+.work-actions .btn { padding: 0 14px; white-space: nowrap; }

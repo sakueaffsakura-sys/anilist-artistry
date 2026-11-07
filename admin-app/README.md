@@ -25,6 +25,11 @@ gêneros, sinopse e capítulos; leitor de imagens, texto de novel (A−/A+) e bl
 com a chave trocada por [REDACTED]. Cada obra mostra se já está publicada no site ou na fila, e pode ser
 publicada ou atualizada dali.
 
+## Capítulos
+Na página da obra, cada capítulo mostra **No site ✓** quando o número já está publicado; os outros têm o
+botão **Enviar** ao lado. Capítulos escolhidos vão de 2 em 2 com a mesma espera do envio completo, e os que já
+estão no site são pulados sem baixar nada (o site também ignora repetidos em vez de contar erro).
+
 ## Obras no site
 A aba **No site** lista as obras do Better Mangá (todas, publicadas, rascunhos ou vindas da MediocreScan),
 com busca por título. Em cada obra dá para publicar ou voltar a rascunho, fixar nas atualizações, colocar
