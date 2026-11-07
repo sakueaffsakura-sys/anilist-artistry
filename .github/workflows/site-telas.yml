@@ -14,7 +14,7 @@ on:
         default: "lookism"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: site-telas-${{ github.ref }}
@@ -51,11 +51,13 @@ jobs:
       - name: Registro do servidor
         if: always()
         run: tail -n 60 server.log || true
-      - uses: actions/upload-artifact@v4
+      - name: Guardar as capturas (release "site-telas", só para conferência)
         if: always()
-        with:
-          name: telas
-          path: |
-            telas/
-            server.log
-          retention-days: 7
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p telas && cp server.log telas/ 2>/dev/null || true
+          echo "${{ github.sha }}" > telas/versao.txt
+          zip -qr telas.zip telas
+          gh release view site-telas >/dev/null 2>&1 || gh release create site-telas --title "Telas do site (conferência)" --notes "Capturas automáticas do visual do site. Não é uma versão do site." --prerelease --latest=false
+          gh release upload site-telas telas.zip --clobber

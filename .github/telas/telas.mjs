@@ -72,7 +72,7 @@ async function shoot(page, name, { steps = 1 } = {}) {
       if (!moved) break;
       await settle(page);
     }
-    await page.screenshot({ path: `${OUT}/${name}-${String(i + 1).padStart(2, "0")}.png` });
+    await page.screenshot({ path: `${OUT}/${name}-${String(i + 1).padStart(2, "0")}.jpg`, type: "jpeg", quality: 72 });
   }
 }
 
@@ -106,7 +106,7 @@ for (const [viewName, view] of Object.entries(VIEWS)) {
       if (p.end) {
         await page.evaluate(() => scrollTo(0, document.body.scrollHeight));
         await settle(page);
-        await page.screenshot({ path: `${OUT}/${p.name}-${viewName}-fim.png` });
+        await page.screenshot({ path: `${OUT}/${p.name}-${viewName}-fim.jpg`, type: "jpeg", quality: 72 });
       }
     } catch (e) {
       log.push(`[${viewName} ${p.name}] FALHOU: ${e.message}`);
