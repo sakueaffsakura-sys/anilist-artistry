@@ -112,9 +112,9 @@
   }
 
   /* ---------- rotas (# para o botão voltar do Android funcionar) ---------- */
-  const TABS = { inicio: "Início", recentes: "Recentes", novas: "Novas", paravoce: "Para você", buscar: "Buscar", fila: "Fila do site" };
-  const CHIPS = { recentes: [["atualizadas", "Todas"], ["ia", "Com IA"]], paravoce: [["recomendacoes", "Recomendações"], ["listas", "Listas"], ["leitura", "Leitura"]] };
-  let chip = { recentes: "atualizadas", paravoce: "recomendacoes" };
+  const TABS = { inicio: "Início", recentes: "Recentes", novas: "Novas", buscar: "Buscar", site: "No site", fila: "Fila do site" };
+  const CHIPS = { inicio: [["destaques", "Destaques"], ["recomendacoes", "Recomendações"], ["listas", "Listas"], ["leitura", "Leitura"]], recentes: [["atualizadas", "Todas"], ["ia", "Com IA"]] };
+  let chip = { inicio: "destaques", recentes: "atualizadas" };
   let current = { tab: "inicio" };
   window.addEventListener("hashchange", route);
   function go(hash) { if (location.hash === hash) route(); else location.hash = hash; }
@@ -124,10 +124,12 @@
     const [kind, id, extra] = h.split("/");
     if (kind === "obra" && /^\d+$/.test(id)) return openWork(Number(id));
     if (kind === "cap" && /^\d+$/.test(id)) return openChapter(Number(id), /^\d+$/.test(extra || "") ? Number(extra) : null);
+    if (kind === "gerir" && /^[0-9a-f-]{36}$/i.test(id || "")) return openManage(id);
+    if (kind === "site") return openSiteTab();
     openTab(TABS[kind] ? kind : "inicio");
   }
   function setView(v, title, back) {
-    ["list", "work", "reader"].forEach((n) => { $(`view-${n}`).hidden = n !== v; });
+    ["list", "work", "reader", "site", "manage"].forEach((n) => { $(`view-${n}`).hidden = n !== v; });
     $("page-title").textContent = title; $("back").hidden = !back; $("brand").hidden = Boolean(back);
     window.scrollTo(0, 0);
     updateSendAll();
@@ -171,13 +173,13 @@
         const p = await engine.plan(); lastRaw = p;
         const titles = new Map((p.items || []).map((i) => [i.id, i.title]));
         works = (p.queue || []).map((id) => ({ id, title: titles.get(id) || `Obra ${id}`, cover: null }));
-      } else if (tab === "paravoce" && chip.paravoce === "listas") {
+      } else if (tab === "inicio" && chip.inicio === "listas") {
         const r = await engine.lists(); lastRaw = r.raw; return renderGroups(r.lists);
-      } else if (tab === "paravoce" && chip.paravoce === "leitura") {
+      } else if (tab === "inicio" && chip.inicio === "leitura") {
         const r = await engine.reading(); lastRaw = r.raw; return renderReading(r.chapters);
       } else if (tab === "buscar") { const r = await engine.search(query, page); lastRaw = r.raw; works = r.works; pageable = !/^\d+$/.test(query); }
       else {
-        const kind = tab === "inicio" ? "inicio" : tab === "novas" ? "novas" : tab === "recentes" ? chip.recentes : "recomendacoes";
+        const kind = tab === "inicio" ? (chip.inicio === "recomendacoes" ? "recomendacoes" : "inicio") : tab === "novas" ? "novas" : chip.recentes;
         const r = await engine.list(kind, page); lastRaw = r.raw; works = r.works; pageable = kind === "novas" || kind === "atualizadas";
       }
       const fresh = works.filter((w) => !rows.some((r) => r.id === w.id));
@@ -219,7 +221,7 @@
     $("groups").append(ul);
   }
   function updateMeta() {
-    if (!rows.length || current.tab === "paravoce" && chip.paravoce !== "recomendacoes") return;
+    if (!rows.length || (current.tab === "inicio" && (chip.inicio === "listas" || chip.inicio === "leitura"))) return;
     const pub = rows.filter((w) => statusOf(w.id) === "ok").length;
     $("list-meta").textContent = `${rows.length} obras · ${pub} publicadas · ${rows.length - pub} para enviar`;
   }
@@ -282,9 +284,15 @@
     const s = statusOf(work.id), b = $("w-publish");
     b.disabled = engine.running;
     b.textContent = s === "ok" ? "Atualizar capítulos no site" : s === "queue" ? "Continuar envio" : "Publicar no site";
+    $("w-manage").hidden = s === "new";
     $("w-site").textContent = s === "ok" ? "Esta obra já está no Better Mangá. Atualizar envia só os capítulos que faltam." : s === "queue" ? "Esta obra está na fila do site e ainda tem capítulos para enviar." : "Esta obra ainda não está no Better Mangá.";
   }
   $("w-publish").onclick = () => { if (work) startRun([work]); };
+  $("w-manage").onclick = async () => {
+    if (!work) return;
+    try { const r = await engine.siteList("todas", "", 1, work.id); const it = (r.items || [])[0]; if (it) go(`#/gerir/${it.id}`); else toast("Obra ainda não encontrada no site."); }
+    catch (e) { toast(e.message); }
+  };
 
   /* ---------- leitor ---------- */
   let chapterRaw = null, readerWork = null;
@@ -336,6 +344,118 @@
     $("r-next").textContent = next ? `Capítulo ${next.number}` : "Último capítulo";
   }
 
+  /* ---------- obras no site ---------- */
+  const SITE_CHIPS = [["todas", "Todas"], ["publicadas", "Publicadas"], ["rascunhos", "Rascunhos"], ["mediocre", "Da MediocreScan"]];
+  let siteFilter = "todas", siteQuery = "", sitePage = 1, siteLoading = false;
+  const fmtDate = (v) => { try { return new Date(v).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }); } catch (_) { return ""; } };
+  function openSiteTab() {
+    current = { tab: "site" }; rows = [];
+    setView("site", "No site", false);
+    document.querySelectorAll(".bottom-nav button").forEach((b) => { if (b.dataset.tab === "site") b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+    $("site-chips").innerHTML = "";
+    SITE_CHIPS.forEach(([k, label]) => {
+      const b = el("button", { type: "button", textContent: label }); b.setAttribute("role", "tab"); b.setAttribute("aria-selected", String(siteFilter === k));
+      b.onclick = () => { siteFilter = k; openSiteTab(); }; $("site-chips").append(b);
+    });
+    $("site-search").value = siteQuery;
+    $("site-list").innerHTML = ""; sitePage = 1; loadSite();
+  }
+  $("form-site-search").onsubmit = (e) => { e.preventDefault(); siteQuery = $("site-search").value.trim(); $("site-list").innerHTML = ""; sitePage = 1; loadSite(); };
+  $("site-more").onclick = () => { sitePage++; loadSite(); };
+  async function loadSite() {
+    if (siteLoading) return;
+    siteLoading = true; $("site-more").hidden = true; $("site-empty").hidden = true; $("site-meta").textContent = "Carregando…";
+    try {
+      const r = await engine.siteList(siteFilter, siteQuery, sitePage);
+      (r.items || []).forEach((w) => $("site-list").append(el("li", {}, siteRow(w))));
+      const shown = $("site-list").children.length;
+      $("site-meta").textContent = `${r.total} obra(s) no site${siteQuery ? ` com "${siteQuery}"` : ""} · mostrando ${shown}`;
+      $("site-more").hidden = shown >= r.total;
+      if (!shown) { const e = $("site-empty"); e.textContent = siteQuery ? "Nenhuma obra do site com esse título." : "Nenhuma obra aqui ainda."; e.hidden = false; }
+    } catch (e) { $("site-meta").textContent = ""; const x = $("site-empty"); x.textContent = e.message; x.hidden = false; }
+    finally { siteLoading = false; }
+  }
+  function siteRow(w) {
+    const pills = [
+      el("span", { className: `pill ${w.published ? "ok" : "draft"}`, textContent: w.published ? "Publicada" : "Rascunho" }),
+      w.pinned ? el("span", { className: "pill hot", textContent: "Fixada" }) : null,
+      w.in_slider ? el("span", { className: "pill hot", textContent: "Destaque" }) : null,
+    ];
+    const info = el("div", { className: "min0" },
+      el("p", { className: "t", textContent: w.title }),
+      el("p", { className: "s", textContent: [`${w.chapter_count} capítulos`, w.kind, `atualizada ${fmtDate(w.updated_at)}`].filter(Boolean).join(" · ") }),
+      el("div", {}, ...pills));
+    const b = el("button", { type: "button", className: "site-row" }, w.cover_url ? el("img", { src: w.cover_url, alt: "", loading: "lazy" }) : el("div", { className: "ph" }), info, el("span", { className: "muted", textContent: "›" }));
+    b.onclick = () => go(`#/gerir/${w.id}`);
+    return b;
+  }
+
+  let managed = null;
+  async function openManage(seriesId) {
+    setView("manage", "Gerenciar obra", true);
+    $("m-title").textContent = "Carregando…"; $("m-meta").textContent = ""; $("m-origin").textContent = ""; $("m-chapters").innerHTML = ""; $("m-cover").removeAttribute("src");
+    try { const r = await engine.siteWork(seriesId); managed = r; renderManage(); }
+    catch (e) { $("m-title").textContent = e.message; }
+  }
+  function renderManage() {
+    const w = managed.work, chapters = managed.chapters || [];
+    $("page-title").textContent = w.title; $("m-title").textContent = w.title;
+    if (w.cover_url) $("m-cover").src = w.cover_url;
+    $("m-meta").textContent = [w.kind, w.status, `${w.views ?? 0} visualizações`, `atualizada ${fmtDate(w.updated_at)}`].filter(Boolean).join(" · ");
+    $("m-origin").textContent = w.source_mediocre_id ? `Vinculada à MediocreScan, obra ${w.source_mediocre_id}` : "Obra criada no site (sem vínculo com a MediocreScan).";
+    $("m-open").href = `${(state.site || DEFAULT_SITE).replace(/\/+$/, "")}/obra/${encodeURIComponent(w.slug)}`;
+    $("m-mediocre").hidden = !w.source_mediocre_id; $("m-sync").hidden = !w.source_mediocre_id || engine.running;
+    document.querySelectorAll("#view-manage .switch").forEach((sw) => { sw.setAttribute("aria-checked", String(Boolean(w[sw.dataset.field]))); sw.disabled = false; });
+    const st = $("m-status"); if (![...st.options].some((o) => o.value === w.status)) st.append(el("option", { textContent: w.status })); st.value = w.status;
+    $("m-count").textContent = `${chapters.length} capítulos · ${chapters.filter((c) => !c.published).length} ocultos`;
+    $("m-empty").hidden = chapters.length > 0;
+    const ul = $("m-chapters"); ul.innerHTML = "";
+    chapters.forEach((c) => {
+      const li = el("li", { className: c.published ? "" : "hidden-cap" });
+      const vis = el("button", { type: "button", className: "chip-btn", textContent: c.published ? "Ocultar" : "Mostrar" });
+      vis.onclick = async () => {
+        vis.disabled = true;
+        try { await engine.chapterUpdate(c.id, !c.published); c.published = !c.published; renderManage(); toast(c.published ? "Capítulo visível." : "Capítulo oculto."); }
+        catch (e) { toast(e.message); vis.disabled = false; }
+      };
+      const del = el("button", { type: "button", className: "chip-btn del", textContent: "Excluir" });
+      del.onclick = async () => {
+        if (!confirm(`Excluir o capítulo ${c.number} do site? Não dá para desfazer.`)) return;
+        del.disabled = true;
+        try { await engine.chapterDelete(c.id); managed.chapters = managed.chapters.filter((x) => x.id !== c.id); renderManage(); toast("Capítulo excluído."); }
+        catch (e) { toast(e.message); del.disabled = false; }
+      };
+      li.append(el("span", { className: "cap-num", textContent: String(c.number) }),
+        el("div", { className: "min0" }, el("p", { className: "cap-title", textContent: `Capítulo ${c.number}` }), el("p", { className: "cap-sub", textContent: [c.title, fmtDate(c.created_at), c.published ? null : "oculto"].filter(Boolean).join(" · ") })),
+        vis, del);
+      ul.append(li);
+    });
+  }
+  document.querySelectorAll("#view-manage .switch").forEach((sw) => {
+    sw.onclick = async () => {
+      if (!managed) return;
+      const field = sw.dataset.field, value = sw.getAttribute("aria-checked") !== "true";
+      sw.disabled = true; sw.setAttribute("aria-checked", String(value));
+      try { const r = await engine.siteUpdate(managed.work.id, { [field]: value }); managed.work = Object.assign(managed.work, r.work); renderManage(); toast("Salvo."); }
+      catch (e) { sw.setAttribute("aria-checked", String(!value)); sw.disabled = false; toast(e.message); }
+    };
+  });
+  $("m-status").onchange = async () => {
+    if (!managed) return;
+    try { const r = await engine.siteUpdate(managed.work.id, { status: $("m-status").value }); managed.work = Object.assign(managed.work, r.work); renderManage(); toast("Status salvo."); }
+    catch (e) { toast(e.message); renderManage(); }
+  };
+  $("m-mediocre").onclick = () => managed && go(`#/obra/${managed.work.source_mediocre_id}`);
+  $("m-sync").onclick = () => { if (managed && managed.work.source_mediocre_id) startRun([{ id: managed.work.source_mediocre_id, title: managed.work.title }]); };
+  $("m-delete").onclick = async () => {
+    if (!managed) return;
+    const typed = prompt(`Para excluir "${managed.work.title}" e todos os capítulos do site, digite EXCLUIR:`);
+    if (typed === null) return;
+    if (typed.trim().toUpperCase() !== "EXCLUIR") { toast("Exclusão cancelada: o texto não confere."); return; }
+    try { await engine.siteDelete(managed.work.id); toast("Obra excluída do site."); managed = null; go("#/site"); }
+    catch (e) { toast(e.message); }
+  };
+
   /* ---------- envio ---------- */
   const pendingRows = () => (current.tab && $("view-list").hidden === false ? rows.filter((w) => statusOf(w.id) !== "ok") : []);
   function updateSendAll() {
@@ -367,6 +487,7 @@
   }
   $("stop").onclick = () => { engine.stop(); setStatus("Parando depois do passo atual…"); };
   function repaint() {
+    if (managed && !$("view-manage").hidden) $("m-sync").hidden = !managed.work.source_mediocre_id || engine.running;
     document.querySelectorAll(".card-work").forEach((c) => { const id = Number(c.dataset.id); const w = rows.find((r) => r.id === id); if (w) c.replaceWith(card(w)); });
     renderSiteStatus(); updateMeta(); updateSendAll();
   }

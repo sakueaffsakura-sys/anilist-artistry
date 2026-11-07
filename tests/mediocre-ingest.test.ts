@@ -30,6 +30,15 @@ describe("ingest", () => {
       .toEqual({ action: "enqueue", items: [{ obraId: 7, title: "X" }, { obraId: 8, title: null }] });
     expect(() => parseIngestBody({ action: "enqueue", items: [] })).toThrow();
   });
+  test("site management actions validate input", () => {
+    const id = "28cc5d19-b7ad-46c4-982c-a52a2b1ed8a2";
+    expect(parseIngestBody({ action: "site_list", filter: "x", q: "a%b" })).toEqual({ action: "site_list", filter: "todas", q: "a b", page: 1, obraId: null });
+    expect(parseIngestBody({ action: "site_update", seriesId: id, patch: { published: false, views: 9 } })).toEqual({ action: "site_update", seriesId: id, patch: { published: false } });
+    expect(() => parseIngestBody({ action: "site_update", seriesId: id, patch: {} })).toThrow();
+    expect(() => parseIngestBody({ action: "site_work", seriesId: "1" })).toThrow();
+    expect(() => parseIngestBody({ action: "site_delete", seriesId: id, confirm: "sim" })).toThrow();
+    expect(parseIngestBody({ action: "chapter_update", chapterId: id, published: true })).toEqual({ action: "chapter_update", chapterId: id, published: true });
+  });
   test("getter only serves supplied data", async () => {
     const g = suppliedGetter({ "/obras/1": { a: 1 } }, null);
     expect((await g("api", "/obras/1")).ok).toBe(true);

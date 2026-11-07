@@ -7,7 +7,8 @@
 (function (root) {
   "use strict";
 
-  const API_HOSTS = ["https://api.mediocretoons.net", "https://back2.mediocrescan.com"];
+  // Todas as rotas da API usam o domínio novo; o caminho continua o mesmo.
+  const API_HOSTS = ["https://api.mediocretoons.net"];
   const CDN = "https://cdn.mediocrescan.com";
   const PACE = { perSend: 2, waitMs: 20000, lockMs: 60000, maxLocksInRow: 5, gapMs: 1500 };
   const LIST_PAGE = { "/obras/adicionados-recentes": 20, "/obras/atualizadas-recentes": 30 };
@@ -283,6 +284,13 @@
 
     return {
       list, search, lists, reading, work, chapter, thumbs, status, plan, enqueue, run,
+      // Obras que já estão no site (gerenciamento).
+      siteList: (filter, q, page, obraId) => site({ action: "site_list", filter, q: q || "", page: page || 1, obraId: obraId || null }),
+      siteWork: (seriesId) => site({ action: "site_work", seriesId }),
+      siteUpdate: (seriesId, patch) => site({ action: "site_update", seriesId, patch }),
+      chapterUpdate: (chapterId, published) => site({ action: "chapter_update", chapterId, published }),
+      chapterDelete: (chapterId) => site({ action: "chapter_delete", chapterId }),
+      siteDelete: (seriesId) => site({ action: "site_delete", seriesId, confirm: "EXCLUIR" }),
       stop() { if (running) stopFlag = true; },
       get running() { return running; },
     };

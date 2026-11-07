@@ -100,6 +100,7 @@
       </div>
       <div class="work-actions">
         <button id="w-publish" type="button" class="btn primary">Publicar no site</button>
+        <button id="w-manage" type="button" class="btn ghost" hidden>Gerenciar</button>
         <button id="w-json" type="button" class="btn ghost">JSON</button>
       </div>
       <p id="w-site" class="site-status"></p>
@@ -112,6 +113,54 @@
       </div>
       <ul id="w-chapters" class="chapters"></ul>
       <p id="w-empty" class="empty" hidden>Nenhum capítulo encontrado.</p>
+    </article>
+
+    <!-- Obras no site -->
+    <div id="view-site" class="view" hidden>
+      <div id="site-chips" class="chips" role="tablist"></div>
+      <form id="form-site-search" class="row search">
+        <input id="site-search" type="search" placeholder="Buscar no site pelo título" enterkeyhint="search" />
+        <button class="btn" type="submit">Buscar</button>
+      </form>
+      <div id="site-meta" class="list-meta"></div>
+      <ul id="site-list" class="site-rows"></ul>
+      <p id="site-empty" class="empty" hidden></p>
+      <button id="site-more" type="button" class="btn ghost wide" hidden>Carregar mais</button>
+    </div>
+
+    <!-- Gerenciar uma obra do site -->
+    <article id="view-manage" class="view" hidden>
+      <div class="work-head plain">
+        <img id="m-cover" class="work-cover" alt="" />
+        <div class="min0">
+          <h1 id="m-title"></h1>
+          <p id="m-meta" class="muted small"></p>
+          <p id="m-origin" class="muted small"></p>
+        </div>
+      </div>
+      <div class="manage-links">
+        <a id="m-open" class="btn ghost small" target="_blank" rel="noopener">Abrir no site</a>
+        <button id="m-mediocre" type="button" class="btn ghost small" hidden>Ver na MediocreScan</button>
+        <button id="m-sync" type="button" class="btn primary small" hidden>Buscar capítulos novos</button>
+      </div>
+      <ul class="switches">
+        <li><div><strong>Publicada</strong><span>Visível para os leitores. Desligue para virar rascunho.</span></div><button type="button" role="switch" class="switch" data-field="published" aria-checked="false"><span></span></button></li>
+        <li><div><strong>Fixada nas atualizações</strong><span>Aparece primeiro na lista de atualizações da home.</span></div><button type="button" role="switch" class="switch" data-field="pinned" aria-checked="false"><span></span></button></li>
+        <li><div><strong>No destaque da home</strong><span>Entra no carrossel do topo da página inicial.</span></div><button type="button" role="switch" class="switch" data-field="in_slider" aria-checked="false"><span></span></button></li>
+        <li><div><strong>Status</strong><span>Como a obra aparece no catálogo.</span></div>
+          <select id="m-status" aria-label="Status da obra"><option>Em andamento</option><option>Completo</option></select></li>
+      </ul>
+      <div class="section-head">
+        <h2 class="caption">Capítulos no site</h2>
+        <span id="m-count" class="muted small"></span>
+      </div>
+      <ul id="m-chapters" class="chapters manage"></ul>
+      <p id="m-empty" class="empty" hidden>Nenhum capítulo no site.</p>
+      <div class="danger-zone">
+        <strong>Excluir obra do site</strong>
+        <p class="muted small">Apaga a obra e todos os capítulos do Better Mangá. Não dá para desfazer.</p>
+        <button id="m-delete" type="button" class="btn danger small">Excluir obra</button>
+      </div>
     </article>
 
     <!-- Leitor -->
@@ -158,10 +207,10 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 10.4 3.5 2.1-1 1.7-4.5-2.7V6h2z"/></svg>Recentes</button>
       <button type="button" data-tab="novas">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z"/></svg>Novas</button>
-      <button type="button" data-tab="paravoce">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="m12 21-1.4-1.3C5.4 15 2 12 2 8.4 2 5.4 4.4 3 7.4 3c1.7 0 3.4.8 4.6 2.1A6.1 6.1 0 0 1 16.6 3C19.6 3 22 5.4 22 8.4c0 3.6-3.4 6.6-8.6 11.3z"/></svg>Para você</button>
       <button type="button" data-tab="buscar">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9.5 3a6.5 6.5 0 0 1 5.2 10.4l5.4 5.4-1.4 1.4-5.4-5.4A6.5 6.5 0 1 1 9.5 3Zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Z"/></svg>Buscar</button>
+      <button type="button" data-tab="site">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 4h16v12H4zm2 2v8h12V6zm-2 12h16v2H4zm6.6-4.6L8 10.8l1.4-1.4 1.2 1.2 3.9-3.9L16 8.1z"/></svg>No site</button>
     </nav>
   </section>
 

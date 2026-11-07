@@ -26,7 +26,24 @@ export type IngestBody =
   | { action: "enqueue"; items: { obraId: number; title: string | null }[] }
   | { action: "work"; obraId: number; work: unknown; publish: boolean }
   | { action: "chapters"; obraId: number; chapters: { capId: number; meta: unknown; content: unknown }[] }
-  | { action: "finish"; obraId: number; added: number; remaining: number };
+  | { action: "finish"; obraId: number; added: number; remaining: number }
+  | { action: "site_list"; filter: SiteFilter; q: string; page: number; obraId: number | null }
+  | { action: "site_work"; seriesId: string }
+  | { action: "site_update"; seriesId: string; patch: SitePatch }
+  | { action: "chapter_update"; chapterId: string; published: boolean }
+  | { action: "chapter_delete"; chapterId: string }
+  | { action: "site_delete"; seriesId: string; confirm: string };
+
+/** Gerenciamento das obras do site pelo app Estúdio (somente administradores, como todo o endpoint). */
+export type SiteFilter = "todas" | "publicadas" | "rascunhos" | "mediocre";
+export type SitePatch = { published?: boolean; pinned?: boolean; in_slider?: boolean; status?: string };
+export const SITE_PAGE_SIZE = 30;
+const SITE_STATUSES = ["Em andamento", "Completo", "Pausado", "Cancelado", "Hiato"];
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function uuid(v: unknown, label: string): string {
+  if (typeof v !== "string" || !UUID_RE.test(v)) throw new Error(`${label} inválido.`);
+  return v;
+}
 
 function count(v: unknown, label: string): number {
   if (typeof v !== "number" || !Number.isSafeInteger(v) || v < 0 || v > 100_000) throw new Error(`${label} inválido.`);
@@ -39,8 +56,33 @@ function workId(v: unknown): number {
 
 /** Validates the helper payload shape; throws a readable message on anything unexpected. */
 export function parseIngestBody(v: unknown): IngestBody {
-  const o = v as { obraId?: unknown; action?: unknown; work?: unknown; chapters?: unknown; publish?: unknown; syncLimit?: unknown; added?: unknown; remaining?: unknown; ids?: unknown; items?: unknown } | null;
+  const o = v as { obraId?: unknown; action?: unknown; work?: unknown; chapters?: unknown; publish?: unknown; syncLimit?: unknown; added?: unknown; remaining?: unknown; ids?: unknown; items?: unknown; filter?: unknown; q?: unknown; page?: unknown; seriesId?: unknown; chapterId?: unknown; patch?: unknown; published?: unknown; confirm?: unknown } | null;
   if (!o || typeof o !== "object") throw new Error("Corpo inválido.");
+  if (o.action === "site_list") {
+    const filter = (["todas", "publicadas", "rascunhos", "mediocre"] as const).find((f) => f === o.filter) ?? "todas";
+    const q = typeof o.q === "string" ? o.q.replace(/[%_,()]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) : "";
+    const page = o.page === undefined ? 1 : Math.min(Math.max(count(o.page, "Página"), 1), 1000);
+    const obraId = o.obraId === undefined || o.obraId === null ? null : workId(o.obraId);
+    return { action: "site_list", filter, q, page, obraId };
+  }
+  if (o.action === "site_work") return { action: "site_work", seriesId: uuid(o.seriesId, "Obra") };
+  if (o.action === "site_update") {
+    const p = (o.patch && typeof o.patch === "object" ? o.patch : {}) as Record<string, unknown>;
+    const patch: SitePatch = {};
+    for (const k of ["published", "pinned", "in_slider"] as const) if (typeof p[k] === "boolean") patch[k] = p[k] as boolean;
+    if (typeof p["status"] === "string" && SITE_STATUSES.includes(p["status"])) patch.status = p["status"];
+    if (!Object.keys(patch).length) throw new Error("Nada para alterar.");
+    return { action: "site_update", seriesId: uuid(o.seriesId, "Obra"), patch };
+  }
+  if (o.action === "chapter_update") {
+    if (typeof o.published !== "boolean") throw new Error("Informe se o capítulo fica visível.");
+    return { action: "chapter_update", chapterId: uuid(o.chapterId, "Capítulo"), published: o.published };
+  }
+  if (o.action === "chapter_delete") return { action: "chapter_delete", chapterId: uuid(o.chapterId, "Capítulo") };
+  if (o.action === "site_delete") {
+    if (o.confirm !== "EXCLUIR") throw new Error('Para excluir, confirme digitando EXCLUIR.');
+    return { action: "site_delete", seriesId: uuid(o.seriesId, "Obra"), confirm: "EXCLUIR" };
+  }
   if (o.action === "plan") {
     const n = o.syncLimit === undefined ? 10 : count(o.syncLimit, "Limite");
     return { action: "plan", syncLimit: Math.min(n, INGEST_MAX_SYNC) };
@@ -147,7 +189,56 @@ async function finishIngest(admin: Admin, body: { obraId: number; added: number;
   }).eq("id", item.id);
 }
 
+const SITE_COLUMNS = "id, slug, title, cover_url, banner_url, published, pinned, in_slider, kind, status, updated_at, created_at, source_mediocre_id, views, rating, chapters(count)";
+type SiteRow = { chapters?: { count: number }[] | null } & Record<string, unknown>;
+const withCount = (r: SiteRow) => { const { chapters, ...rest } = r; return { ...rest, chapter_count: chapters?.[0]?.count ?? 0 }; };
+
+async function siteList(admin: Admin, b: { filter: SiteFilter; q: string; page: number; obraId: number | null }) {
+  let q = admin.from("series").select(SITE_COLUMNS, { count: "exact" });
+  if (b.obraId) q = q.eq("source_mediocre_id", b.obraId);
+  if (b.filter === "publicadas") q = q.eq("published", true);
+  if (b.filter === "rascunhos") q = q.eq("published", false);
+  if (b.filter === "mediocre") q = q.not("source_mediocre_id", "is", null);
+  if (b.q) q = q.ilike("title", `%${b.q}%`);
+  const from = (b.page - 1) * SITE_PAGE_SIZE;
+  const { data, count: total, error } = await q.order("updated_at", { ascending: false }).range(from, from + SITE_PAGE_SIZE - 1);
+  if (error) throw new Error("Não foi possível listar as obras do site.");
+  return { items: (data ?? []).map((r) => withCount(r as SiteRow)), total: total ?? 0, page: b.page, pageSize: SITE_PAGE_SIZE };
+}
+async function siteWork(admin: Admin, seriesId: string) {
+  const { data: s, error } = await admin.from("series").select(SITE_COLUMNS).eq("id", seriesId).maybeSingle();
+  if (error || !s) throw new Error("Obra não encontrada no site.");
+  const { data: ch } = await admin.from("chapters").select("id, number, title, published, created_at").eq("series_id", seriesId).order("number", { ascending: false }).limit(5000);
+  return { work: withCount(s as SiteRow), chapters: ch ?? [] };
+}
+
 export async function runIngest(admin: Admin, body: IngestBody, createdBy: string) {
+  if (body.action === "site_list") return { ...(await siteList(admin, body)), added: 0, skipped: 0 };
+  if (body.action === "site_work") return { ...(await siteWork(admin, body.seriesId)), added: 0, skipped: 0 };
+  if (body.action === "site_update") {
+    const { data, error } = await admin.from("series").update({ ...body.patch, updated_at: new Date().toISOString() }).eq("id", body.seriesId).select(SITE_COLUMNS).maybeSingle();
+    if (error || !data) throw new Error("Não foi possível salvar a obra.");
+    return { work: withCount(data as SiteRow), added: 0, skipped: 0 };
+  }
+  if (body.action === "chapter_update") {
+    const { data, error } = await admin.from("chapters").update({ published: body.published }).eq("id", body.chapterId).select("id, published").maybeSingle();
+    if (error || !data) throw new Error("Não foi possível alterar o capítulo.");
+    return { chapter: data, added: 0, skipped: 0 };
+  }
+  if (body.action === "chapter_delete") {
+    const { data, error } = await admin.from("chapters").delete().eq("id", body.chapterId).select("id").maybeSingle();
+    if (error || !data) throw new Error("Não foi possível excluir o capítulo.");
+    return { deleted: data.id, added: 0, skipped: 0 };
+  }
+  if (body.action === "site_delete") {
+    const { data: s } = await admin.from("series").select("id, source_mediocre_id").eq("id", body.seriesId).maybeSingle();
+    if (!s) throw new Error("Obra não encontrada no site.");
+    await admin.from("chapters").delete().eq("series_id", s.id);
+    const { error } = await admin.from("series").delete().eq("id", s.id);
+    if (error) throw new Error("Não foi possível excluir a obra.");
+    if (s.source_mediocre_id) await admin.from("mediocre_queue").delete().eq("obra_id", s.source_mediocre_id);
+    return { deleted: s.id, added: 0, skipped: 0 };
+  }
   if (body.action === "plan") return { ...(await ingestPlan(admin, body.syncLimit)), added: 0, skipped: 0 };
   if (body.action === "check") return { ...(await ingestCheck(admin, body.ids)), added: 0, skipped: 0 };
   if (body.action === "enqueue") {
