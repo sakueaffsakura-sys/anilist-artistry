@@ -25,10 +25,8 @@ async function send(body) {
 }
 const unwrap = (d) => (d && typeof d === "object" && !Array.isArray(d) && d.data && typeof d.data === "object" ? d.data : d);
 function contentPath(m) {
-  const p = m.cap_caminho || m.cap_conteudo || m.cap_path;
-  if (typeof p === "string" && p.trim()) return p.startsWith("/") ? p : `/${p}`;
-  const obra = m.obr_id ?? m.obra?.obr_id, num = m.cap_num;
-  return obra != null && num != null ? `/obras/${obra}/capitulos/${num}/conteudo.json` : null;
+  const { obr_id: obra, cap_num: num, cap_uuid: uuid } = m || {};
+  return obra && num != null && typeof uuid === "string" ? `/obras/${obra}/capitulos/${num}/${uuid}.json` : null;
 }
 
 async function pull(id) {
