@@ -97,7 +97,9 @@ async function setup(context, { signedIn, admin }) {
     if (admin && method === "GET" && url.includes("/rest/v1/user_roles")) {
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ role: "admin" }]) });
     }
-    if (method !== "GET" && method !== "HEAD" && !url.includes("/rest/v1/rpc/get_")) {
+    // Escritas não saem daqui; funções só de leitura (rankings, get_*) vão ao banco normalmente.
+    const readOnlyRpc = /\/rest\/v1\/rpc\/(get_|obra_ranking|xp_ranking)/.test(url);
+    if (method !== "GET" && method !== "HEAD" && !readOnlyRpc) {
       return route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
     }
     const headers = { ...req.headers() };

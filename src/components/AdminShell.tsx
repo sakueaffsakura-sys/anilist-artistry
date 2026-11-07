@@ -91,7 +91,9 @@ export function AdminShell({
     { label: "Comunidade e sistema", paths: ["/admin/contas", "/admin/pedidos", "/admin/suporte", "/admin/app", "/admin/manutencao"] },
   ];
   const visible = NAV.filter((n) => !("adminOnly" in n) || isAdmin);
-  const current = [...NAV].sort((a, b) => b.to.length - a.to.length).find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to))) ?? NAV[0];
+  // Páginas sem item próprio no menu (ex.: editar uma obra) ficam com o ícone de Obras.
+  const current = [...NAV].sort((a, b) => b.to.length - a.to.length).find((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)))
+    ?? (pathname === "/admin" ? NAV[0] : NAV.find((n) => n.to === "/admin/obras") ?? NAV[0]);
   const CurrentIcon = current.icon;
   const results = query.trim() ? visible.filter((n) => n.label.toLowerCase().includes(query.trim().toLowerCase())) : [];
   const initial = (user?.email ?? "?").slice(0, 1).toUpperCase();

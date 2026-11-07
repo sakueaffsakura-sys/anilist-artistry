@@ -102,3 +102,11 @@ Aplicada `0057_rls_initplan_series_chapters.sql` e registrada no histórico Driz
 As políticas `maintenance_restriction` (restritiva, todos os comandos) de `series` e `chapters`, e `staff read all series`/`staff read all chapters` (leitura da equipe), passaram a chamar `maintenance_access_allowed()` e `has_role()` dentro de `(select ...)`. Assim o Postgres calcula cada função uma vez por consulta em vez de uma vez por linha; o resultado não depende da linha. Contar os capítulos para o painel caiu de 5,4 s para 0,4 s (limite de 8 s para contas logadas), e as contagens de capítulos das prateleiras também ficam mais leves.
 
 Nomes, comandos, papéis e tipo das políticas não mudaram; a regra em si é a mesma, só muda quando é calculada. Nenhum dado foi alterado. Conferido depois: visitante, leitor e administrador continuam vendo as mesmas contagens. Reversão: `ALTER POLICY` voltando às expressões sem `(select ...)` e remoção do registro no histórico.
+
+## Leituras sem mexer na data de atualização — 2026-11-07
+
+Aplicada `0058_series_touch_ignore_views.sql` e registrada no histórico Drizzle com o hash do arquivo. Antes, foram conferidos o histórico (58 registros, último 0057) e os gatilhos de `series`.
+
+O gatilho `series_touch` passou a ter `WHEN`: só roda quando muda alguma coluna além de `views` e `updated_at`. Abrir um capítulo soma 1 em `views` e não faz mais a obra subir em "Capítulos novos" e "Atualizadas". Quem grava `updated_at` de propósito (importações, painel) continua igual, e mudar qualquer outro campo continua atualizando a data. Os dois casos foram testados numa transação desfeita antes de aplicar.
+
+Nenhum dado foi alterado. Reversão: recriar `series_touch BEFORE UPDATE ... EXECUTE FUNCTION touch_updated_at()` sem o `WHEN` e remover o registro no histórico.

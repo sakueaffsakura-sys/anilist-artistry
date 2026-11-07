@@ -16,3 +16,13 @@ export function compactNumber(value: number | null | undefined): string {
 export function countLabel(value: number, one: string, many: string): string {
   return `${value.toLocaleString("pt-BR")} ${value === 1 ? one : many}`;
 }
+
+/** Título do capítulo só quando diz algo além do número ("Capítulo 43" no capítulo 43 vira nada). */
+export function chapterSubtitle(title: string | null | undefined, number: number | string): string | null {
+  const text = (title ?? "").trim();
+  if (!text) return null;
+  const n = String(number).replace(/\.0+$/, "");
+  const plain = text.toLocaleLowerCase("pt-BR").replace(/\s+/g, " ");
+  const repeats = new RegExp(`^(cap[ií]tulo|cap\\.?|chapter|ch\\.?|epis[oó]dio|ep\\.?)? ?#?0*${n.replace(".", "[.,]")}$`);
+  return repeats.test(plain) ? null : text;
+}

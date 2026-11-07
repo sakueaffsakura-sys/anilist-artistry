@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useGenres } from "@/hooks/use-genres";
+import { usePublicGenres } from "@/hooks/use-genres";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { BookOpen, Compass, LayoutGrid, List as ListIcon, Search, SlidersHorizontal, Star, User2, X } from "lucide-react";
@@ -96,7 +96,7 @@ function Pesquisar() {
 
   const isUser = s.q.startsWith("@");
 
-  const tags = useGenres();
+  const tags = usePublicGenres();
 
   const results = useQuery({
     queryKey: ["search", profile.id, profile.kidsMaxAge, s],

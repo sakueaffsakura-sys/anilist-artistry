@@ -36,7 +36,7 @@ import { ageRatingLabel } from "@/lib/age-ratings";
 import { AgeRatingBadge } from "@/components/AgeRatingBadge";
 import { KidsBlocked } from "@/components/KidsBlocked";
 import { activeProfileId, hasProfileChosen, isWorkAllowed, useActiveProfile } from "@/lib/active-profile";
-import { compactNumber, formatRating } from "@/lib/format";
+import { chapterSubtitle, compactNumber, formatRating } from "@/lib/format";
 import { kindLabel } from "@/lib/work-categories";
 /** Capítulo publicado nos últimos 3 dias. */
 const isFresh = (iso: string) => Date.now() - new Date(iso).getTime() < 3 * 24 * 60 * 60 * 1000;
@@ -480,9 +480,13 @@ function SeriesPage() {
                 </p>
               ) : null}
               <div className="work-stats mt-3">
-                <span title={stats.count ? `${stats.count} ${stats.count === 1 ? "avaliação" : "avaliações"}` : "Ainda sem avaliações"}><Star className="fill-gold text-gold" /><b>{formatRating(average)}</b>{stats.count ? <span className="hidden sm:inline">({stats.count})</span> : null}</span>
+                {stats.count ? (
+                  <span title={`${stats.count} ${stats.count === 1 ? "avaliação" : "avaliações"}`}><Star className="fill-gold text-gold" /><b>{formatRating(average)}</b><span className="hidden sm:inline">({stats.count})</span></span>
+                ) : (
+                  <span><Star />Sem nota</span>
+                )}
                 <span><BookOpen /><b>{obra.chapters.length.toLocaleString("pt-BR")}</b> cap.</span>
-                <span title={`${obra.views.toLocaleString("pt-BR")} leituras`}><Eye /><b>{compactNumber(obra.views)}</b><span className="hidden sm:inline">leituras</span></span>
+                {obra.views > 0 ? <span title={`${obra.views.toLocaleString("pt-BR")} leituras`}><Eye /><b>{compactNumber(obra.views)}</b><span className="hidden sm:inline">leituras</span></span> : null}
                 <span><MessageCircle /><b>{comments.data?.length ?? 0}</b></span>
                 <span className="hidden sm:inline-flex"><Clock />{timeAgo(lastChapter?.created_at ?? obra.updated_at)}</span>
               </div>
@@ -602,7 +606,7 @@ function SeriesPage() {
                           >
                             <span className="chapter-row-title flex min-w-0 items-center gap-2 text-sm font-semibold">
                               <span className="shrink-0">Cap. {formatChapter(chapter.number)}</span>
-                              {chapter.title ? <span className="truncate font-normal text-muted-foreground">{chapter.title}</span> : null}
+                              {chapterSubtitle(chapter.title, chapter.number) ? <span className="truncate font-normal text-muted-foreground">{chapterSubtitle(chapter.title, chapter.number)}</span> : null}
                             </span>
                             <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                               {isFresh(chapter.created_at) ? <span className="chapter-new">Novo</span> : null}

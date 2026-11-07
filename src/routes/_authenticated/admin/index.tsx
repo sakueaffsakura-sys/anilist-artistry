@@ -117,7 +117,7 @@ function AdminPage() {
       <div className="admin-metrics grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCard label="Obras" value={d ? fmt(d.series) : "—"} icon={<BookOpen className="h-5 w-5" />} />
         <StatCard label="Capítulos" value={d ? fmt(d.chapters) : "—"} icon={<Layers className="h-5 w-5" />} />
-        <StatCard label="Visualizações" value={d ? fmt(d.views) : "—"} icon={<Eye className="h-5 w-5" />} />
+        <StatCard label="Leituras" value={d ? fmt(d.views) : "—"} icon={<Eye className="h-5 w-5" />} />
         <StatCard label="Contas" value={d ? fmt(d.users) : "—"} icon={<Users className="h-5 w-5" />} />
       </div>
 

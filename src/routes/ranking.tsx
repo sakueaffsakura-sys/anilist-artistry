@@ -7,7 +7,6 @@ import { PageTitle } from "@/components/LibraryBits";
 import { supabase } from "@/integrations/supabase/client";
 import { coverUrl } from "@/lib/media";
 import { compactNumber, formatRating } from "@/lib/format";
-import { fetchSeries } from "@/lib/queries";
 
 export const Route = createFileRoute("/ranking")({
   staticData: { sitemap: true },
@@ -67,17 +66,11 @@ function ObrasRankings() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("obra_ranking", { _metric: metric });
       if (error) throw error;
-      return (data ?? []).map((r) => ({ ...r, rating: Number(r.rating), total: Number(r.total) })) as ObraRank[];
+      // A função devolve sempre 20 obras; só entram as que tiveram movimento na semana.
+      return (data ?? []).map((r) => ({ ...r, rating: Number(r.rating), total: Number(r.total) })).filter((r) => r.total > 0) as ObraRank[];
     },
   });
-  // Sem leituras registradas na semana: mostra as mais lidas de sempre, para a página nunca ficar vazia.
   const weekEmpty = list.isSuccess && (list.data?.length ?? 0) === 0;
-  const allTime = useQuery({
-    queryKey: ["series", "views", 20],
-    enabled: weekEmpty && metric === "views",
-    queryFn: () => fetchSeries({ order: "views", limit: 20 }),
-  });
-  const allTimeRows: ObraRank[] = (allTime.data ?? []).map((s) => ({ id: s.id, slug: s.slug, title: s.title, cover_url: s.cover_url, rating: Number(s.rating), total: s.views }));
   const rows = list.data ?? [];
 
   return (
@@ -102,14 +95,7 @@ function ObrasRankings() {
       ) : null}
 
       {weekEmpty ? (
-        metric === "views" && allTimeRows.length ? (
-          <>
-            <p className="mb-1 mt-3 text-[13px] text-muted-foreground">Ainda não há leituras registradas nesta semana. Estas são as mais lidas de todos os tempos.</p>
-            <RankList rows={allTimeRows} unit={active.unit} />
-          </>
-        ) : metric !== "views" ? (
-          <p className="py-8 text-sm text-muted-foreground">Ainda sem {active.label.toLowerCase()} nos últimos 7 dias.</p>
-        ) : null
+        <p className="py-8 text-sm text-muted-foreground">Ainda sem {active.label.toLowerCase()} nos últimos 7 dias.</p>
       ) : null}
     </section>
   );

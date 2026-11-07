@@ -178,14 +178,14 @@ function Home() {
             {novels.data.length ? <HScroll>
               {novels.data.map((item) => <div key={item.id} className={shelfItem}>
                 <SeriesCard slug={item.slug} title={item.title} cover={item.cover_url} rating={item.rating}
-                  chapters={item.chapter_count} favorite={favoriteIds.has(item.id)} seriesId={item.id} ageRating={item.age_rating} />
+                  chapters={item.chapter_count ?? null} favorite={favoriteIds.has(item.id)} seriesId={item.id} ageRating={item.age_rating} />
               </div>)}
             </HScroll> : <p className="py-6 text-sm text-muted-foreground">Nenhuma novel publicada ainda.</p>}
           </SectionRow>
         ) : null}
 
         {ranking.isPending ? <LoadingShelf label="Carregando as mais lidas" /> : null}
-        {(ranking.data?.length ?? 0) > 0 ? (
+        {(ranking.data?.[0]?.views ?? 0) > 0 ? (
           <SectionRow
             icon={<Trophy />}
             title="Mais lidas"
@@ -204,7 +204,7 @@ function Home() {
                     <div className="min-w-0">
                       <h3 className="line-clamp-2"><Link to="/obra/$slug" params={{ slug: item.slug }}>{item.title}</Link></h3>
                       <p className="card-meta mt-0.5">
-                        <span title={`${item.views.toLocaleString("pt-BR")} leituras`}>{compactNumber(item.views)} leituras</span>
+                        {item.views > 0 ? <span title={`${item.views.toLocaleString("pt-BR")} leituras`}>{compactNumber(item.views)} leituras</span> : null}
                         <span>{kindLabel(item.kind)}</span>
                         {latest ? <span>Cap. {formatChapter(latest.number)}</span> : null}
                       </p>

@@ -5,6 +5,7 @@ import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
 import { SectionRow } from "@/components/SectionRow";
 import { selectRecentUpdates } from "@/lib/recent-updates";
 import { kindLabel } from "@/lib/work-categories";
+import { chapterSubtitle } from "@/lib/format";
 
 /** Capítulo publicado há menos de 3 horas. */
 const isFresh = (iso: string) => Date.now() - new Date(iso).getTime() < 3 * 60 * 60 * 1000;
@@ -23,6 +24,7 @@ export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
       <ul className="update-list">
         {items.map((item) => {
           const [latest, previous] = item.chapters ?? [];
+          const subtitle = latest ? chapterSubtitle(latest.title, latest.number) : null;
           return (
             <li key={item.id} className="update-row max-md:[&:nth-child(n+9)]:hidden">
               <Link to="/obra/$slug" params={{ slug: item.slug }} tabIndex={-1} aria-hidden="true">
@@ -36,7 +38,7 @@ export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
                 {latest ? (
                   <p className="update-chapter">
                     <Link to="/obra/$slug/$chapter" params={{ slug: item.slug, chapter: formatChapter(latest.number) }}>Cap. {formatChapter(latest.number)}</Link>
-                    {latest.title ? <span>{latest.title}</span> : previous ? <span>· antes: <Link to="/obra/$slug/$chapter" params={{ slug: item.slug, chapter: formatChapter(previous.number) }} className="font-semibold text-muted-foreground hover:text-primary">Cap. {formatChapter(previous.number)}</Link></span> : null}
+                    {subtitle ? <span>{subtitle}</span> : previous ? <span>· antes: <Link to="/obra/$slug/$chapter" params={{ slug: item.slug, chapter: formatChapter(previous.number) }} className="font-semibold text-muted-foreground hover:text-primary">Cap. {formatChapter(previous.number)}</Link></span> : null}
                   </p>
                 ) : null}
                 <p className="card-meta mt-0.5">

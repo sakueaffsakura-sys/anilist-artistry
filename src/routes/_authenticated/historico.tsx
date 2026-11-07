@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { History, Trash2, X } from "lucide-react";
+import { History, Play, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
 import { PageTitle } from "@/components/LibraryBits";
@@ -138,7 +138,7 @@ function Historico() {
                   params={{ slug: e.series.slug, chapter: formatChapter(e.chapters.number) }}
                   className="card-meta mt-1 font-semibold text-primary hover:underline"
                 >
-                  Continuar no cap. {formatChapter(e.chapters.number)}
+                  <Play className="h-3 w-3 fill-current" /> Cap. {formatChapter(e.chapters.number)}
                 </Link>
               ) : null}
             </div>

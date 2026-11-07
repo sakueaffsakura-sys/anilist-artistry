@@ -45,3 +45,17 @@ describe("Work category labels", () => {
     expect(sameKind("Shoujo2", "Shoujo")).toBe(true);
   });
 });
+
+describe("Chapter subtitle", () => {
+  it("hides titles that only repeat the chapter number", async () => {
+    const { chapterSubtitle, formatRating } = await import("../src/lib/format");
+    expect(chapterSubtitle("Capítulo 43", 43)).toBeNull();
+    expect(chapterSubtitle("Cap. 14", "14")).toBeNull();
+    expect(chapterSubtitle("Chapter 7.5", 7.5)).toBeNull();
+    expect(chapterSubtitle("", 3)).toBeNull();
+    expect(chapterSubtitle("O retorno do herói", 12)).toBe("O retorno do herói");
+    expect(chapterSubtitle("Capítulo 2: a fuga", 2)).toBe("Capítulo 2: a fuga");
+    expect(formatRating(7.56)).toBe("7,6");
+    expect(formatRating(null)).toBe("0,0");
+  });
+});

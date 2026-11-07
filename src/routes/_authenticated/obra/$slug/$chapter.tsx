@@ -167,6 +167,8 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const progress = Math.round(((index + 1) / Math.max(obra.chapters.length, 1)) * 100);
 
+    // Os pedidos do Supabase só saem quando alguém pede o resultado (.then/await): sem isso a posição
+    // de leitura e o "lido" podiam nunca ser gravados.
     const save = (pos: number) => {
       void supabase.from("reading_history").upsert(
         {
@@ -179,14 +181,15 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
           updated_at: new Date().toISOString(),
         },
         { onConflict: "user_id,profile_id,series_id" },
-      );
+      ).then(({ error }) => { if (error) console.warn("Histórico de leitura não salvo:", error.message); });
       if (pos > 0.9) {
         void supabase
           .from("chapter_reads")
           .upsert(
             { user_id: user.id, chapter_id: current.id },
             { onConflict: "user_id,chapter_id" },
-          );
+          )
+          .then(({ error }) => { if (error) console.warn("Capítulo lido não salvo:", error.message); });
       }
     };
 
@@ -241,7 +244,9 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
 
   useEffect(() => {
     if (!obra) return;
-    void supabase.rpc("increment_series_views", { _series_id: obra.id });
+    void supabase.rpc("increment_series_views", { _series_id: obra.id }).then(({ error }) => {
+      if (error) console.warn("Leitura não contada:", error.message);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [obra?.id, chapter]);
 
