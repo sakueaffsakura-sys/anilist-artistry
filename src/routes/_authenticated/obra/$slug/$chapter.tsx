@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { AlignJustify, BookOpen, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronsDown, Home, Infinity, List, Maximize2, MessageCircle, Minus, Moon, Palette, Plus, Settings2, SunMedium } from "lucide-react";
+import { AlignJustify, BookOpen, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronsDown, Home, Infinity as InfinityIcon, List, Maximize2, MessageCircle, Minus, Moon, Palette, Plus, Settings2, SunMedium } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -492,7 +492,7 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
               <ChevronRight className="h-5 w-5" />
             </Button>
             <Link to="/obra/$slug" params={{ slug }} className={`${iconBtn} hidden sm:grid`} aria-label="Lista de capítulos" title="Lista de capítulos">
-              <Infinity className="h-5 w-5" />
+              <InfinityIcon className="h-5 w-5" />
             </Link>
             <Button
               variant="ghost"

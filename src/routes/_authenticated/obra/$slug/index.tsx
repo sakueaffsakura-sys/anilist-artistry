@@ -50,6 +50,13 @@ const monthYear = (iso: string) => {
 };
 /** Obras longas: atalhos de 100 em 100 capítulos para não rolar a lista inteira. */
 const RANGE_SIZE = 100;
+/**
+ * Listas de ids de capítulo vão ao banco em partes: numa obra com centenas de capítulos, um endereço
+ * com todos os ids passa do limite do servidor e o pedido falha (os "Lido" e o progresso sumiam).
+ */
+const ID_CHUNK = 150;
+const chunk = <T,>(items: readonly T[]): T[][] =>
+  Array.from({ length: Math.ceil(items.length / ID_CHUNK) }, (_, i) => items.slice(i * ID_CHUNK, (i + 1) * ID_CHUNK));
 
 export const Route = createFileRoute("/_authenticated/obra/$slug/")({
   staticData: { sitemap: false },
@@ -199,12 +206,16 @@ function SeriesPage() {
     queryFn: async () => {
       const chapterIds = series.data!.chapters.map((c) => c.id);
       if (chapterIds.length === 0) return new Set<string>();
-      const { data } = await supabase
-        .from("chapter_reads")
-        .select("chapter_id")
-        .eq("user_id", user!.id)
-        .in("chapter_id", chapterIds);
-      return new Set((data ?? []).map((row) => row.chapter_id));
+      const parts = await Promise.all(chunk(chapterIds).map(async (ids) => {
+        const { data, error } = await supabase
+          .from("chapter_reads")
+          .select("chapter_id")
+          .eq("user_id", user!.id)
+          .in("chapter_id", ids);
+        if (error) throw error;
+        return data ?? [];
+      }));
+      return new Set(parts.flat().map((row) => row.chapter_id));
     },
   });
 
@@ -324,12 +335,14 @@ function SeriesPage() {
       const chapterIds = series.data.chapters.map((c) => c.id);
       if (chapterIds.length === 0) return;
       if (mode === "unread") {
-        const { error } = await supabase
-          .from("chapter_reads")
-          .delete()
-          .eq("user_id", user.id)
-          .in("chapter_id", chapterIds);
-        if (error) throw error;
+        for (const ids of chunk(chapterIds)) {
+          const { error } = await supabase
+            .from("chapter_reads")
+            .delete()
+            .eq("user_id", user.id)
+            .in("chapter_id", ids);
+          if (error) throw error;
+        }
       } else {
         const { error } = await supabase
           .from("chapter_reads")

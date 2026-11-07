@@ -590,7 +590,8 @@ body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-even
 /* ranking: números grandes com brilho e medalhas para os 3 primeiros */
 .rank-item { display: flex; align-items: flex-start; }
 .rank-number { position: relative; z-index: 0; margin-top: 7.25rem; margin-right: -.9rem; font-family: var(--font-display); font-weight: 900; font-size: 5.25rem; line-height: .78; color: var(--background); -webkit-text-stroke: 2px color-mix(in oklab, var(--primary) 85%, transparent); paint-order: stroke fill; text-shadow: 0 0 26px color-mix(in oklab, var(--primary) 35%, transparent); user-select: none; }
-.rank-item[data-rank="1"] .rank-number { -webkit-text-stroke-color: var(--medal-gold); text-shadow: 0 0 30px color-mix(in oklab, var(--medal-gold) 55%, transparent); }
+/* o "1" é estreito: com a sobreposição normal a capa cobria quase todo o número */
+.rank-item[data-rank="1"] .rank-number { margin-right: -.2rem; -webkit-text-stroke-color: var(--medal-gold); text-shadow: 0 0 30px color-mix(in oklab, var(--medal-gold) 55%, transparent); }
 .rank-item[data-rank="2"] .rank-number { -webkit-text-stroke-color: var(--medal-silver); text-shadow: 0 0 26px color-mix(in oklab, var(--medal-silver) 35%, transparent); }
 .rank-item[data-rank="3"] .rank-number { -webkit-text-stroke-color: var(--medal-bronze); text-shadow: 0 0 26px color-mix(in oklab, var(--medal-bronze) 40%, transparent); }
 .rank-item > :last-child { position: relative; z-index: 1; flex: 1; min-width: 0; }
@@ -599,6 +600,11 @@ body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-even
 
 /* cabeçalho das seções: contador e "ver todos" em pílula */
 .section-count { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 22px; padding: 0 8px; border-radius: 999px; background: color-mix(in oklab, var(--primary) 16%, transparent); color: var(--primary); font-size: 11px; font-weight: 800; font-family: var(--font-sans); }
+/* celulares estreitos (360–400 px): título um pouco menor e, com contador, sem o tracejado, para caber numa linha */
+@media (max-width: 400px) {
+  .discovery-section .section-title { font-size: 1.125rem; }
+  .discovery-section .section-title:has(.section-count)::after { content: none; }
+}
 .see-all { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--glass-border); background: var(--glass); font-size: 12px; font-weight: 800; color: var(--primary); transition: border-color .2s, box-shadow .2s, transform .2s; }
 .see-all:hover { border-color: color-mix(in oklab, var(--primary) 50%, transparent); box-shadow: var(--glow-soft); transform: translateX(2px); }
 
