@@ -339,6 +339,7 @@
     $("sender").hidden = false; $("sender-idle").hidden = true; $("sender-run").hidden = false; $("log").innerHTML = "";
     $("run-work").textContent = title; $("run-queue").textContent = `${ids.length} capítulo(s) escolhido(s)`; setBar(0, ids.length); setStatus("Preparando…");
     await askBattery(); await keepAwake(true);
+    markRun(`${title}: ${ids.length} capítulo(s) escolhido(s)`);
     await native.start(title, `${ids.length} capítulo(s) escolhido(s)`);
     await engine.sendChapters(wid, ids, title);
     keepAwake(false); native.stop(); chapterJob = null;
@@ -560,6 +561,8 @@
     repaint();
     await askBattery();
     await keepAwake(true);
+    markRun(`${list.length} obra(s): ${list.map((w) => w.name || w.title || w.id).slice(0, 3).join(", ")}`);
+    log(`Envio iniciado: ${list.length} obra(s).`);
     await native.start("Enviando obras", `${list.length} obra(s) na vez`);
     await engine.run(list);
     keepAwake(false);
@@ -573,7 +576,30 @@
   }
   function setStatus(text, warn) { const e = $("run-status"); e.textContent = text; e.classList.toggle("pause", Boolean(warn)); }
   function setBar(done, total) { const pct = total ? Math.round((done / total) * 100) : 0; $("run-bar").firstElementChild.style.width = `${pct}%`; $("run-bar").setAttribute("aria-valuenow", String(pct)); }
-  function log(text) { const li = el("li", { textContent: `${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} ${text}` }); const ol = $("log"); ol.prepend(li); while (ol.children.length > 40) ol.lastChild.remove(); }
+  /* Histórico guardado no celular: sobrevive se o app fechar, para sabermos por que o envio parou. */
+  const LOG_KEY = "bm-estudio-log";
+  function saveLog(line) {
+    try { const all = JSON.parse(localStorage.getItem(LOG_KEY) || "[]"); all.unshift(line); localStorage.setItem(LOG_KEY, JSON.stringify(all.slice(0, 300))); } catch (_) { /* sem armazenamento */ }
+  }
+  function log(text) {
+    const d = new Date();
+    const line = `${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} ${text}`;
+    saveLog(line);
+    const li = el("li", { textContent: line.slice(6) }); const ol = $("log"); ol.prepend(li); while (ol.children.length > 40) ol.lastChild.remove();
+  }
+  /** Marca que um envio está rodando; se o app reabrir com a marca, o envio foi cortado no meio. */
+  const RUN_KEY = "bm-estudio-run";
+  const markRun = (what) => { try { localStorage.setItem(RUN_KEY, JSON.stringify({ what, at: Date.now() })); } catch (_) { /* ok */ } };
+  const clearRun = () => { try { localStorage.removeItem(RUN_KEY); } catch (_) { /* ok */ } };
+  function interruptedRun() { try { return JSON.parse(localStorage.getItem(RUN_KEY) || "null"); } catch (_) { return null; } }
+  $("open-history").onclick = () => {
+    let lines = [];
+    try { lines = JSON.parse(localStorage.getItem(LOG_KEY) || "[]"); } catch (_) { lines = []; }
+    $("settings").close();
+    $("json-title").textContent = "Histórico de envios";
+    $("json-body").textContent = lines.length ? redact(lines.join("\n")) : "Nenhum envio registrado ainda.";
+    $("json-dialog").showModal();
+  };
   function count(ms, render) { clearInterval(countdown); const end = Date.now() + ms; const tick = () => { const s = Math.max(0, Math.ceil((end - Date.now()) / 1000)); render(s); if (s <= 0) clearInterval(countdown); }; tick(); countdown = setInterval(tick, 1000); }
   function onEngineEvent(e) {
     switch (e.type) {
@@ -589,6 +615,11 @@
       case "sending": clearInterval(countdown); setStatus(`Enviando capítulos ${e.from}${e.to > e.from ? ` e ${e.to}` : ""} de ${e.total}…`); break;
       case "progress": setBar(e.done, e.total); note.done = e.done; native.update(note.work, `${e.done} de ${e.total} capítulos · ${queueLeft} obra(s) na vez`, e.done, e.total); break;
       case "waiting": count(e.ms, (s) => setStatus(`Próximo envio em ${s} s`)); break;
+      case "net-retry":
+        log(`Falha de conexão ${e.where} (${e.detail}). Nova tentativa ${e.attempt}/${e.max} em ${Math.round(e.ms / 1000)} s.`);
+        native.update(note.work, `Sem conexão. Tentando de novo (${e.attempt}/${e.max})…`, note.done, note.total);
+        count(e.ms, (sec) => setStatus(`Falha de conexão ${e.where}. Tentando de novo em ${sec} s (${e.attempt}/${e.max}).`, true));
+        break;
       case "pause": native.update(note.work, "A MediocreScan travou. Voltando em 1 minuto…", note.done, note.total); log(`A MediocreScan travou (${e.reason}). Pausa ${e.count}/${e.max}.`); count(e.ms, (s) => setStatus(`A MediocreScan travou por excesso de pedidos. Voltando em ${s} s.`, true)); break;
       case "resume": clearInterval(countdown); setStatus("Continuando…"); break;
       case "chapters-start":
@@ -612,6 +643,7 @@
     }
   }
   function finishRun(text, isError) {
+    clearRun();
     native.stop();
     if (work && !$("view-work").hidden && chapterJob === null) refreshChapterMarks(work.id);
     clearInterval(countdown); setStatus(text, isError); log(text); toast(text);
@@ -648,10 +680,29 @@
   async function checkQueueDot() { try { const p = await engine.plan(); $("queue-dot").hidden = !(p.queue || []).length; } catch (_) { /* sem aviso */ } }
 
   /* ---------- início ---------- */
+  /** Ao abrir: se um envio foi cortado (app fechado, atualizado ou encerrado pelo Android), oferece continuar. */
+  async function checkResume() {
+    const cut = interruptedRun();
+    if (cut) { log(`Envio interrompido (${cut.what}): o app foi fechado, atualizado ou encerrado pelo Android antes de terminar.`); clearRun(); }
+    try {
+      const p = await engine.plan();
+      const items = p.items || []; const n = (p.queue || []).length;
+      if (!n) return;
+      const titles = new Map(items.map((i) => [i.id, i.title]));
+      const list = p.queue.map((id) => ({ id, title: titles.get(id) || `Obra ${id}` }));
+      $("resume-text").innerHTML = "";
+      $("resume-text").append(el("strong", { textContent: cut ? "O envio parou no meio." : `${n} obra(s) esperando na fila do site.` }),
+        document.createTextNode(cut ? ` O app foi fechado ou atualizado durante o envio. ${n} obra(s) continuam na fila, começando por ${list[0].title}. Os capítulos que já foram não são enviados de novo.` : ` Começando por ${list[0].title}. Os capítulos que já estão no site não são enviados de novo.`));
+      $("resume-card").hidden = false;
+      $("resume-go").onclick = () => { $("resume-card").hidden = true; startRun(list); };
+      $("resume-dismiss").onclick = () => { $("resume-card").hidden = true; };
+    } catch (_) { /* sem aviso */ }
+  }
+
   function enterMain() {
     show("main"); $("who").textContent = whoText(); $("token-card").hidden = Boolean(state.token);
     if (!location.hash) location.hash = "#/inicio"; else route();
-    checkQueueDot();
+    checkQueueDot(); checkResume();
   }
   if (state.session) enterMain(); else show("login");
   setInterval(() => { const s = state.session; if (s && s.mode === "email" && s.expires - Date.now() < 5 * 60_000) refreshSession(); }, 60_000);
