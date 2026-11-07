@@ -12,7 +12,12 @@
   const CDN = "https://cdn.mediocrescan.com";
   // 5 capítulos por envio e 1 min 12 s de espera antes dos próximos 5.
   // apiGapMs: durante o envio, 1 pedido à API da MediocreScan por minuto (as páginas no CDN não contam).
-  const PACE = { perSend: 5, waitMs: 72000, lockMs: 60000, lockSteps: [60000, 120000, 300000, 600000, 900000], maxLocksInRow: 5, gapMs: 1500, apiGapMs: 60000, netRetries: 3, netWaitMs: 20000 };
+  // Recusa seguida: 1, 2, 5, 10 e depois 15 min (até 12 vezes). Queda de conexão: esperas crescentes (~22 min).
+  // Mesmas regras do motor nativo (android-src/EnvioEngine.java).
+  const PACE = {
+    perSend: 5, waitMs: 72000, lockMs: 60000, lockSteps: [60000, 120000, 300000, 600000, 900000], maxLocksInRow: 12,
+    gapMs: 1500, apiGapMs: 60000, netWaits: [20000, 30000, 60000, 120000, 180000, 300000, 300000, 300000], cdnRefusalsForBlock: 5,
+  };
   const LIST_PAGE = { "/obras/adicionados-recentes": 20, "/obras/atualizadas-recentes": 30 };
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -51,7 +56,7 @@
   function createEngine(deps) {
     const emit = (e) => { try { deps.onEvent && deps.onEvent(e); } catch (_) { /* tela não deve parar o envio */ } };
     // lastPairAt vale para o app inteiro: entre lotes, entre obras e entre envios seguidos.
-    let apiIdx = 0, lastApiCall = null, lastCdnCall = null, locksInRow = 0, stopFlag = false, running = false, lastLockEnd = null, lastPairAt = null;
+    let apiIdx = 0, lastApiCall = null, lastCdnCall = null, locksInRow = 0, stopFlag = false, running = false, lastLockEnd = null, lastPairAt = null, cdnRefusals = 0;
     // Horários guardados no celular: se o app reiniciar, a espera entre lotes continua valendo.
     try {
       const saved = deps.pace && deps.pace.load ? deps.pace.load() : null;
@@ -69,9 +74,11 @@
     }
     /** Falha de conexão no meio do envio: espera e tenta de novo, em vez de pular o capítulo. */
     async function netRetry(where, attempt, detail) {
-      if (attempt >= PACE.netRetries) throw new Fatal(`Sem resposta ${where} depois de ${PACE.netRetries} tentativas (${detail}). O envio parou aqui e continua deste ponto quando você tocar em Continuar.`);
-      emit({ type: "net-retry", where, detail, attempt: attempt + 1, max: PACE.netRetries, ms: PACE.netWaitMs });
-      await wait(PACE.netWaitMs);
+      const max = PACE.netWaits.length;
+      if (attempt >= max) throw new Fatal(`Sem resposta ${where} depois de ${max} tentativas (${detail}). O envio parou aqui e continua deste ponto quando você tocar em Continuar.`);
+      const ms = PACE.netWaits[attempt];
+      emit({ type: "net-retry", where, detail, attempt: attempt + 1, max, ms });
+      await wait(ms);
     }
 
     /**
@@ -87,7 +94,7 @@
 
     async function lockPause(reason) {
       locksInRow++;
-      if (locksInRow > PACE.maxLocksInRow) throw new Fatal(`A MediocreScan continua recusando os pedidos (${reason}) depois de 5 esperas. Tente mais tarde${reason === "IP bloqueado" ? " ou troque de rede (Wi-Fi ↔ dados móveis)" : ""}; o envio continua de onde parou.`);
+      if (locksInRow > PACE.maxLocksInRow) throw new Fatal(`A MediocreScan continua recusando os pedidos (${reason}) depois de ${PACE.maxLocksInRow} esperas. Tente mais tarde${reason === "IP bloqueado" ? " ou troque de rede (Wi-Fi ↔ dados móveis)" : ""}; o envio continua de onde parou.`);
       // Travou de novo logo depois: espera mais a cada vez (1, 2, 5, 10, 15 min) para não prolongar o bloqueio.
       const ms = PACE.lockSteps[Math.min(locksInRow - 1, PACE.lockSteps.length - 1)] || PACE.lockMs;
       emit({ type: "pause", ms, reason, count: locksInRow, max: PACE.maxLocksInRow });
@@ -127,13 +134,20 @@
         if (kind === "api" && r.status >= 520 && r.status <= 530 && apiIdx < API_HOSTS.length - 1) { apiIdx++; continue; }
         if (r.status === 401) throw new Fatal("A MediocreScan recusou sua chave (401). Cole uma chave nova nas configurações.");
         if (r.status === 429 || r.status === 403) {
-          const body = r.status === 403 ? String(await r.text().catch(() => "")).slice(0, 300) : "";
-          const reason = r.status === 429 ? "pedidos demais" : /ip\s+bloquead/i.test(body) ? "IP bloqueado" : "acesso recusado";
+          const body = String(await r.text().catch(() => "")).slice(0, 300);
+          const blocked = /bloquead|blocked|banned/i.test(body);
+          // Uma página recusada no CDN costuma ser arquivo que não existe mais: pula, sem travar tudo.
+          if (kind === "cdn" && r.status === 403 && !blocked && ++cdnRefusals < PACE.cdnRefusalsForBlock) {
+            if (patient) { const m = /\/capitulos\/([^/]+)\//.exec(path); emit({ type: "log", text: `O CDN recusou as páginas${m ? ` do capítulo ${m[1]}` : ""} (403); esse capítulo fica para depois.` }); }
+            return null;
+          }
+          const reason = r.status === 429 ? "pedidos demais" : blocked ? "IP bloqueado" : kind === "api" ? "acesso recusado" : "o CDN recusou as páginas";
           if (!patient) throw new Error(`A MediocreScan pediu uma pausa (${reason}). Tente de novo em 1 minuto.`);
           await lockPause(reason);
           continue;
         }
         locksInRow = 0;
+        if (kind === "cdn") cdnRefusals = 0;
         if (r.status === 404) return null;
         if (r.status >= 500 && patient) { await netRetry("da MediocreScan", netFails++, `erro ${r.status}`); continue; }
         if (!r.ok) throw new Error(`A MediocreScan respondeu ${r.status}.`);
@@ -299,7 +313,7 @@
           emit({ type: "sending", from: tried + 1, to: tried + group.length, total });
           const chapters = [];
           for (const [k, capId] of group.entries()) {
-            emit({ type: "fetching", n: k + 1, of: group.length, at: tried + k + 1, total });
+            emit({ type: "fetching", n: k + 1, of: group.length, pos: tried + k + 1, total });
             try {
               const data = await chapterData(capId, entries);
               if (!data) { emit({ type: "log", text: `Capítulo ${capId}: não encontrado na MediocreScan.` }); continue; }
@@ -358,7 +372,7 @@
           emit({ type: "sending", from: i + 1, to: i + group.length, total: todo.length });
           const chapters = [];
           for (const [k, capId] of group.entries()) {
-            emit({ type: "fetching", n: k + 1, of: group.length, at: i + k + 1, total: todo.length });
+            emit({ type: "fetching", n: k + 1, of: group.length, pos: i + k + 1, total: todo.length });
             try {
               const data = await chapterData(capId, entries);
               if (!data) { emit({ type: "chapter-state", id, capId, state: "fail" }); skipped++; continue; }

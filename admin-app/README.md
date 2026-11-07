@@ -9,10 +9,19 @@ que não está bloqueado) e envia ao site pelo endpoint `/api/public/mediocre-in
 - **Pedidos à API:** durante o envio, no máximo 1 pedido por minuto a `api.mediocretoons.net` (as páginas no
   CDN não contam). Quando a lista de capítulos da obra já traz o UUID, o app vai direto às páginas sem pedir o
   capítulo à API.
-- **Ritmo:** uma obra por vez até o último capítulo, 5 capítulos por envio, 1 min 12 s de espera antes dos próximos 5 e
-  pausa de 1 minuto quando a API trava (para depois de 5 travamentos seguidos). Falha de conexão é tentada
-  de novo 3 vezes (20 s entre elas) em vez de pular o capítulo. Parar no meio guarda o ponto na
-  fila do site, e a obra é retomada primeiro.
+- **Ritmo:** uma obra por vez até o último capítulo, 5 capítulos por envio, 1 min 12 s de espera antes dos próximos 5.
+  Quando a MediocreScan recusa (403/429), espera 1, 2, 5, 10 e depois 15 min entre tentativas (até 12 seguidas).
+  Falha de conexão é tentada de novo com esperas crescentes (8 vezes, ~22 min) em vez de pular o capítulo; cada
+  pedido tem tempo máximo (45 s na MediocreScan, 2 min no site). Uma página recusada isolada no CDN fica para
+  depois; várias seguidas contam como bloqueio. Parar no meio guarda o ponto na fila do site, e a obra é retomada primeiro.
+- **Motor nativo (no celular):** o envio roda no serviço em primeiro plano do Android (`android-src/EnvioEngine.java`,
+  mesma lógica do `www/engine.js`), não na tela. Continua com o app minimizado, com a tela apagada e mesmo se o
+  Android fechar a tela do app. Mantém CPU e Wi-Fi acordados, mostra contagem regressiva na notificação e avisa no
+  fim. Se o Android encerrar o processo, o serviço é recriado e continua o trabalho guardado; ao abrir o app, a tela
+  busca os eventos que perdeu (número de sequência) e, se o envio foi cortado há menos de 15 min, continua sozinho.
+  Enquanto envia, os pedidos da tela à API entram na mesma fila de 1 por minuto. A sessão renovada pelo serviço volta
+  para a tela (o token de renovação muda a cada uso). No Android 14+ o serviço é de "uso especial" (sem o limite de
+  6 h por dia da sincronização de dados do Android 15). No navegador, o `engine.js` envia pela tela.
 
 ## Como o APK é gerado
 O workflow `.github/workflows/estudio-apk.yml` compila o app a cada mudança em `admin-app/` na `main` e

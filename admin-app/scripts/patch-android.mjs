@@ -23,10 +23,12 @@ if (!main) throw new Error("MainActivity.java não encontrado");
 const pkg = /package\s+([\w.]+);/.exec(readFileSync(main, "utf8"))[1];
 const javaDir = dirname(main);
 
-// Serviço em primeiro plano + plugin (envio continua com o app minimizado ou a tela apagada).
-for (const f of ["EnvioService.java", "EstudioPlugin.java"]) {
+// Motor de envio nativo + serviço em primeiro plano + plugin (o envio continua com o app fechado).
+const sources = readdirSync("android-src").filter((f) => f.endsWith(".java"));
+for (const f of sources) {
   writeFileSync(join(javaDir, f), readFileSync(join("android-src", f), "utf8").replace("package __PKG__;", `package ${pkg};`));
 }
+console.log(`Código nativo copiado: ${sources.join(", ")}`);
 
 writeFileSync(main, `package ${pkg};
 
@@ -51,16 +53,12 @@ public class MainActivity extends BridgeActivity {
     }
 
     /**
-     * Em celulares com pouca memória (ex.: Galaxy A07) o Android mata a parte do WebView que roda o
-     * envio quando o app vai para trás, e o app inteiro reinicia. Aqui: o WebView fica com prioridade
-     * alta mesmo fora da tela e, se ainda assim for encerrado, a tela é recriada em vez de fechar o app
-     * (o envio continua sozinho de onde parou).
+     * Em celulares com pouca memória (ex.: Galaxy A07) o Android encerra a parte do WebView quando o app
+     * vai para trás. O envio roda no serviço nativo, então a tela pode ser encerrada à vontade: aqui ela
+     * só é recriada (em vez de o app fechar) e, ao voltar, mostra o andamento que o serviço guardou.
      */
     private void protectRenderer() {
         if (getBridge() == null || getBridge().getWebView() == null) return;
-        if (Build.VERSION.SDK_INT >= 26) {
-            try { getBridge().getWebView().setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false); } catch (Exception ignored) { }
-        }
         getBridge().addWebViewListener(new WebViewListener() {
             @Override
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
@@ -101,9 +99,9 @@ public class MainActivity extends BridgeActivity {
         keepWebViewRunning();
     }
 
-    /** Durante um envio, o app continua trabalhando mesmo minimizado. */
+    /** Modo antigo (a tela envia): mantém o WebView trabalhando minimizado. O motor nativo não precisa. */
     private void keepWebViewRunning() {
-        if (!EnvioService.running || getBridge() == null) return;
+        if (!EnvioService.running || !EnvioService.jsMode || getBridge() == null) return;
         WebView web = getBridge().getWebView();
         if (web == null) return;
         web.onResume();
@@ -118,14 +116,20 @@ let m = readFileSync(manifestPath, "utf8");
 const perms = [
   "android.permission.FOREGROUND_SERVICE",
   "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+  "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
+  "android.permission.ACCESS_WIFI_STATE",
   "android.permission.POST_NOTIFICATIONS",
   "android.permission.WAKE_LOCK",
   "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
 ].filter((p) => !m.includes(`"${p}"`)).map((p) => `    <uses-permission android:name="${p}" />`).join("\n");
 if (perms) m = m.replace(/<\/manifest>\s*$/, `${perms}\n</manifest>\n`);
 if (!m.includes(".EnvioService")) {
-  m = m.replace("</application>", `        <service android:name=".EnvioService" android:exported="false" android:foregroundServiceType="dataSync" />\n    </application>`);
+  // specialUse (Android 14+): envio longo sem o limite diário de 6 h da sincronização de dados no Android 15.
+  m = m.replace("</application>", `        <service android:name=".EnvioService" android:exported="false" android:stopWithTask="false" android:foregroundServiceType="dataSync|specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Envio contínuo de capítulos ao site, escolhido pelo usuário, com notificação e botão Parar." />
+        </service>\n    </application>`);
 }
 writeFileSync(manifestPath, m);
 
-console.log(`Android ajustado: versão 1.${build}, envio em segundo plano com notificação.`);
+if (!m.includes("FOREGROUND_SERVICE_SPECIAL_USE") || !m.includes("specialUse")) throw new Error("Manifesto sem o serviço de uso especial");
+console.log(`Android ajustado: versão 1.${build}, motor de envio nativo em primeiro plano.`);

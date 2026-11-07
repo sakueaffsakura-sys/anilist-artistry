@@ -243,6 +243,11 @@ async function chapterStatus(admin: Admin, obraId: number) {
   return { seriesId: s.id, slug: s.slug, published: s.published, numbers: (ch ?? []).map((c) => Number(c.number)) };
 }
 
+/** The device is still sending this work: keep the site's own queue tick off it while it does. */
+async function keepReserved(admin: Admin, obraId: number) {
+  await admin.from("mediocre_queue").update({ next_run_at: reserveUntil() }).eq("obra_id", obraId).in("status", ["running", "waiting"]);
+}
+
 export async function runIngest(admin: Admin, body: IngestBody, createdBy: string) {
   if (body.action === "chapter_status") return { ...(await chapterStatus(admin, body.obraId)), added: 0, skipped: 0 };
   if (body.action === "queue_remove") {
@@ -292,11 +297,13 @@ export async function runIngest(admin: Admin, body: IngestBody, createdBy: strin
   }
   if (body.action === "finish") { await finishIngest(admin, body, createdBy); return { ok: true, added: 0, skipped: 0 }; }
   if (body.action === "work") {
+    await keepReserved(admin, body.obraId);
     const r = await importMediocreWork(admin, body.obraId, { createdBy, chapterLimit: 0, draft: !body.publish, get: suppliedGetter({ [`/obras/${body.obraId}`]: body.work }, null) });
     return { slug: r.slug, created: r.created, pendingCapIds: r.pendingCapIds, remaining: r.remaining, added: 0, skipped: 0 };
   }
   const { data: s } = await admin.from("series").select("id, slug, kind").eq("source_mediocre_id", body.obraId).maybeSingle();
   if (!s) throw new Error("Envie primeiro os dados da obra.");
+  await keepReserved(admin, body.obraId);
   let added = 0, skipped = 0;
   for (const c of body.chapters) {
     const ok = await importChapter(admin, s.id, c.capId, s.kind === "Novel", suppliedGetter({ [`/capitulos/${c.capId}`]: c.meta }, c.content));

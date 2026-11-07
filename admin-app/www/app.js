@@ -30,7 +30,15 @@
   async function refreshSession() {
     const s = state.session;
     if (!s || s.mode !== "email" || !s.refresh) return false;
-    try { state.session = await authRequest("refresh_token", { refresh_token: s.refresh }); save(); return true; } catch (_) { return false; }
+    // O serviço pode ter renovado antes (e o token de renovação antigo não vale mais): usa o dele.
+    if (Native && typeof Native.events === "function") {
+      try { const r = await Native.events({ since: Number.MAX_SAFE_INTEGER }); if (r && r.session && adoptSession(r.session) && state.session.expires - Date.now() > 5 * 60_000) return true; } catch (_) { /* segue */ }
+    }
+    try {
+      state.session = await authRequest("refresh_token", { refresh_token: state.session.refresh }); save();
+      if (Native && typeof Native.setSession === "function") Native.setSession({ session: state.session }).catch(() => {});
+      return true;
+    } catch (_) { return false; }
   }
   const siteHeaders = () => { const s = state.session; if (!s) return {}; return s.mode === "code" ? { "x-ingest-token": s.code } : { authorization: `Bearer ${s.access}` }; };
   const appVersion = () => (window.BM_VERSION ? `v${window.BM_VERSION}` : "teste");
@@ -44,7 +52,8 @@
   }
   const engine = BMEngine.createEngine({
     // Sem resposta em tempo: conta como falha de conexão e tenta de novo (antes um pedido travado parava o envio para sempre).
-    fetch: (url, init) => withTimeout(fetch(url, init), /mediocre-ingest/.test(String(url)) ? 120000 : 45000),
+    // Durante um envio nativo, pedidos da tela à API entram na mesma fila de 1 por minuto do serviço.
+    fetch: (url, init) => (nativeRunning && String(url).startsWith(API_ORIGIN) ? nativeApiFetch(String(url)) : withTimeout(fetch(url, init), /mediocre-ingest/.test(String(url)) ? 120000 : 45000)),
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
     pace: {
       load: () => { try { return JSON.parse(localStorage.getItem("bm-estudio-pace") || "null"); } catch (_) { return null; } },
@@ -70,10 +79,86 @@
   })();
   const native = {
     start: (title, text) => Native ? Native.start({ title, text }).catch(() => {}) : Promise.resolve(),
-    update: (title, text, progress, max) => Native ? Native.update({ title, text, progress: progress ?? -1, max: max ?? 0 }).catch(() => {}) : Promise.resolve(),
+    update: (title, text, progress, max) => Native && engine.running ? Native.update({ title, text, progress: progress ?? -1, max: max ?? 0 }).catch(() => {}) : Promise.resolve(),
     stop: () => Native ? Native.stop().catch(() => {}) : Promise.resolve(),
   };
   if (Native && Native.addListener) { try { Native.addListener("stopRequested", () => { engine.stop(); setStatus("Parando depois do passo atual…"); }); } catch (_) { /* sem botão na notificação */ } }
+
+  /* ---------- motor nativo: o serviço do Android envia; a tela só acompanha ---------- */
+  // No celular o envio roda no serviço em primeiro plano (continua com o app fechado). A tela recebe os
+  // eventos ao vivo e, ao reabrir, busca os que perdeu pelo número de sequência.
+  const NATIVE = Boolean(Native);
+  const API_ORIGIN = "https://api.mediocretoons.net";
+  const SEQ_KEY = "bm-estudio-seq";
+  const TERMINAL = new Set(["run-done", "run-stopped", "run-error", "chapters-done"]);
+  let lastSeq = (() => { try { return Number(localStorage.getItem(SEQ_KEY)) || 0; } catch (_) { return 0; } })();
+  let nativeRunning = false, nativeWaiters = [], syncing = null;
+  function busy() { return engine.running || nativeRunning; }
+  const nativeConfig = () => ({ site: state.site || DEFAULT_SITE, token: state.token, session: state.session, supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY });
+  async function nativeApiFetch(url) {
+    const r = await Native.mediocreGet({ path: url.slice(API_ORIGIN.length), token: state.token });
+    const body = typeof r.body === "string" ? r.body : "";
+    return { status: r.status, ok: r.status >= 200 && r.status < 300, headers: { get: () => null }, json: async () => JSON.parse(body), text: async () => body };
+  }
+  /** Sessão renovada pelo serviço (o token de renovação muda a cada uso: a tela precisa do novo). */
+  function adoptSession(s) {
+    const cur = state.session;
+    if (!s || !cur || s.mode !== "email" || cur.mode !== "email") return false;
+    if ((Number(s.expires) || 0) <= (Number(cur.expires) || 0) || !s.access || !s.refresh) return false;
+    state.session = Object.assign({}, cur, s); save();
+    return true;
+  }
+  function showRunning() {
+    $("sender").hidden = false; $("sender-idle").hidden = true; $("sender-run").hidden = false; $("send-all").hidden = true; $("resume-card").hidden = true;
+  }
+  function handleNative(e) {
+    if (!e || typeof e.seq !== "number" || e.seq <= lastSeq) return;
+    lastSeq = e.seq;
+    try { localStorage.setItem(SEQ_KEY, String(lastSeq)); } catch (_) { /* ok */ }
+    if (e.type === "session") { adoptSession(e.session); return; }
+    if (e.type === "site-moved") {
+      if (e.origin) { state.site = e.origin; save(); $("site-url").value = e.origin; if (state.session) $("who").textContent = whoText(); }
+      return;
+    }
+    if (e.type === "run-start" || e.type === "chapters-start") { nativeRunning = true; showRunning(); }
+    onEngineEvent(e);
+    if (TERMINAL.has(e.type)) {
+      nativeRunning = false;
+      const w = nativeWaiters; nativeWaiters = []; w.forEach((f) => f(e));
+    }
+  }
+  function onNativeLive(e) {
+    if (!e || typeof e.seq !== "number") return;
+    if (e.seq === lastSeq + 1 && !syncing) handleNative(e); else if (e.seq > lastSeq) syncNative();
+  }
+  /** Busca no serviço o que aconteceu enquanto a tela estava fechada. */
+  function syncNative() {
+    if (!NATIVE) return Promise.resolve(null);
+    if (syncing) return syncing;
+    syncing = (async () => {
+      try {
+        const r = await Native.events({ since: lastSeq });
+        if (typeof r.seq === "number" && r.seq < lastSeq) { lastSeq = 0; } // dados do app apagados: recomeça a contagem
+        if (r.session) adoptSession(r.session);
+        const fresh = (r.events || []).filter((e) => e && e.seq > lastSeq).sort((a, b) => a.seq - b.seq);
+        if (fresh.length) fresh.forEach(handleNative);
+        else if (r.running) (r.snapshot || []).forEach((e) => onEngineEvent(Object.assign({}, e, { silent: true })));
+        nativeRunning = Boolean(r.running);
+        if (nativeRunning) { showRunning(); if (!$("run-status").textContent) setStatus("Enviando em segundo plano…"); }
+        repaint();
+        return r;
+      } catch (_) { return null; } finally { syncing = null; }
+    })();
+    return syncing;
+  }
+  /** Começa um envio no serviço; devolve false se o Android não deixar (aí a tela envia). */
+  async function startNative(job) {
+    nativeRunning = true; showRunning();
+    try { await Native.startJob({ job, config: nativeConfig() }); return true; }
+    catch (e) { nativeRunning = false; log(`Envio em segundo plano indisponível (${e && e.message ? e.message : e}). Enviando pela tela.`); return false; }
+  }
+  if (NATIVE && Native.addListener) { try { Native.addListener("engine", onNativeLive); } catch (_) { /* sem eventos ao vivo: a tela busca ao voltar */ } }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && state.session) syncNative(); });
   /** Pede uma vez para o Android não "economizar bateria" no app, senão o envio para com a tela apagada. */
   async function askBattery() {
     if (!Native || state.batteryAsked) return;
@@ -257,7 +342,7 @@
     $("list-meta").textContent = `${items.length} obra(s) na fila. Tire da fila as que você já finalizou.`;
     const clear = el("button", { type: "button", className: "btn ghost small", textContent: "Esvaziar a fila" });
     clear.onclick = async () => {
-      if (engine.running) { toast("Pare o envio antes de mexer na fila."); return; }
+      if (busy()) { toast("Pare o envio antes de mexer na fila."); return; }
       if (!confirm(`Tirar as ${items.length} obras da fila? Elas e os capítulos já publicados continuam no site.`)) return;
       try { const r = await engine.queueClear(); items.forEach((i) => marks.queued.delete(i.id)); toast(`${r.removed} obra(s) tiradas da fila.`); checkQueueDot(); openTab("fila"); }
       catch (e) { toast(e.message); }
@@ -273,7 +358,7 @@
       open.onclick = () => go(`#/obra/${i.id}`);
       const remove = el("button", { type: "button", className: "chip-btn del", textContent: "Tirar da fila" });
       remove.onclick = async () => {
-        if (engine.running) { toast("Pare o envio antes de mexer na fila."); return; }
+        if (busy()) { toast("Pare o envio antes de mexer na fila."); return; }
         remove.disabled = true;
         try { await engine.queueRemove([i.id]); marks.queued.delete(i.id); toast(`"${i.title || i.id}" saiu da fila.`); checkQueueDot(); openTab("fila"); }
         catch (e) { toast(e.message); remove.disabled = false; }
@@ -292,7 +377,8 @@
     $("groups").append(ul);
   }
   function updateMeta() {
-    if (!rows.length || (current.tab === "inicio" && (chip.inicio === "listas" || chip.inicio === "leitura"))) return;
+    // A fila do site escreve o próprio resumo (renderQueue).
+    if (!rows.length || current.tab === "fila" || (current.tab === "inicio" && (chip.inicio === "listas" || chip.inicio === "leitura"))) return;
     const pub = rows.filter((w) => statusOf(w.id) === "ok").length;
     $("list-meta").textContent = `${rows.length} obras · ${pub} publicadas · ${rows.length - pub} para enviar`;
   }
@@ -372,23 +458,33 @@
   function queueChapter(c) {
     if (!work || !c.id || onSite(c)) return;
     if (!state.token) { toast("Cole a chave da MediocreScan primeiro."); return; }
-    if (engine.running && chapterJob === null) { toast("Espere o envio atual terminar para enviar capítulos soltos."); return; }
+    if (busy() && chapterJob === null) { toast("Espere o envio atual terminar para enviar capítulos soltos."); return; }
     capState[c.id] = "queued"; capQueue.push({ workId: work.id, title: work.title, capId: c.id });
     renderChapters(); pumpChapters();
   }
   /** Envia os capítulos escolhidos, por obra, um lote de cada vez (mesmo ritmo do envio completo). */
   async function pumpChapters() {
-    if (engine.running || !capQueue.length) return;
+    if (busy() || !capQueue.length) return;
     const wid = capQueue[0].workId, title = capQueue[0].title;
     const ids = []; for (let i = capQueue.length - 1; i >= 0; i--) if (capQueue[i].workId === wid) ids.unshift(capQueue.splice(i, 1)[0].capId);
     chapterJob = wid;
     $("sender").hidden = false; $("sender-idle").hidden = true; $("sender-run").hidden = false; $("log").innerHTML = "";
     $("run-work").textContent = title; $("run-queue").textContent = `${ids.length} capítulo(s) escolhido(s)`; setBar(0, ids.length); setStatus("Preparando…");
-    await askBattery(); await keepAwake(true);
-    markRun(`${title}: ${ids.length} capítulo(s) escolhido(s)`);
-    await native.start(title, `${ids.length} capítulo(s) escolhido(s)`);
-    await engine.sendChapters(wid, ids, title);
-    keepAwake(false); native.stop(); chapterJob = null;
+    await askBattery();
+    let viaNative = false;
+    if (NATIVE) {
+      const finished = new Promise((res) => nativeWaiters.push(res));
+      if (await startNative({ type: "chapters", workId: wid, title, capIds: ids })) { viaNative = true; await finished; }
+      else nativeWaiters = nativeWaiters.filter((f) => f !== finished);
+    }
+    if (!viaNative) {
+      await keepAwake(true);
+      markRun(`${title}: ${ids.length} capítulo(s) escolhido(s)`);
+      await native.start(title, `${ids.length} capítulo(s) escolhido(s)`);
+      await engine.sendChapters(wid, ids, title);
+      keepAwake(false); native.stop();
+    }
+    chapterJob = null;
     if (work && work.id === wid) await refreshChapterMarks(wid);
     if (capQueue.length) pumpChapters();
   }
@@ -403,7 +499,7 @@
   function renderSiteStatus() {
     if (!work) return;
     const s = statusOf(work.id), b = $("w-publish");
-    b.disabled = engine.running;
+    b.disabled = busy();
     b.textContent = s === "ok" ? "Enviar o que falta" : s === "queue" ? "Continuar envio" : "Publicar no site";
     $("w-manage").hidden = s === "new";
     const total = work.chapters.length, have = work.chapters.filter(onSite).length;
@@ -528,7 +624,7 @@
     $("m-meta").textContent = [w.kind, w.status, `${w.views ?? 0} visualizações`, `atualizada ${fmtDate(w.updated_at)}`].filter(Boolean).join(" · ");
     $("m-origin").textContent = w.source_mediocre_id ? `Vinculada à MediocreScan, obra ${w.source_mediocre_id}` : "Obra criada no site (sem vínculo com a MediocreScan).";
     $("m-open").href = `${(state.site || DEFAULT_SITE).replace(/\/+$/, "")}/obra/${encodeURIComponent(w.slug)}`;
-    $("m-mediocre").hidden = !w.source_mediocre_id; $("m-sync").hidden = !w.source_mediocre_id || engine.running;
+    $("m-mediocre").hidden = !w.source_mediocre_id; $("m-sync").hidden = !w.source_mediocre_id || busy();
     document.querySelectorAll("#view-manage .switch").forEach((sw) => { sw.setAttribute("aria-checked", String(Boolean(w[sw.dataset.field]))); sw.disabled = false; });
     const st = $("m-status"); if (![...st.options].some((o) => o.value === w.status)) st.append(el("option", { textContent: w.status })); st.value = w.status;
     $("m-count").textContent = `${chapters.length} capítulos · ${chapters.filter((c) => !c.published).length} ocultos`;
@@ -584,9 +680,9 @@
   const pendingRows = () => (current.tab && $("view-list").hidden === false ? rows.filter((w) => statusOf(w.id) !== "ok") : []);
   function updateSendAll() {
     const n = pendingRows().length, b = $("send-all");
-    b.hidden = engine.running || n === 0;
+    b.hidden = busy() || n === 0;
     b.textContent = current.tab === "fila" ? `Continuar fila do site (${n})` : `Enviar não enviadas desta lista (${n})`;
-    $("sender").hidden = !engine.running && b.hidden;
+    $("sender").hidden = !busy() && b.hidden;
   }
   $("send-all").onclick = () => {
     const list = pendingRows(); if (!list.length) return;
@@ -595,7 +691,7 @@
   };
   let queueLeft = 0, countdown = null, fetchNote = "";
   async function startRun(list) {
-    if (engine.running) return;
+    if (busy()) return;
     if (!state.token) { toast("Cole a chave da MediocreScan primeiro."); $("token-card").hidden = false; return; }
     queueLeft = list.length;
     $("sender").hidden = false; $("sender-idle").hidden = true; $("sender-run").hidden = false; $("log").innerHTML = "";
@@ -606,17 +702,25 @@
     } catch (e) { log(`Fila: ${e.message}`); }
     repaint();
     await askBattery();
+    log(`Envio iniciado: ${list.length} obra(s).`);
+    if (NATIVE) {
+      setStatus("Iniciando o envio em segundo plano…");
+      const job = { type: "works", works: list.map((w) => ({ id: w.id, title: w.name || w.title || null })), index: 0 };
+      if (await startNative(job)) { repaint(); return; }
+    }
     await keepAwake(true);
     markRun(`${list.length} obra(s): ${list.map((w) => w.name || w.title || w.id).slice(0, 3).join(", ")}`);
-    log(`Envio iniciado: ${list.length} obra(s).`);
     await native.start("Enviando obras", `${list.length} obra(s) na vez`);
     await engine.run(list);
     keepAwake(false);
     native.stop();
   }
-  $("stop").onclick = () => { engine.stop(); setStatus("Parando depois do passo atual…"); };
+  $("stop").onclick = () => {
+    if (nativeRunning && NATIVE) Native.stopJob().catch(() => {}); else engine.stop();
+    setStatus("Parando depois do passo atual…");
+  };
   function repaint() {
-    if (managed && !$("view-manage").hidden) $("m-sync").hidden = !managed.work.source_mediocre_id || engine.running;
+    if (managed && !$("view-manage").hidden) $("m-sync").hidden = !managed.work.source_mediocre_id || busy();
     document.querySelectorAll(".card-work").forEach((c) => { const id = Number(c.dataset.id); const w = rows.find((r) => r.id === id); if (w) c.replaceWith(card(w)); });
     renderSiteStatus(); updateMeta(); updateSendAll();
   }
@@ -627,8 +731,8 @@
   function saveLog(line) {
     try { const all = JSON.parse(localStorage.getItem(LOG_KEY) || "[]"); all.unshift(line); localStorage.setItem(LOG_KEY, JSON.stringify(all.slice(0, 300))); } catch (_) { /* sem armazenamento */ }
   }
-  function log(text) {
-    const d = new Date();
+  function log(text, at) {
+    const d = at ? new Date(at) : new Date();
     const line = `${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} ${text}`;
     saveLog(line);
     const li = el("li", { textContent: line.slice(6) }); const ol = $("log"); ol.prepend(li); while (ol.children.length > 40) ol.lastChild.remove();
@@ -650,74 +754,82 @@
     $("json-dialog").showModal();
   };
   function count(ms, render) { clearInterval(countdown); const end = Date.now() + ms; const tick = () => { const s = Math.max(0, Math.ceil((end - Date.now()) / 1000)); render(s); if (s <= 0) clearInterval(countdown); }; tick(); countdown = setInterval(tick, 1000); }
+  /** Quanto falta de uma espera, descontando o tempo desde o evento (eventos lidos depois de reabrir). */
+  const remaining = (e) => Math.max(0, (Number(e.ms) || 0) - (e.at ? Date.now() - e.at : 0));
+  const mmss = (s) => (s >= 60 ? `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s` : `${s} s`);
   function onEngineEvent(e) {
+    const at = e.at || Date.now(), quiet = Boolean(e.silent);
+    const note2 = (text) => { if (!quiet) log(text, at); };
     switch (e.type) {
-      case "run-start": $("run-queue").textContent = `${e.count} obra(s) na vez`; break;
+      case "run-start": $("run-queue").textContent = `${e.count} obra(s) na vez`; if (typeof e.count === "number") queueLeft = e.count; break;
       case "work-start":
+        if (typeof e.left === "number") queueLeft = e.left;
         note = { work: e.name, total: e.total, done: 0 };
         native.update(e.name, `${e.total} capítulo(s) para enviar · ${queueLeft} obra(s) na vez`, 0, e.total);
         setBar(0, e.total); $("run-work").textContent = e.name;
         $("run-queue").textContent = `${queueLeft} obra(s) na vez · ${e.total} capítulo(s) nesta`;
-        log(`${e.name}: ${e.created ? "criada no site" : "já estava no site"}, ${e.total} capítulo(s) para enviar.`);
+        note2(`${e.name}: ${e.created ? "criada no site" : "já estava no site"}, ${e.total} capítulo(s) para enviar.`);
         if (!e.total) setStatus("Nenhum capítulo novo.");
         break;
       case "sending":
         fetchNote = ""; beatRun(); clearInterval(countdown); setStatus(`Enviando capítulos ${e.from}${e.to > e.from ? ` a ${e.to}` : ""} de ${e.total}…`);
-        log(`${note.work || "Envio"}: buscando capítulos ${e.from}${e.to > e.from ? `–${e.to}` : ""} de ${e.total}.`);
+        note2(`${note.work || "Envio"}: buscando capítulos ${e.from}${e.to > e.from ? `–${e.to}` : ""} de ${e.total}.`);
         break;
       case "progress":
-        beatRun(); setBar(e.done, e.total); note.done = e.done;
+        beatRun(); setBar(e.done, e.total); note.done = e.done; note.total = e.total;
+        if (typeof e.left === "number") queueLeft = e.left;
         $("run-queue").textContent = `${e.done} de ${e.total} capítulos · ${queueLeft} obra(s) na vez`;
-        log(`${note.work || "Envio"}: ${e.done} de ${e.total} prontos (+${e.added} no site${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}).`);
+        note2(`${note.work || "Envio"}: ${e.done} de ${e.total} prontos (+${e.added} no site${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}).`);
         native.update(note.work, `${e.done} de ${e.total} capítulos · ${queueLeft} obra(s) na vez`, e.done, e.total); break;
-      case "waiting": count(e.ms, (s) => setStatus(`Próximos 5 capítulos em ${s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s} s`}`)); break;
+      case "waiting": count(remaining(e), (s) => setStatus(`Próximos 5 capítulos em ${mmss(s)}`)); break;
       case "posting": clearInterval(countdown); fetchNote = ""; setStatus(`Publicando ${e.count} capítulo(s) no site…`); break;
       case "fetching":
-        fetchNote = `capítulo ${e.at} de ${e.total} (${e.n}º de ${e.of} deste lote)`;
+        fetchNote = `capítulo ${e.pos} de ${e.total} (${e.n}º de ${e.of} deste lote)`;
         clearInterval(countdown); setStatus(`Baixando ${fetchNote}…`);
         break;
       case "api-wait":
-        count(e.ms, (sec) => setStatus(fetchNote ? `Baixando ${fetchNote}: o próximo pedido à MediocreScan sai em ${sec} s (1 por minuto).` : `Aguardando ${sec} s para o próximo pedido à MediocreScan (1 por minuto).`));
+        count(remaining(e), (sec) => setStatus(fetchNote ? `Baixando ${fetchNote}: o próximo pedido à MediocreScan sai em ${sec} s (1 por minuto).` : `Aguardando ${sec} s para o próximo pedido à MediocreScan (1 por minuto).`));
         break;
       case "net-retry":
-        log(`Falha de conexão ${e.where} (${e.detail}). Nova tentativa ${e.attempt}/${e.max} em ${Math.round(e.ms / 1000)} s.`);
+        note2(`Falha de conexão ${e.where} (${e.detail}). Nova tentativa ${e.attempt}/${e.max} em ${Math.round(e.ms / 1000)} s.`);
         native.update(note.work, `Sem conexão. Tentando de novo (${e.attempt}/${e.max})…`, note.done, note.total);
-        count(e.ms, (sec) => setStatus(`Falha de conexão ${e.where}. Tentando de novo em ${sec} s (${e.attempt}/${e.max}).`, true));
+        count(remaining(e), (sec) => setStatus(`Falha de conexão ${e.where}. Tentando de novo em ${mmss(sec)} (${e.attempt}/${e.max}).`, true));
         break;
       case "pause": {
         const mins = Math.round(e.ms / 60000);
         native.update(note.work, `A MediocreScan recusou (${e.reason}). Nova tentativa em ${mins} min…`, note.done, note.total);
-        log(`A MediocreScan recusou o pedido (${e.reason}). Espera ${e.count}/${e.max}: ${mins} min.`);
-        count(e.ms, (s) => setStatus(`A MediocreScan recusou o pedido (${e.reason}). Tentativa ${e.count} de ${e.max}: tenta de novo em ${s >= 60 ? `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s` : `${s} s`}.`, true));
+        note2(`A MediocreScan recusou o pedido (${e.reason}). Espera ${e.count}/${e.max}: ${mins} min.`);
+        count(remaining(e), (s) => setStatus(`A MediocreScan recusou o pedido (${e.reason}). Tentativa ${e.count} de ${e.max}: tenta de novo em ${mmss(s)}.`, true));
         break;
       }
       case "resume": clearInterval(countdown); setStatus("Continuando…"); break;
       case "chapters-start":
         note = { work: e.name, total: e.count, done: 0 };
-        log(`${e.name}: ${e.count} capítulo(s) escolhido(s).`);
+        $("run-work").textContent = e.name; $("run-queue").textContent = `${e.count} capítulo(s) escolhido(s)`; setBar(0, e.count);
+        note2(`${e.name}: ${e.count} capítulo(s) escolhido(s).`);
         break;
       case "chapter-state":
         if (work && work.id === e.id) { capState[e.capId] = e.state; renderChapters(); }
         break;
       case "chapters-done":
-        finishRun(`${e.name}: +${e.added} capítulo(s)${e.already ? `, ${e.already} já estavam no site` : ""}${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}.`);
+        finishRun(`${e.name}: +${e.added} capítulo(s)${e.already ? `, ${e.already} já estavam no site` : ""}${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}.`, false, quiet, at);
         break;
       case "work-done":
-        queueLeft = Math.max(0, queueLeft - 1); marks.imported.add(e.id); marks.queued.delete(e.id); repaint();
-        log(`${e.name}: ${e.note ? e.note : `+${e.added} capítulo(s)${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}`}.`);
+        queueLeft = typeof e.left === "number" ? e.left : Math.max(0, queueLeft - 1); marks.imported.add(e.id); marks.queued.delete(e.id); repaint();
+        note2(`${e.name}: ${e.note ? e.note : `+${e.added} capítulo(s)${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}`}.`);
         break;
-      case "log": log(e.text); break;
-      case "run-done": finishRun(`Pronto: ${e.works} obra(s), ${e.added} capítulo(s) enviados.`); break;
-      case "run-stopped": finishRun(`Envio parado. ${e.added} capítulo(s) enviados. A obra atual continua de onde parou na próxima vez.`); break;
-      case "run-error": finishRun(e.message, true); break;
+      case "log": note2(e.text); break;
+      case "run-done": finishRun(`Pronto: ${e.works} obra(s), ${e.added} capítulo(s) enviados.`, false, quiet, at); break;
+      case "run-stopped": finishRun(`Envio parado. ${e.added} capítulo(s) enviados. A obra atual continua de onde parou na próxima vez.`, false, quiet, at); break;
+      case "run-error": finishRun(e.message, true, quiet, at); break;
     }
   }
-  function finishRun(text, isError) {
+  function finishRun(text, isError, quiet, at) {
     clearRun();
-    native.stop();
+    if (engine.running) native.stop();
     if (work && !$("view-work").hidden && chapterJob === null) refreshChapterMarks(work.id);
-    clearInterval(countdown); setStatus(text, isError); log(text); toast(text);
-    setTimeout(() => { if (!engine.running) { $("sender-run").hidden = true; $("sender-idle").hidden = false; repaint(); } }, 6000);
+    clearInterval(countdown); setStatus(text, isError); if (!quiet) { log(text, at); if (!at || Date.now() - at < 120_000) toast(text); }
+    setTimeout(() => { if (!busy()) { $("sender-run").hidden = true; $("sender-idle").hidden = false; repaint(); } }, 6000);
     repaint(); checkQueueDot();
   }
   let wakeLock = null;
@@ -736,7 +848,7 @@
   $("open-settings").onclick = () => {
     $("token").value = state.token; $("site-url-2").value = state.site;
     $("account").textContent = state.session && state.session.mode === "email" ? `Conectado como ${state.session.email}.` : "Conectado com código do painel.";
-    $("app-version").textContent = `Versão do app: ${window.BM_VERSION || "teste"} · 5 capítulos a cada 1 min 12 s.`;
+    $("app-version").textContent = `Versão do app: ${window.BM_VERSION || "teste"} · 5 capítulos a cada 1 min 12 s · ${NATIVE ? "envio nativo (continua com o app fechado)" : "envio pela tela"}.`;
     $("settings").showModal();
   };
   $("form-settings").onsubmit = () => {
@@ -744,46 +856,67 @@
     save(); $("token-card").hidden = Boolean(state.token); $("who").textContent = whoText(); toast("Configurações salvas."); route();
   };
   $("logout").onclick = () => {
-    if (engine.running) { toast("Pare o envio antes de sair."); return; }
+    if (busy()) { toast("Pare o envio antes de sair."); return; }
     state.session = null; save(); $("settings").close(); $("password").value = ""; $("code").value = ""; show("login");
   };
 
   async function checkQueueDot() { try { const p = await engine.plan(); $("queue-dot").hidden = !(p.queue || []).length; } catch (_) { /* sem aviso */ } }
 
   /* ---------- início ---------- */
+  /** Cartão "continuar envio": com auto=true continua sozinho em 8 s (o Android encerrou o app há pouco). */
+  function showResumeCard(onGo, auto) {
+    $("resume-card").hidden = false;
+    let timer = null; $("resume-go").textContent = "Continuar envio";
+    const go = () => { clearInterval(timer); $("resume-card").hidden = true; if (!busy()) onGo(); };
+    $("resume-go").onclick = go;
+    $("resume-dismiss").onclick = () => { clearInterval(timer); $("resume-card").hidden = true; $("resume-go").textContent = "Continuar envio"; };
+    if (auto) {
+      log("O app reiniciou durante o envio. Continuando sozinho…");
+      let left = 8;
+      const tick = () => { $("resume-go").textContent = `Continuando em ${left} s`; if (left-- <= 0) go(); };
+      tick(); timer = setInterval(tick, 1000);
+    }
+  }
+  function describeJob(job) {
+    if (job.type === "chapters") return `${job.title || `obra ${job.workId}`} (${(job.capIds || []).length} capítulo(s))`;
+    const works = job.works || [], i = Math.max(0, Number(job.index) || 0), first = works[i] || {};
+    return `${Math.max(0, works.length - i)} obra(s), começando por ${first.title || `obra ${first.id || ""}`}`;
+  }
   /** Ao abrir: se um envio foi cortado (app fechado, atualizado ou encerrado pelo Android), oferece continuar. */
-  async function checkResume() {
-    const cut = interruptedRun();
+  async function checkResume(nat) {
+    if (busy()) return;
+    // Motor nativo: o trabalho guardado no celular continua exatamente de onde parou.
+    if (nat && nat.job && !nat.running) {
+      const job = nat.job, what = describeJob(job);
+      log(`Envio interrompido (${what}): o Android encerrou o app antes de terminar.`);
+      $("resume-text").innerHTML = "";
+      $("resume-text").append(el("strong", { textContent: "O envio parou no meio." }),
+        document.createTextNode(` O Android encerrou o app durante o envio de ${what}. Os capítulos que já foram não são enviados de novo.`));
+      showResumeCard(() => startNative(job), Date.now() - (Number(nat.beat) || 0) < AUTO_RESUME_MS);
+      return;
+    }
+    const cut = NATIVE ? null : interruptedRun();
     if (cut) { log(`Envio interrompido (${cut.what}): o app foi fechado, atualizado ou encerrado pelo Android antes de terminar.`); clearRun(); }
     try {
       const p = await engine.plan();
       const items = p.items || []; const n = (p.queue || []).length;
-      if (!n) return;
+      if (!n || busy()) return;
       const titles = new Map(items.map((i) => [i.id, i.title]));
       const list = p.queue.map((id) => ({ id, title: titles.get(id) || `Obra ${id}` }));
       $("resume-text").innerHTML = "";
       $("resume-text").append(el("strong", { textContent: cut ? "O envio parou no meio." : `${n} obra(s) esperando na fila do site.` }),
         document.createTextNode(cut ? ` O app foi fechado ou atualizado durante o envio. ${n} obra(s) continuam na fila, começando por ${list[0].title}. Os capítulos que já foram não são enviados de novo.` : ` Começando por ${list[0].title}. Os capítulos que já estão no site não são enviados de novo.`));
-      $("resume-card").hidden = false;
-      let auto = null; $("resume-go").textContent = "Continuar envio";
-      const go = () => { clearInterval(auto); $("resume-card").hidden = true; if (!engine.running) startRun(list); };
-      $("resume-go").onclick = go;
-      $("resume-dismiss").onclick = () => { clearInterval(auto); $("resume-card").hidden = true; $("resume-go").textContent = "Continuar envio"; };
-      // Cortado há pouco (o Android reiniciou o app): continua sozinho, sem precisar tocar.
-      if (cut && Date.now() - cut.at < AUTO_RESUME_MS) {
-        log("O app reiniciou durante o envio. Continuando sozinho…");
-        let left = 8;
-        const tick = () => { $("resume-go").textContent = `Continuando em ${left} s`; if (left-- <= 0) go(); };
-        tick(); auto = setInterval(tick, 1000);
-      }
+      showResumeCard(() => startRun(list), Boolean(cut && Date.now() - cut.at < AUTO_RESUME_MS));
     } catch (_) { /* sem aviso */ }
   }
 
   function enterMain() {
     show("main"); $("who").textContent = whoText(); $("token-card").hidden = Boolean(state.token);
     if (!location.hash) location.hash = "#/inicio"; else route();
-    checkQueueDot(); checkResume();
+    checkQueueDot();
+    if (NATIVE) syncNative().then((r) => { if (!nativeRunning) checkResume(r); }); else checkResume();
   }
   if (state.session) enterMain(); else show("login");
-  setInterval(() => { const s = state.session; if (s && s.mode === "email" && s.expires - Date.now() < 5 * 60_000) refreshSession(); }, 60_000);
+  // Renova a sessão antes de vencer (durante um envio nativo quem renova é o serviço).
+  setInterval(() => { const s = state.session; if (!nativeRunning && s && s.mode === "email" && s.expires - Date.now() < 5 * 60_000) refreshSession(); }, 60_000);
 })();
