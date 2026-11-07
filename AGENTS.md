@@ -41,3 +41,4 @@
 - Discovery/collection reuse LibraryBits and URL filters; tools mount on expansion. AdminShell owns studio navigation, independent of public headers/readers.
 - Reels: private bucket, owner folders, admin review, signed URLs; hidden for kids.
 - MediocreScan: admin and public createServerFn proxies share one allowlisted server helper (fixed GET paths, CDN content path only from API chapter metadata, token only in MEDIOCRE_API_TOKEN); /mediocre is the public showcase. Imports copy works into series (source_mediocre_id unique) in bounded chapter batches; reader requests auto-import only a single exact title match, found via /obras/buscar?string= with the public lists as fallback.
+- MediocreScan queue counts skipped chapters as bounded work failures and only inserted chapters reduce remaining; IP blocks retain cooldown without consuming attempts, so unavailable content cannot stall following works or falsely complete an import.
