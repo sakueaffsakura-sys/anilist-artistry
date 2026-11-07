@@ -5,7 +5,7 @@
 //
 // Ritmo (a API bloqueia envios múltiplos):
 //   • uma obra por vez, até o fim: só passa para outra depois de enviar todos os capítulos;
-//   • 2 capítulos por envio e espera de 20 s antes dos próximos 2;
+//   • 2 capítulos por envio e espera de 1 minuto antes dos próximos 2;
 //   • se a API travar por excesso de pedidos, pausa 1 minuto e continua do mesmo ponto;
 //   • se o tempo da execução acabar no meio de uma obra, ela fica "em andamento" e a próxima
 //     execução recomeça por ela.
@@ -28,7 +28,7 @@ const MANUAL = [...new Set((process.env.OBRAS || "").split(/[\s,;]+/).filter((s)
 const BUDGET_MS = Math.min(Number(process.env.TEMPO_MAXIMO_MIN) || 20, 50) * 60_000;
 
 const CHAPTERS_PER_SEND = 2; // capítulos por envio
-const WAIT_BETWEEN_SENDS_MS = 20_000; // espera antes dos próximos 2 (15 s pedidos + folga)
+const WAIT_BETWEEN_SENDS_MS = 60_000; // 1 minuto antes dos próximos 2 capítulos
 const LOCK_PAUSE_MS = 60_000; // pausa quando a API trava por excesso de pedidos
 const MAX_PAUSES_IN_A_ROW = 5; // depois disso a execução para; a próxima tenta de novo
 const GAP_MS = 1500; // intervalo mínimo entre dois pedidos à API

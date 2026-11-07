@@ -6,8 +6,9 @@ que não está bloqueado) e envia ao site pelo endpoint `/api/public/mediocre-in
 - **Entrar:** e-mail e senha da conta de administrador do site, ou um código de envio gerado no painel
   (admin/mediocre → "Gerar código da automação"), para quem entra no site com o Google.
 - **Chave da MediocreScan:** colada no app; fica só no celular e vai somente para a MediocreScan.
-- **Ritmo:** uma obra por vez até o último capítulo, 2 capítulos por envio, 20 s entre envios e pausa de
-  1 minuto quando a API trava (para depois de 5 travamentos seguidos). Parar no meio guarda o ponto na
+- **Ritmo:** uma obra por vez até o último capítulo, 2 capítulos por envio, 1 minuto de espera antes dos próximos 2 e
+  pausa de 1 minuto quando a API trava (para depois de 5 travamentos seguidos). Falha de conexão é tentada
+  de novo 3 vezes (20 s entre elas) em vez de pular o capítulo. Parar no meio guarda o ponto na
   fila do site, e a obra é retomada primeiro.
 
 ## Como o APK é gerado
@@ -24,6 +25,11 @@ listas e leitura) e Buscar (nome ou ID); página da obra com selos IA/Oficial/No
 gêneros, sinopse e capítulos; leitor de imagens, texto de novel (A−/A+) e blocos mistos; visualizador de JSON
 com a chave trocada por [REDACTED]. Cada obra mostra se já está publicada no site ou na fila, e pode ser
 publicada ou atualizada dali.
+
+## Envio interrompido e histórico
+Se o app fechar no meio de um envio (atualização do APK, Android encerrando, app removido dos recentes), ao
+abrir de novo ele avisa e oferece **Continuar**: a fila do site guarda a obra e os capítulos que faltam. O
+histórico de envios fica salvo no celular (Configurações → Histórico de envios) com o motivo de cada parada.
 
 ## Capítulos
 Na página da obra, cada capítulo mostra **No site ✓** quando o número já está publicado; os outros têm o

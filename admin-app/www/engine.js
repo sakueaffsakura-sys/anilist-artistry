@@ -10,7 +10,8 @@
   // Todas as rotas da API usam o domínio novo; o caminho continua o mesmo.
   const API_HOSTS = ["https://api.mediocretoons.net"];
   const CDN = "https://cdn.mediocrescan.com";
-  const PACE = { perSend: 2, waitMs: 20000, lockMs: 60000, maxLocksInRow: 5, gapMs: 1500 };
+  // 2 capítulos por envio e 1 minuto de espera antes dos próximos 2.
+  const PACE = { perSend: 2, waitMs: 60000, lockMs: 60000, maxLocksInRow: 5, gapMs: 1500, netRetries: 3, netWaitMs: 20000 };
   const LIST_PAGE = { "/obras/adicionados-recentes": 20, "/obras/atualizadas-recentes": 30 };
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -57,6 +58,13 @@
       while (deps.now() < end) { checkStop(); await deps.sleep(Math.min(500, end - deps.now())); }
       checkStop();
     }
+    /** Falha de conexão no meio do envio: espera e tenta de novo, em vez de pular o capítulo. */
+    async function netRetry(where, attempt, detail) {
+      if (attempt >= PACE.netRetries) throw new Fatal(`Sem resposta ${where} depois de ${PACE.netRetries} tentativas (${detail}). O envio parou aqui e continua deste ponto quando você tocar em Continuar.`);
+      emit({ type: "net-retry", where, detail, attempt: attempt + 1, max: PACE.netRetries, ms: PACE.netWaitMs });
+      await wait(PACE.netWaitMs);
+    }
+
     async function lockPause(reason) {
       locksInRow++;
       if (locksInRow > PACE.maxLocksInRow) throw new Fatal(`A MediocreScan continua travada (${reason}). Tente de novo mais tarde.`);
@@ -70,6 +78,7 @@
       if (patient === undefined) patient = true;
       const token = (deps.mediocreToken() || "").trim().replace(/^Bearer\s+/i, "");
       if (!token && kind === "api") throw new Fatal("Cole sua chave da MediocreScan nas configurações.");
+      let netFails = 0;
       for (;;) {
         checkStop();
         // Intervalo calmo no envio (ou com envio rodando); navegação só evita toques duplos.
@@ -83,7 +92,8 @@
           });
         } catch (_) {
           if (kind === "api" && apiIdx < API_HOSTS.length - 1) { apiIdx++; continue; }
-          throw new Error("Sem conexão com a MediocreScan. Confira a internet do celular.");
+          if (!patient) throw new Error("Sem conexão com a MediocreScan. Confira a internet do celular.");
+          await netRetry("da MediocreScan", netFails++, "sem conexão"); continue;
         }
         if (kind === "api" && r.status >= 520 && r.status <= 530 && apiIdx < API_HOSTS.length - 1) { apiIdx++; continue; }
         if (r.status === 401) throw new Fatal("A MediocreScan recusou sua chave (401). Cole uma chave nova nas configurações.");
@@ -96,14 +106,16 @@
         }
         locksInRow = 0;
         if (r.status === 404) return null;
+        if (r.status >= 500 && patient) { await netRetry("da MediocreScan", netFails++, `erro ${r.status}`); continue; }
         if (!r.ok) throw new Error(`A MediocreScan respondeu ${r.status}.`);
-        return r.json();
+        try { return await r.json(); }
+        catch (_) { if (!patient) throw new Error("Resposta incompleta da MediocreScan."); await netRetry("da MediocreScan", netFails++, "resposta incompleta"); continue; }
       }
     }
 
-    async function site(body, retried, hops) {
+    async function site(body, retried, hops, netFails) {
       checkStop();
-      hops = hops || 0;
+      hops = hops || 0; netFails = netFails || 0;
       const endpoint = `${deps.site.url().replace(/\/+$/, "")}/api/public/mediocre-ingest`;
       let r;
       try {
@@ -112,7 +124,11 @@
           headers: Object.assign({ "content-type": "application/json" }, deps.site.headers()),
           body: JSON.stringify(body),
         });
-      } catch (_) { throw new Error("Sem conexão com o site. Confira a internet e o endereço do site."); }
+      } catch (_) {
+        if (!running) throw new Error("Sem conexão com o site. Confira a internet e o endereço do site.");
+        await netRetry("do site", netFails, "sem conexão");
+        return site(body, retried, hops, netFails + 1);
+      }
       // O site pode responder que mudou de endereço (ex.: domínio próprio). Segue e passa a usar o novo.
       if (r.status === 301 || r.status === 302 || r.status === 303 || r.status === 307 || r.status === 308) {
         const loc = r.headers && typeof r.headers.get === "function" ? r.headers.get("location") : null;
@@ -132,6 +148,7 @@
       if (r.status === 401) throw new Fatal(j.error || "Sua sessão acabou. Entre de novo.");
       if (r.status === 403) throw new Fatal(j.error || "Esta conta não é administradora do site.");
       if (r.status === 503) throw new Fatal("O site está em manutenção. Tente de novo depois.");
+      if (r.status >= 500 && running) { await netRetry("do site", netFails, `erro ${r.status}`); return site(body, retried, hops, netFails + 1); }
       if (!r.ok) throw new Error(j.error || `O site respondeu ${r.status}.`);
       return j;
     }

@@ -70,6 +70,14 @@
       </form>
     </div>
 
+    <div id="resume-card" class="card warn" hidden>
+      <p id="resume-text"></p>
+      <div class="row">
+        <button id="resume-go" type="button" class="btn primary">Continuar envio</button>
+        <button id="resume-dismiss" type="button" class="btn ghost">Agora não</button>
+      </div>
+    </div>
+
     <!-- Listas -->
     <div id="view-list" class="view">
       <div id="chips" class="chips" role="tablist" hidden></div>
@@ -234,6 +242,7 @@
       <p class="hint">Fica guardada só neste celular e vai somente para a MediocreScan.</p>
       <label>Endereço do site<input id="site-url-2" inputmode="url" spellcheck="false" /></label>
       <p id="account" class="hint"></p>
+      <button type="button" class="btn ghost" id="open-history">Histórico de envios</button>
       <div class="row end">
         <button type="button" class="btn ghost" id="logout">Sair da conta</button>
         <button type="submit" class="btn primary">Salvar</button>
