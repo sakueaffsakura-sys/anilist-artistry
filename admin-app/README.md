@@ -25,6 +25,15 @@ gêneros, sinopse e capítulos; leitor de imagens, texto de novel (A−/A+) e bl
 com a chave trocada por [REDACTED]. Cada obra mostra se já está publicada no site ou na fila, e pode ser
 publicada ou atualizada dali.
 
+## Obras no site
+A aba **No site** lista as obras do Better Mangá (todas, publicadas, rascunhos ou vindas da MediocreScan),
+com busca por título. Em cada obra dá para publicar ou voltar a rascunho, fixar nas atualizações, colocar
+no destaque da home, mudar o status, mostrar/ocultar ou excluir capítulos, buscar capítulos novos na
+MediocreScan e excluir a obra (pede para digitar EXCLUIR). Tudo passa pelo endpoint de envio, que só
+aceita administradores.
+
+A API da MediocreScan é chamada só em `https://api.mediocretoons.net` (mesmos caminhos de antes).
+
 ## Arquivos
 - `www/parse.js` — leitura tolerante das respostas (mesmos casos dos testes do MediocreScan Reader).
 - `www/engine.js` — consultas, fila e ritmo de envio (testável sem celular).
