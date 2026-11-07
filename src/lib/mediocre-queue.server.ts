@@ -42,6 +42,8 @@ export async function processQueueTick(admin: Admin, now = Date.now()): Promise<
 
   try {
     const out = await importMediocreWork(admin, item.obra_id, { createdBy: item.created_by, chapterLimit: 1 });
+    // A skipped chapter is still missing: count the failure instead of retrying forever.
+    if (out.skipped > 0) throw new Error("Não foi possível copiar o capítulo pendente (conteúdo indisponível, numeração inválida ou falha ao salvar).");
     const done = out.remaining === 0;
     await admin.from("mediocre_queue").update({
       status: done ? "done" : "running",

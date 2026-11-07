@@ -1,4 +1,5 @@
 # Tarefas
+- [x] Corrigir capítulo com erro que trava a fila MediocreScan: cinco falhas reproduzidas antes da correção, oito testes da fila e 137 testes totais passaram; três tentativas liberam a próxima obra, conteúdo ausente continua pendente e bloqueio preserva a pausa. Build OK; sem alterar dados nem publicar, execução em produção não verificada.
 - [x] Adaptar o arquivo enviado ao importador do painel: JSON local numerado, formatos de páginas do script e conferência antes de publicar; sem capturar sessões externas. Publicação real não executada.
 - [x] Criar Reels dos usuários: envio, feed vertical, curtidas, denúncias e revisão administrativa; validar sem apagar dados existentes.
 - [x] Criar identidade própria do painel: navegação lateral por áreas, menu móvel, barra exclusiva, indicadores e visão geral editorial. Conta real: 341 obras/37.064 capítulos/26 contas, lista 30 obras, menu abriu novels e fechou; 854px e 390px sem overflow ou navegação pública duplicada, sem erros. 108 testes passaram, build OK; sem gravações ou publicação. Telas internas individuais não foram todas revisadas.

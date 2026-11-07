@@ -53,6 +53,7 @@ async function importChapter(admin: Admin, seriesId: string, capId: number, isNo
   const path = chapterContentPath(m);
   if (path) {
     const c = await mediocreGet("cdn", path);
+    if (!c.ok && c.error.code === "IP_BLOCKED") throw new Error(c.error.message);
     if (c.ok) {
       const blocks = normalizeChapterContent(c.data);
       pages = blocks.flatMap((b) => (b.type === "image" ? [b.url] : []));
@@ -130,8 +131,8 @@ export async function importMediocreWork(admin: Admin, obraId: number, opts: { k
   const isNovel = series.kind === "Novel";
   let added = 0, skipped = 0;
   // One chapter at a time: bursts made the API block the server IP.
-  for (const c of batch) (await importChapter(admin, series!.id, c["cap_id"] as number, isNovel)) ? added++ : skipped++;
-  return { seriesId: series.id, slug: series.slug, created, added, skipped, remaining: todo.length - batch.length };
+  for (const c of batch) (await importChapter(admin, series.id, c["cap_id"] as number, isNovel)) ? added++ : skipped++;
+  return { seriesId: series.id, slug: series.slug, created, added, skipped, remaining: todo.length - added };
 }
 
 /** Finds a single exact-title match: name search first, public lists as fallback. */
