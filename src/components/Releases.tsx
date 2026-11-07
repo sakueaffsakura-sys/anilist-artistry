@@ -10,6 +10,9 @@ import { useSession } from "@/hooks/useAuth";
 import { chapterCount } from "@/lib/series-summary";
 import { activeProfileId } from "@/lib/active-profile";
 
+/** Obra que chegou nos últimos 7 dias. */
+const isNew = (iso: string) => Date.now() - new Date(iso).getTime() < 7 * 24 * 60 * 60 * 1000;
+
 export function Releases({ rows }: { rows: SeriesRow[] }) {
   const { user } = useSession();
   const queryClient = useQueryClient();
@@ -56,7 +59,13 @@ export function Releases({ rows }: { rows: SeriesRow[] }) {
   return (
     <section aria-label="Lançamentos" className="relative min-w-0 max-w-full py-4 md:py-8">
       <div className="mb-6 flex items-center gap-3">
-        <h2 className="section-title shrink-0"><Sparkles className="h-[18px] w-[18px]" />Lançamentos</h2>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+          <Sparkles className="h-[18px] w-[18px]" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 text-lg font-bold">Lançamentos <span className="section-count">{rows.length}</span></h2>
+          <p className="text-xs text-muted-foreground">Obras que acabaram de chegar ao Better Mangá</p>
+        </div>
         <div className="ml-auto hidden items-center gap-2 md:flex">
           <button
             type="button"
@@ -93,7 +102,7 @@ export function Releases({ rows }: { rows: SeriesRow[] }) {
                   params={{ slug: item.slug }}
                   className="group relative flex h-full flex-col gap-2 text-left no-underline"
                 >
-                  <div className="relative aspect-[2/3] overflow-hidden rounded-md border border-foreground/10 bg-card/55 transition-[transform,box-shadow,border-color] duration-200 ease-out group-hover:-translate-y-0.5 group-hover:border-foreground group-hover:shadow-[4px_4px_0_var(--primary)]">
+                  <div className="series-cover relative aspect-[2/3] overflow-hidden rounded-[1.35rem] border border-foreground/10 bg-card/55 transition-[transform,box-shadow,border-color] duration-300 ease-out group-hover:-translate-y-0.5 group-hover:border-foreground/20 group-hover:shadow-[0_18px_42px_rgba(0,0,0,0.45)] group-hover:will-change-transform">
                     <img
                       alt={item.title}
                       loading="lazy"
@@ -103,6 +112,10 @@ export function Releases({ rows }: { rows: SeriesRow[] }) {
                       src={coverUrl(item.cover_url)}
                     />
                     <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/10" />
+                    <span className="pointer-events-none absolute left-2 top-2 z-[12] flex flex-col items-start gap-1">
+                      {isNew(item.created_at) ? <span className="badge-new">Novo</span> : null}
+                      <span className="kind-badge">{item.kind}</span>
+                    </span>
                     <span
                       className="pointer-events-none absolute bottom-2 left-2 z-[12] inline-flex max-w-[calc(100%-1rem)] items-center gap-2 rounded-full border border-foreground/15 bg-black/25 px-2 py-1 shadow-[0_2px_14px_rgba(0,0,0,0.45)] backdrop-blur-2xl"
                       title={`${chapterCount(item)} capítulos · média ${Number(item.rating).toFixed(1).replace(".", ",")}/10`}
@@ -142,6 +155,7 @@ export function Releases({ rows }: { rows: SeriesRow[] }) {
                         ? `Cap. ${formatChapter(latest.number)} · ${timeAgo(latest.created_at)}`
                         : "Cap. 0"}
                     </p>
+                    <p className="mt-0.5 truncate text-[10px] font-semibold text-muted-foreground/70">Chegou {timeAgo(item.created_at)}</p>
                   </div>
                 </Link>
               </div>

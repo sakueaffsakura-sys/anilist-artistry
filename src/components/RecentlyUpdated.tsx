@@ -52,7 +52,7 @@ export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
   if (rows.length === 0) return null;
 
   return (
-    <SectionRow icon={<Clock className="h-5 w-5" />} title="Atualizados Recentes">
+    <SectionRow icon={<Clock className="h-5 w-5" />} title="Atualizados Recentes" count={selectRecentUpdates(rows).length} subtitle="Capítulos novos, do mais recente para o mais antigo">
 
       <HScroll>
         {selectRecentUpdates(rows).map((item) => {
@@ -60,12 +60,12 @@ export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
           return (
             <div
               key={item.id}
-              className="group flex w-[160px] min-w-0 shrink-0 flex-col gap-2 rounded-md bg-card/40 transition-colors duration-200"
+              className="group flex w-[160px] min-w-0 shrink-0 flex-col gap-2 rounded-[1.35rem] bg-card/40 transition-colors duration-200"
             >
               <Link
                 to="/obra/$slug"
                 params={{ slug: item.slug }}
-                className="group/cover relative z-0 block aspect-[2/3] w-full shrink-0 overflow-hidden rounded-md border border-foreground/10 bg-surface-2/55 transition-[transform,box-shadow,border-color] duration-200 ease-out hover:z-20 hover:-translate-y-0.5 hover:border-foreground/25 hover:shadow-[0_18px_44px_rgba(0,0,0,0.5)] hover:will-change-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:translate-y-0 active:shadow-none motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-none"
+                className="series-cover group/cover relative z-0 block aspect-[2/3] w-full shrink-0 overflow-hidden rounded-[1.35rem] border border-foreground/10 bg-surface-2/55 transition-[transform,box-shadow,border-color] duration-200 ease-out hover:z-20 hover:-translate-y-0.5 hover:border-foreground/25 hover:shadow-[0_18px_44px_rgba(0,0,0,0.5)] hover:will-change-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary active:translate-y-0 active:shadow-none motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-none"
               >
                 <img
                   alt={item.title}
@@ -96,6 +96,9 @@ export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
                   />
                 </button>
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/10 opacity-90" />
+                {latest && Date.now() - new Date(latest.created_at).getTime() < 3 * 60 * 60 * 1000 ? (
+                  <span className="pointer-events-none absolute bottom-9 left-2 z-[12] inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 px-2 py-0.5 text-[10px] font-extrabold text-white"><span className="live-dot" />Agora há pouco</span>
+                ) : null}
                 <span
                   className="pointer-events-none absolute bottom-2 left-2 z-[12] inline-flex max-w-[calc(100%-1rem)] items-center gap-2 rounded-full border border-white/15 bg-black/25 px-2 py-1 shadow-[0_2px_14px_rgba(0,0,0,0.45)]"
                   title={`${chapterCount(item)} capítulos · média ${Number(item.rating).toFixed(1).replace(".", ",")}/10`}

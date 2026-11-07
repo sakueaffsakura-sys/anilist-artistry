@@ -5,9 +5,11 @@ import {
   ArrowDownWideNarrow,
   ArrowRight,
   BookOpen,
+  CalendarDays,
   Check,
   CheckCheck,
   ChevronDown,
+  Clock,
   Eye,
   Forward,
   Search,
@@ -18,8 +20,8 @@ import {
   MessageSquare,
   Play,
   RotateCcw,
-  Send,
   Star,
+  TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
@@ -27,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchComments, fetchSeriesBySlug } from "@/lib/queries";
-import { coverUrl, formatChapter } from "@/lib/media";
+import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
 import { useSession } from "@/hooks/useAuth";
 import { AddToListButton, StatusButton } from "@/components/SeriesActions";
 import { CommentThreads } from "@/components/CommentThreads";
@@ -38,6 +40,12 @@ import { ageRatingLabel } from "@/lib/age-ratings";
 import { AgeRatingBadge } from "@/components/AgeRatingBadge";
 import { KidsBlocked } from "@/components/KidsBlocked";
 import { activeProfileId, hasProfileChosen, isWorkAllowed, useActiveProfile } from "@/lib/active-profile";
+const compact = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
+/** Capítulo publicado nos últimos 3 dias. */
+const isFresh = (iso: string) => Date.now() - new Date(iso).getTime() < 3 * 24 * 60 * 60 * 1000;
+/** Obras longas: atalhos de 100 em 100 capítulos para não rolar a lista inteira. */
+const RANGE_SIZE = 100;
+
 export const Route = createFileRoute("/_authenticated/obra/$slug/")({
   staticData: { sitemap: false },
   beforeLoad: ({ context }) => {
@@ -89,6 +97,7 @@ function SeriesPage() {
   const [replyTo, setReplyTo] = useState<{ id: string; username: string } | null>(null);
   const [chapterSearch, setChapterSearch] = useState("");
   const [commentSort, setCommentSort] = useState<"new" | "old">("new");
+  const [range, setRange] = useState<number | null>(null);
 
   const series = useSuspenseQuery({
     queryKey: ["series", slug],
@@ -152,7 +161,8 @@ function SeriesPage() {
       const avg = rows.length
         ? rows.reduce((sum, row) => sum + row.score, 0) / rows.length
         : 0;
-      return { count: rows.length, avg };
+      const byScore = Array.from({ length: 10 }, (_, i) => rows.filter((row) => Math.round(row.score) === i + 1).length);
+      return { count: rows.length, avg, byScore };
     },
   });
 
@@ -365,12 +375,22 @@ function SeriesPage() {
   const firstChapter = obra.chapters.reduce<(typeof obra.chapters)[number] | undefined>((a, b) => (!a || Number(b.number) < Number(a.number) ? b : a), undefined);
   const lastChapter = obra.chapters.reduce<(typeof obra.chapters)[number] | undefined>((a, b) => (!a || Number(b.number) > Number(a.number) ? b : a), undefined);
   const q = chapterSearch.trim().toLowerCase();
-  const visibleChapters = q
+  const ranges = obra.chapters.length > RANGE_SIZE
+    ? Array.from({ length: Math.ceil(obra.chapters.length / RANGE_SIZE) }, (_, i) => {
+        const slice = obra.chapters.slice(i * RANGE_SIZE, (i + 1) * RANGE_SIZE);
+        return { from: slice[0]?.number ?? 0, to: slice[slice.length - 1]?.number ?? 0, ids: new Set(slice.map((c) => c.id)) };
+      })
+    : [];
+  const activeRange = range !== null ? ranges[range] : undefined;
+  const visibleChapters = (q
     ? chapters.filter((c) => formatChapter(c.number).includes(q) || (c.title ?? "").toLowerCase().includes(q))
-    : chapters;
+    : chapters).filter((c) => q || !activeRange || activeRange.ids.has(c.id));
   const sortedComments = commentSort === "new" ? (comments.data ?? []) : [...(comments.data ?? [])].reverse();
   const synopsisLong = (obra.synopsis ?? "").length > 320;
-  const stats = ratingStats.data ?? { count: 0, avg: 0 };
+  const stats = ratingStats.data ?? { count: 0, avg: 0, byScore: Array.from({ length: 10 }, () => 0) };
+  const maxScoreCount = Math.max(1, ...stats.byScore);
+  const readCount = obra.chapters.filter((c) => readIds.has(c.id)).length;
+  const readPercent = obra.chapters.length ? Math.round((readCount / obra.chapters.length) * 100) : 0;
   const average = stats.count > 0 ? stats.avg : Number(obra.rating) || 0;
 
   return (
@@ -385,7 +405,6 @@ function SeriesPage() {
             className="h-full w-full scale-110 object-cover opacity-30 blur-2xl"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/80 to-background" />
-          <div className="work-hero-tone" aria-hidden="true" />
         </div>
 
         <main className="work-overview relative z-10 mx-auto max-w-7xl px-4 pb-8 pt-6 sm:px-6 lg:px-8 md:pt-10">
@@ -397,42 +416,68 @@ function SeriesPage() {
             <ChevronDown className="h-4 w-4 rotate-90" /> Voltar
           </button>
           <div className="flex flex-col items-center gap-6 md:flex-row md:items-start md:gap-12 lg:gap-16">
-            {/* Cover */}
+            {/* Capa */}
             <div className="flex flex-col items-center md:w-[260px] md:shrink-0">
-              <div className="mb-2 flex flex-wrap justify-center gap-2 md:hidden">
-                <span className="rounded-full border border-border bg-surface-2 px-3 py-1 text-xs font-semibold text-muted-foreground">{obra.kind}</span>
-                <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300">{obra.status}</span>
+              <div className="mb-3 flex flex-wrap justify-center gap-2 md:hidden">
+                <span className="rounded-full border border-border bg-surface-2 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{obra.kind}</span>
+                <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">{obra.status}</span>
                 <AgeRatingBadge value={obra.age_rating} />
               </div>
-              <img
-                src={coverUrl(obra.cover_url)}
-                alt={obra.title}
-                className="work-cover aspect-[2/3] w-[200px] object-cover md:w-full"
-              />
+              <div className="work-cover-wrap">
+                <img
+                  src={coverUrl(obra.cover_url)}
+                  alt={obra.title}
+                  className="work-cover aspect-[2/3] w-[200px] object-cover md:w-full"
+                />
+              </div>
+              {obra.views > 0 ? (
+                <p className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/70 px-3 py-1 text-xs font-semibold text-muted-foreground">
+                  <TrendingUp className="h-3.5 w-3.5 text-primary" /> {obra.views.toLocaleString("pt-BR")} leituras
+                </p>
+              ) : null}
             </div>
 
-            {/* Info */}
+            {/* Informações */}
             <div className="min-w-0 w-full flex-1 text-center md:text-left">
-              <div className="mb-3 hidden flex-wrap items-center gap-3 md:flex">
-                <span className="rounded-full border border-border bg-surface-2/70 px-3 py-1 text-xs font-semibold text-muted-foreground">{obra.kind}</span>
-                <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">{obra.status}</span>
+              <div className="mb-3 hidden flex-wrap items-center gap-2 md:flex">
+                <span className="rounded border border-border px-2 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">{obra.kind}</span>
+                <span className="rounded border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-400">{obra.status}</span>
                 <AgeRatingBadge value={obra.age_rating} size="sm" />
+                {lastChapter && isFresh(lastChapter.created_at) ? <span className="chapter-new">Capítulo novo</span> : null}
               </div>
-              <h1 className="font-display text-3xl font-extrabold leading-[1.1] tracking-[-0.01em] md:text-5xl">{obra.title}</h1>
+              <h1 className="font-display text-2xl font-black leading-tight md:text-4xl">{obra.title}</h1>
               {obra.alt_titles ? (
-                <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{obra.alt_titles}</p>
+                <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{obra.alt_titles}</p>
               ) : null}
 
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground md:justify-start">
+                <span className="inline-flex items-center gap-1.5"><BookOpen className="h-4 w-4" /> {obra.chapters.length} capítulos</span>
+                <span className="inline-flex items-center gap-1.5 font-bold text-gold"><Star className="h-4 w-4 fill-gold" /> {average.toFixed(1).replace(".", ",")}</span>
+                <span className="inline-flex items-center gap-1.5"><MessageCircle className="h-4 w-4" /> {comments.data?.length ?? 0}</span>
+              </div>
+
               <dl className="work-facts mt-5 text-left">
-                <div><dt>Capítulos</dt><dd className="tabular-nums">{obra.chapters.length}</dd></div>
-                <div><dt>Nota</dt><dd className="inline-flex items-center gap-1.5 tabular-nums text-gold"><Star className="h-4 w-4 fill-gold" />{average.toFixed(1).replace(".", ",")}</dd></div>
-                <div><dt>Comentários</dt><dd className="tabular-nums">{comments.data?.length ?? 0}</dd></div>
-                <div><dt>Atualizada</dt><dd>{new Date(obra.updated_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</dd></div>
+                <div><dt><BookOpen />Capítulos</dt><dd className="tabular-nums">{obra.chapters.length}</dd></div>
+                <div><dt><Star />Nota</dt><dd className="tabular-nums text-gold">{average.toFixed(1).replace(".", ",")}<span className="ml-1 text-[11px] font-semibold text-muted-foreground">{stats.count ? `(${stats.count})` : ""}</span></dd></div>
+                <div><dt><Eye />Leituras</dt><dd className="tabular-nums" title={obra.views.toLocaleString("pt-BR")}>{compact.format(obra.views)}</dd></div>
+                <div><dt><MessageCircle />Comentários</dt><dd className="tabular-nums">{comments.data?.length ?? 0}</dd></div>
+                <div><dt><Clock />Atualizada</dt><dd>{timeAgo(lastChapter?.created_at ?? obra.updated_at)}</dd></div>
+                <div><dt><CalendarDays />No site desde</dt><dd>{new Date(obra.created_at).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })}</dd></div>
               </dl>
+
+              {user && readCount > 0 ? (
+                <div className="work-progress mt-4 text-left">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <span className="font-bold">Seu progresso</span>
+                    <span className="text-xs font-semibold text-muted-foreground tabular-nums">{readCount} de {obra.chapters.length} capítulos · {readPercent}%</span>
+                  </div>
+                  <div className="work-progress-bar mt-2" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={readPercent} aria-label="Capítulos lidos"><span style={{ width: `${Math.max(readPercent, 2)}%` }} /></div>
+                </div>
+              ) : null}
 
               <div className="mt-4 flex flex-wrap justify-center gap-1.5 md:justify-start md:gap-2">
                 {normalizeGenres(obra.genres).map((genre) => (
-                  <Link key={genre} to="/catalogo" search={{ tag: genre }} title={`Ver obras de ${genre}`} className="rounded-full border border-border bg-surface-2/60 px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground">{genre}</Link>
+                  <Link key={genre} to="/catalogo" search={{ tag: genre }} title={`Ver obras de ${genre}`} className="rounded-lg border border-border bg-surface-2/60 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground">{genre}</Link>
                 ))}
               </div>
 
@@ -445,8 +490,9 @@ function SeriesPage() {
               ) : null}
 
               {obra.synopsis ? (
-                <div className="mt-4 text-left">
-                  <p className={`max-w-[68ch] whitespace-pre-line text-[15px] leading-relaxed text-foreground/85 ${expanded ? "" : "line-clamp-4"}`}>
+                <div className="work-synopsis mt-4 text-left">
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-primary">Sinopse</p>
+                  <p className={`whitespace-pre-line text-sm leading-relaxed text-foreground/80 ${expanded ? "" : "line-clamp-4"}`}>
                     {obra.synopsis}
                   </p>
                   {synopsisLong ? (
@@ -458,13 +504,13 @@ function SeriesPage() {
                 </div>
               ) : null}
 
-              {/* Actions */}
+              {/* Ações */}
               <div className="mt-6 flex flex-wrap justify-center gap-2 md:justify-start">
                 {obra.chapters.length > 0 ? (
                   <Link
                     to="/obra/$slug/$chapter"
                     params={{ slug: obra.slug, chapter: formatChapter((readIds.size > 0 && continueChapter ? continueChapter : firstChapter!).number) }}
-                    className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-[4px_4px_0_var(--ink)] transition hover:brightness-110 active:translate-x-0.5 active:translate-y-0.5 active:shadow-[2px_2px_0_var(--ink)]"
+                    className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-black uppercase tracking-wider text-primary-foreground shadow-lg shadow-primary/25 transition hover:brightness-110 active:scale-[0.97]"
                   >
                     <Play className="h-3.5 w-3.5 fill-current" />
                     {readIds.size > 0 && continueChapter ? `Continuar cap. ${formatChapter(continueChapter.number)}` : "Ler primeiro"}
@@ -474,7 +520,7 @@ function SeriesPage() {
                   <Link
                     to="/obra/$slug/$chapter"
                     params={{ slug: obra.slug, chapter: formatChapter(lastChapter.number) }}
-                    className="flex items-center gap-2 rounded-full border border-border bg-surface/70 px-5 py-3 text-sm font-semibold text-foreground/85 transition hover:border-foreground/40 hover:text-foreground active:scale-[0.97]"
+                    className="flex items-center gap-2 rounded-full bg-foreground/[0.06] px-4 py-2.5 text-xs font-black uppercase tracking-wider text-muted-foreground transition hover:bg-foreground/10 hover:text-foreground active:scale-[0.97]"
                   >
                     <Forward className="h-3.5 w-3.5" /> Ler último
                   </Link>
@@ -488,7 +534,7 @@ function SeriesPage() {
                       type="button"
                       onClick={() => toggleFavorite.mutate()}
                       disabled={toggleFavorite.isPending}
-                      className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition disabled:opacity-50 ${
+                      className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-[11px] font-black uppercase tracking-wider transition disabled:opacity-50 ${
                         favorite.data
                           ? "bg-rose-500 text-white shadow-lg shadow-rose-500/25 hover:bg-rose-400"
                           : "bg-foreground/[0.06] text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
@@ -502,7 +548,7 @@ function SeriesPage() {
                     <StatusButton userId={user.id} seriesId={obra.id} />
                   </>
                 ) : (
-                  <Link to="/auth" className="flex items-center gap-1.5 rounded-full bg-foreground/[0.06] px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground">
+                  <Link to="/auth" className="flex items-center gap-1.5 rounded-full bg-foreground/[0.06] px-4 py-2 text-[11px] font-black uppercase tracking-wider text-muted-foreground hover:text-foreground">
                     <Heart className="h-3.5 w-3.5" /> Entrar para favoritar
                   </Link>
                 )}
@@ -532,6 +578,11 @@ function SeriesPage() {
                       ["Artista", obra.artist || "Não informado"],
                       ["Gêneros", normalizeGenres(obra.genres).join(", ") || "Não informado"],
                       ["Classificação", <span className="flex flex-wrap items-center gap-2"><AgeRatingBadge value={obra.age_rating} size="sm" />{ageRatingLabel(obra.age_rating)}</span>],
+                      ["Nota média", `${average.toFixed(1).replace(".", ",")} de 10 · ${stats.count} ${stats.count === 1 ? "avaliação" : "avaliações"}`],
+                      ["Leituras", obra.views.toLocaleString("pt-BR")],
+                      ["Primeiro capítulo", firstChapter ? `Cap. ${formatChapter(firstChapter.number)} · ${new Date(firstChapter.created_at).toLocaleDateString("pt-BR")}` : "—"],
+                      ["Capítulo mais recente", lastChapter ? `Cap. ${formatChapter(lastChapter.number)} · ${timeAgo(lastChapter.created_at)}` : "—"],
+                      ["No site desde", new Date(obra.created_at).toLocaleDateString("pt-BR")],
                       ["Última atualização", new Date(obra.updated_at).toLocaleDateString("pt-BR")],
                     ] as [string, ReactNode][]).map(([label, value]) => <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4 py-4"><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 break-words font-medium">{value}</dd></div>)}
                   </dl>
@@ -568,32 +619,51 @@ function SeriesPage() {
                   </div>
                 ) : null}
               </div>
+              {ranges.length > 1 && !q ? (
+                <div className="chapter-ranges mt-3" role="group" aria-label="Ir para um trecho dos capítulos">
+                  <button type="button" aria-pressed={range === null} onClick={() => setRange(null)}>Todos</button>
+                  {ranges.map((item, i) => (
+                    <button key={i} type="button" aria-pressed={range === i} onClick={() => setRange(range === i ? null : i)}>
+                      {formatChapter(item.from)}–{formatChapter(item.to)}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               <ul className="mt-4 max-h-[70vh] divide-y divide-border/60 overflow-y-auto rounded-xl border border-border bg-background/40">
                 {visibleChapters.map((chapter) => {
                   const isRead = readIds.has(chapter.id);
                   const commentCount = chapterCommentCounts.data?.get(chapter.id) ?? 0;
                   return (
-                    <li key={chapter.id} className={`group relative flex items-center gap-2 px-3 py-3.5 sm:gap-4 sm:px-4 transition hover:bg-foreground/[0.04] ${isRead ? "opacity-60 hover:opacity-90" : ""}`}>
+                    <li key={chapter.id} className={`group relative flex items-center gap-2 px-3 py-3 sm:gap-4 sm:px-4 transition hover:bg-foreground/[0.04] ${isRead ? "opacity-60 hover:opacity-90" : ""}`}>
                       <Link
                         to="/obra/$slug/$chapter"
                         params={{ slug: obra.slug, chapter: formatChapter(chapter.number) }}
                         className="flex min-w-0 flex-1 items-center gap-4 text-left"
                       >
-                        <span className={`chapter-num ${isRead ? "chapter-num-read" : ""}`} aria-hidden="true">
-                          {isRead ? <Check className="h-[18px] w-[18px]" strokeWidth={2.5} /> : formatChapter(chapter.number)}
+                        <span className="relative h-14 w-11 shrink-0 overflow-hidden rounded-md bg-surface-2 shadow-md transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110">
+                          <img src={coverUrl(obra.cover_url)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                          {isRead ? <span className="absolute inset-0 grid place-items-center bg-background/70 text-primary"><Check className="h-[18px] w-[18px]" strokeWidth={2.5} /></span> : null}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate font-bold transition-colors group-hover:text-primary">
-                            Capítulo {formatChapter(chapter.number)}
-                          </span>
-                          {chapter.title || isRead ? (
-                            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                              {[chapter.title, isRead ? "Lido" : null].filter(Boolean).join(" — ")}
+                          <span className="flex items-center gap-1.5">
+                            <BookOpen className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                            <ArrowRight className="h-3.5 w-3.5 shrink-0 -translate-x-1.5 text-primary opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100" />
+                            <span className={`truncate font-bold transition-colors group-hover:text-primary ${isRead ? "text-emerald-500/90" : ""}`}>
+                              Cap. #{formatChapter(chapter.number)}
+                              {chapter.title ? <span className="ml-2 font-semibold text-muted-foreground transition-colors group-hover:text-primary">| {chapter.title}</span> : null}
                             </span>
-                          ) : null}
+                          </span>
+                          <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                            {isFresh(chapter.created_at) ? <span className="chapter-new">Novo</span> : null}
+                            {isRead ? <span className="inline-block rounded border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-400">Lido</span> : null}
+                            <span className="text-[11px] font-medium text-muted-foreground/70 sm:hidden">{timeAgo(chapter.created_at)}</span>
+                          </span>
                         </span>
-                        <span className="hidden shrink-0 text-xs tabular-nums text-muted-foreground sm:block">
-                          {new Date(chapter.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
+                        <span className="hidden shrink-0 text-right sm:block">
+                          <span className="block text-xs font-medium text-muted-foreground/70 transition-colors group-hover:text-primary">
+                            {new Date(chapter.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+                          </span>
+                          <span className="block text-[10px] font-semibold text-muted-foreground/50">{timeAgo(chapter.created_at)}</span>
                         </span>
                       </Link>
                       {commentCount > 0 ? (
@@ -622,7 +692,7 @@ function SeriesPage() {
                   </li>
                 ) : null}
               </ul>
-              <p className="pt-4 text-center text-xs text-muted-foreground">{visibleChapters.length === obra.chapters.length ? `${visibleChapters.length} capítulos` : `${visibleChapters.length} de ${obra.chapters.length} capítulos`}</p>
+              <p className="pt-4 text-center text-xs text-muted-foreground">Total de capítulos encontrados: {visibleChapters.length}{visibleChapters.length !== obra.chapters.length ? ` de ${obra.chapters.length}` : ""}</p>
               </TabsContent>
               </div>
               </Tabs>
@@ -630,12 +700,22 @@ function SeriesPage() {
 
             {/* Sidebar */}
             <aside className="min-w-0 space-y-8">
+              {obra.chapters.length > 0 ? (
+                <section className="side-card">
+                  <h2 className="flex items-center gap-2 font-display text-base font-bold"><Play className="h-4 w-4 text-primary" />Ler agora</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">{obra.chapters.length} capítulos{lastChapter ? ` · último ${timeAgo(lastChapter.created_at)}` : ""}</p>
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                    {firstChapter ? <Button asChild className="h-11 gap-2"><Link to="/obra/$slug/$chapter" params={{ slug: obra.slug, chapter: formatChapter(firstChapter.number) }}><Play className="h-4 w-4" />Primeiro capítulo</Link></Button> : null}
+                    {lastChapter ? <Button asChild variant="outline" className="h-11 gap-2 border-primary/40 text-primary"><Link to="/obra/$slug/$chapter" params={{ slug: obra.slug, chapter: formatChapter(lastChapter.number) }}><Forward className="h-4 w-4" />Mais recente</Link></Button> : null}
+                  </div>
+                </section>
+              ) : null}
               <section>
-                <h2 className="section-title"><Sparkles className="h-4 w-4" />Obras relacionadas</h2>
+                <h2 className="flex items-center gap-3 border-b border-border pb-4 font-display text-base font-bold"><Sparkles className="h-4 w-4 text-primary" />Obras relacionadas</h2>
                 <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-6">
                   {(recommended.data ?? []).map((r) => (
                     <Link key={r.id} to="/obra/$slug" params={{ slug: r.slug }} className="group min-w-0">
-                      <div className="aspect-[2/3] overflow-hidden rounded-md bg-surface-2"><img src={coverUrl(r.cover_url)} alt={r.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-300 motion-reduce:transition-none group-hover:scale-105" /></div>
+                      <div className="series-cover aspect-[2/3] overflow-hidden rounded-[1.1rem] bg-surface-2"><img src={coverUrl(r.cover_url)} alt={r.title} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-300 motion-reduce:transition-none group-hover:scale-105" /></div>
                       <p className="mt-2 line-clamp-2 text-[13px] font-bold leading-snug group-hover:text-primary">{r.title}</p>
                     </Link>
                   ))}
@@ -655,6 +735,20 @@ function SeriesPage() {
                     <p className="text-[11px] text-muted-foreground">{stats.count} avaliações</p>
                   </div>
                 </div>
+                {stats.count > 0 ? (
+                  <div className="rating-bars mt-4" aria-label="Distribuição das notas">
+                    {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((score) => {
+                      const n = stats.byScore[score - 1] ?? 0;
+                      return (
+                        <div key={score}>
+                          <span>{score}</span>
+                          <span data-bar=""><span style={{ width: `${(n / maxScoreCount) * 100}%` }} /></span>
+                          <span className="text-right">{n}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
                 <div className="mt-4 grid grid-cols-5 gap-2">
                   {Array.from({ length: 10 }, (_, i) => i + 1).map((score) => (
                     <button
@@ -698,12 +792,12 @@ function SeriesPage() {
               <div className="flex items-center gap-3">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><MessageCircle className="h-4 w-4" /></span>
                 <div>
-                  <h2 className="font-display text-lg font-bold">Comentários</h2>
+                  <h2 className="text-sm font-bold">Comentários</h2>
                   <p className="text-xs text-muted-foreground">{comments.data?.length ?? 0} comentários</p>
                 </div>
               </div>
               <div className="flex gap-1.5">
-                {([["new", "Mais recentes"], ["old", "Mais antigos"]] as const).map(([k, label]) => (
+                {([["new", "Mais Recentes"], ["old", "Mais Antigos"]] as const).map(([k, label]) => (
                   <button
                     key={k}
                     onClick={() => setCommentSort(k)}
@@ -749,7 +843,7 @@ function ToolbarButton({ icon, label, onClick, disabled }: { icon: ReactNode; la
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex items-center justify-center gap-1.5 rounded-full border border-border bg-foreground/[0.03] px-4 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-foreground/[0.08] hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+      className="flex items-center justify-center gap-1.5 rounded-full border border-border bg-foreground/[0.03] px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition hover:bg-foreground/[0.08] hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
     >
       {icon}
       {label}
