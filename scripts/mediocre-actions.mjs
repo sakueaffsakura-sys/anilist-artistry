@@ -42,6 +42,7 @@ const timeLeft = () => BUDGET_MS - (Date.now() - started);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const short = (path) => path.replace(/\?.*/, "");
 let apiIdx = 0;
+let lastPairAt = null; // início do último par enviado (vale entre obras)
 let lastCall = 0;
 let pauses = 0;
 
@@ -141,9 +142,11 @@ async function pull(id, { publish }) {
   let outOfTime = false;
   try {
     for (let i = 0; i < pending.length; i += CHAPTERS_PER_SEND) {
-      if (i > 0) {
-        if (timeLeft() < WAIT_BETWEEN_SENDS_MS + 60_000) throw new OutOfTime();
-        await sleep(WAIT_BETWEEN_SENDS_MS);
+      // 1 minuto desde o último par, mesmo que tenha sido de outra obra.
+      const waitMs = lastPairAt === null ? 0 : Math.max(0, WAIT_BETWEEN_SENDS_MS - (Date.now() - lastPairAt));
+      if (waitMs > 0) {
+        if (timeLeft() < waitMs + 60_000) throw new OutOfTime();
+        await sleep(waitMs);
       }
       const chapters = [];
       const group = pending.slice(i, i + CHAPTERS_PER_SEND);
@@ -171,6 +174,7 @@ async function pull(id, { publish }) {
         added += r.added || 0;
         skipped += r.skipped || 0;
       }
+      lastPairAt = Date.now(); // próximo par só 1 minuto depois deste terminar
       console.log(`  ${Math.min(tried, total)}/${total} · +${added} enviados${skipped ? `, ${skipped} sem conteúdo` : ""}`);
     }
   } catch (e) {
