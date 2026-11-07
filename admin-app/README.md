@@ -1,0 +1,24 @@
+# Estúdio Better Mangá (APK de administração)
+
+App Android para publicar no Better Mangá as obras da MediocreScan. O celular busca na API (pelo IP dele,
+que não está bloqueado) e envia ao site pelo endpoint `/api/public/mediocre-ingest`.
+
+- **Entrar:** e-mail e senha da conta de administrador do site, ou um código de envio gerado no painel
+  (admin/mediocre → "Gerar código da automação"), para quem entra no site com o Google.
+- **Chave da MediocreScan:** colada no app; fica só no celular e vai somente para a MediocreScan.
+- **Ritmo:** uma obra por vez até o último capítulo, 2 capítulos por envio, 20 s entre envios e pausa de
+  1 minuto quando a API trava (para depois de 5 travamentos seguidos). Parar no meio guarda o ponto na
+  fila do site, e a obra é retomada primeiro.
+
+## Como o APK é gerado
+O workflow `.github/workflows/estudio-apk.yml` compila o app a cada mudança em `admin-app/` na `main` e
+publica o arquivo na release **estudio-apk** do repositório. Os builds em branches `apk-*` só testam.
+
+A chave de assinatura (`keystore/estudio.jks`) fica no repositório para que cada versão nova instale por
+cima da anterior. O repositório é privado; se um dia ficar público, gere uma chave nova e guarde-a como
+segredo do GitHub.
+
+## Arquivos
+- `www/engine.js` — busca, fila e ritmo de envio (testável sem celular).
+- `www/app.js`, `www/index.html`, `www/style.css` — telas.
+- `scripts/patch-android.mjs` — versão do app e tela acesa durante o uso.

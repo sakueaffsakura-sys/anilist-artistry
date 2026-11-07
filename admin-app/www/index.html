@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#14151b" />
+  <title>Estúdio Better Mangá</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Entrar -->
+  <section id="login" class="screen" hidden>
+    <div class="login-wrap">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">BM</span>
+        <div>
+          <h1>Estúdio</h1>
+          <p>Publique obras da MediocreScan no Better Mangá pelo seu celular.</p>
+        </div>
+      </div>
+
+      <div class="segmented" role="tablist" aria-label="Forma de entrar">
+        <button type="button" role="tab" id="tab-email" aria-selected="true">E-mail e senha</button>
+        <button type="button" role="tab" id="tab-code" aria-selected="false">Código do painel</button>
+      </div>
+
+      <form id="form-email" class="stack">
+        <label>E-mail<input id="email" type="email" autocomplete="username" required /></label>
+        <label>Senha<input id="password" type="password" autocomplete="current-password" required /></label>
+        <p class="hint">Use a mesma conta de administrador do site.</p>
+        <button class="btn primary" type="submit">Entrar</button>
+      </form>
+
+      <form id="form-code" class="stack" hidden>
+        <label>Código de envio<input id="code" autocomplete="off" spellcheck="false" required /></label>
+        <p class="hint">Se você entra no site com o Google, gere um código no painel em admin/mediocre → "Gerar código da automação" e cole aqui.</p>
+        <button class="btn primary" type="submit">Entrar com código</button>
+      </form>
+
+      <details class="more">
+        <summary>Endereço do site</summary>
+        <input id="site-url" inputmode="url" spellcheck="false" />
+      </details>
+      <p id="login-error" class="error" role="alert" hidden></p>
+    </div>
+  </section>
+
+  <!-- Principal -->
+  <section id="main" class="screen" hidden>
+    <header class="topbar">
+      <div class="topbar-title">
+        <span class="brand-mark small" aria-hidden="true">BM</span>
+        <div><strong>Estúdio</strong><span id="who"></span></div>
+      </div>
+      <button type="button" class="icon-btn" id="open-settings" aria-label="Configurações">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Zm7.4-2.5.1-1-.1-1 2.1-1.6-2-3.5-2.5 1a7 7 0 0 0-1.7-1L15 2.5h-4l-.4 2.4a7 7 0 0 0-1.7 1l-2.5-1-2 3.5L6.5 10l-.1 1 .1 1-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.4h4l.4-2.4c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5-2.1-1.6Z"/></svg>
+      </button>
+    </header>
+
+    <div id="token-card" class="card warn" hidden>
+      <p><strong>Falta a chave da MediocreScan.</strong> Cole a chave para ver e enviar as obras. Ela fica só neste celular.</p>
+      <form id="form-token-inline" class="row">
+        <input id="token-inline" type="password" autocomplete="off" placeholder="Chave da MediocreScan" />
+        <button class="btn primary" type="submit">Salvar</button>
+      </form>
+    </div>
+
+    <nav class="tabs" role="tablist" aria-label="Obras">
+      <button type="button" role="tab" data-tab="novas" aria-selected="true">Novas</button>
+      <button type="button" role="tab" data-tab="atualizadas" aria-selected="false">Atualizadas</button>
+      <button type="button" role="tab" data-tab="buscar" aria-selected="false">Buscar</button>
+      <button type="button" role="tab" data-tab="fila" aria-selected="false">Fila do site</button>
+    </nav>
+
+    <form id="form-search" class="row search" hidden>
+      <input id="search" type="search" placeholder="Nome da obra" enterkeyhint="search" />
+      <button class="btn" type="submit">Buscar</button>
+    </form>
+
+    <div id="list-meta" class="list-meta"></div>
+    <ul id="list" class="works"></ul>
+    <p id="list-empty" class="empty" hidden></p>
+    <button id="more" type="button" class="btn ghost wide" hidden>Carregar mais</button>
+
+    <!-- Painel de envio -->
+    <section id="sender" class="sender" aria-live="polite">
+      <div class="sender-idle" id="sender-idle">
+        <button id="send-all" type="button" class="btn primary wide">Enviar não enviadas</button>
+      </div>
+      <div class="sender-run" id="sender-run" hidden>
+        <div class="sender-head">
+          <div class="sender-title">
+            <strong id="run-work">Preparando…</strong>
+            <span id="run-queue"></span>
+          </div>
+          <button id="stop" type="button" class="btn danger small">Parar</button>
+        </div>
+        <div class="bar" role="progressbar" aria-label="Capítulos enviados" aria-valuemin="0" aria-valuemax="100" id="run-bar"><span></span></div>
+        <p id="run-status" class="run-status"></p>
+        <details class="log"><summary>Histórico</summary><ol id="log"></ol></details>
+      </div>
+    </section>
+  </section>
+
+  <!-- Configurações -->
+  <dialog id="settings">
+    <form method="dialog" class="stack" id="form-settings">
+      <h2>Configurações</h2>
+      <label>Chave da MediocreScan<input id="token" type="password" autocomplete="off" /></label>
+      <p class="hint">Fica guardada só neste celular e vai somente para a MediocreScan.</p>
+      <label>Endereço do site<input id="site-url-2" inputmode="url" spellcheck="false" /></label>
+      <p id="account" class="hint"></p>
+      <div class="row end">
+        <button type="button" class="btn ghost" id="logout">Sair da conta</button>
+        <button type="submit" class="btn primary" id="save-settings">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script src="engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
