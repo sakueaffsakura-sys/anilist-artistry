@@ -96,20 +96,37 @@
       }
     }
 
-    async function site(body, retried) {
+    async function site(body, retried, hops) {
       checkStop();
+      hops = hops || 0;
+      const endpoint = `${deps.site.url().replace(/\/+$/, "")}/api/public/mediocre-ingest`;
       let r;
       try {
-        r = await deps.fetch(`${deps.site.url().replace(/\/+$/, "")}/api/public/mediocre-ingest`, {
+        r = await deps.fetch(endpoint, {
           method: "POST",
           headers: Object.assign({ "content-type": "application/json" }, deps.site.headers()),
           body: JSON.stringify(body),
         });
       } catch (_) { throw new Error("Sem conexão com o site. Confira a internet e o endereço do site."); }
+      // O site pode responder que mudou de endereço (ex.: domínio próprio). Segue e passa a usar o novo.
+      if (r.status === 301 || r.status === 302 || r.status === 303 || r.status === 307 || r.status === 308) {
+        const loc = r.headers && typeof r.headers.get === "function" ? r.headers.get("location") : null;
+        let next = null;
+        try { next = loc ? new URL(loc, endpoint) : null; } catch (_) { next = null; }
+        const here = new URL(endpoint);
+        if (next && next.protocol === "https:" && next.origin !== here.origin && hops < 3) {
+          if (deps.site.moved) deps.site.moved(next.origin);
+          emit({ type: "log", text: `O site agora responde em ${next.host}.` });
+          return site(body, retried, hops + 1);
+        }
+        if (next && next.origin === here.origin && /manutencao/.test(next.pathname)) throw new Fatal("O site está em manutenção. Tente de novo depois.");
+        throw new Fatal(`O site redirecionou o pedido${next ? ` para ${next.host}${next.pathname}` : ""}. Coloque o endereço certo em "Endereço do site".`);
+      }
       const j = await r.json().catch(() => ({}));
-      if (r.status === 401 && !retried && (await deps.site.refresh())) return site(body, true);
+      if (r.status === 401 && !retried && (await deps.site.refresh())) return site(body, true, hops);
       if (r.status === 401) throw new Fatal(j.error || "Sua sessão acabou. Entre de novo.");
       if (r.status === 403) throw new Fatal(j.error || "Esta conta não é administradora do site.");
+      if (r.status === 503) throw new Fatal("O site está em manutenção. Tente de novo depois.");
       if (!r.ok) throw new Error(j.error || `O site respondeu ${r.status}.`);
       return j;
     }
