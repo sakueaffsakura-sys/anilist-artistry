@@ -1,5 +1,24 @@
 import { describe, expect, test } from "bun:test";
-import { parseIngestBody, suppliedGetter, INGEST_MAX_CHAPTERS, INGEST_MAX_SYNC, INGEST_MAX_CHECK } from "../src/lib/mediocre-ingest.server";
+import { parseIngestBody, runIngest, suppliedGetter, INGEST_MAX_CHAPTERS, INGEST_MAX_SYNC, INGEST_MAX_CHECK } from "../src/lib/mediocre-ingest.server";
+
+/** Supabase falso: registra as chamadas; `single` responde o maybeSingle de cada tabela. */
+function fakeAdmin(single: Record<string, unknown>) {
+  const calls: string[] = [];
+  const from = (table: string) => {
+    const chain: Record<string, unknown> = new Proxy({}, {
+      get(_t, key) {
+        if (key === "then") return (resolve: (v: unknown) => void) => resolve({ data: null, error: null });
+        return (...args: unknown[]) => {
+          calls.push(`${table}.${String(key)}(${JSON.stringify(args)})`);
+          if (key === "maybeSingle") return Promise.resolve({ data: single[table] ?? null, error: null });
+          return chain;
+        };
+      },
+    });
+    return chain;
+  };
+  return { admin: { from } as never, calls };
+}
 describe("ingest", () => {
   test("rejects more than 5 chapters", () => {
     const ch = Array.from({ length: INGEST_MAX_CHAPTERS + 1 }, (_, i) => ({ capId: i + 1, meta: {} }));
@@ -49,5 +68,14 @@ describe("ingest", () => {
     expect((await g("api", "/obras/1")).ok).toBe(true);
     expect((await g("api", "/obras/2")).ok).toBe(false);
     expect((await g("cdn", "/x")).ok).toBe(false);
+  });
+  test("chapters from the device keep the work reserved for the device", async () => {
+    const { admin, calls } = fakeAdmin({ series: { id: "s1", slug: "obra", kind: "Manhwa" } });
+    const meta = { obr_id: 9, cap_num: 1, cap_uuid: "123e4567-e89b-12d3-a456-426614174000" };
+    const r = await runIngest(admin, { action: "chapters", obraId: 9, chapters: [{ capId: 1, meta, content: { paginas: ["a.webp"] } }] }, "u1");
+    expect(r.added + r.skipped).toBe(1);
+    const reserve = calls.findIndex((c) => c.startsWith("mediocre_queue.update(") && c.includes("next_run_at"));
+    expect(reserve).toBeGreaterThan(-1);
+    expect(calls.some((c) => c.startsWith("mediocre_queue.eq(") && c.includes("[\"obra_id\",9]"))).toBe(true);
   });
 });

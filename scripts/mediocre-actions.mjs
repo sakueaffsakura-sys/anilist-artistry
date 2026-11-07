@@ -54,8 +54,10 @@ class Fatal extends Error {}
 class OutOfTime extends Error {}
 
 if (!TOKEN || !CODE) {
-  console.error("::error::Faltam os segredos MEDIOCRE_TOKEN e/ou CODIGO_ENVIO (GitHub → Settings → Secrets and variables → Actions).");
-  process.exit(1);
+  // Sem os segredos a automação fica desligada (o envio é feito pelo app Estúdio): sai sem erro, para
+  // não gerar um aviso de falha a cada hora.
+  console.log("::notice::Automação desligada: faltam os segredos MEDIOCRE_TOKEN e/ou CODIGO_ENVIO (GitHub → Settings → Secrets and variables → Actions). O app Estúdio continua enviando normalmente.");
+  process.exit(0);
 }
 
 /** Pausa de 1 minuto quando a API trava; para a execução se travar demais seguidas vezes. */
