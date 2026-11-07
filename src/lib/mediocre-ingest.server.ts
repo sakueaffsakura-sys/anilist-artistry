@@ -28,6 +28,8 @@ export type IngestBody =
   | { action: "chapters"; obraId: number; chapters: { capId: number; meta: unknown; content: unknown }[] }
   | { action: "finish"; obraId: number; added: number; remaining: number }
   | { action: "chapter_status"; obraId: number }
+  | { action: "queue_remove"; obraIds: number[] }
+  | { action: "queue_clear" }
   | { action: "site_list"; filter: SiteFilter; q: string; page: number; obraId: number | null }
   | { action: "site_work"; seriesId: string }
   | { action: "site_update"; seriesId: string; patch: SitePatch }
@@ -68,6 +70,12 @@ export function parseIngestBody(v: unknown): IngestBody {
   }
   if (o.action === "site_work") return { action: "site_work", seriesId: uuid(o.seriesId, "Obra") };
   if (o.action === "chapter_status") return { action: "chapter_status", obraId: workId(o.obraId) };
+  if (o.action === "queue_remove") {
+    const raw = (o as { obraIds?: unknown }).obraIds;
+    if (!Array.isArray(raw) || !raw.length || raw.length > INGEST_MAX_CHECK) throw new Error(`Envie de 1 a ${INGEST_MAX_CHECK} obras para tirar da fila.`);
+    return { action: "queue_remove", obraIds: [...new Set(raw.map(workId))] };
+  }
+  if (o.action === "queue_clear") return { action: "queue_clear" };
   if (o.action === "site_update") {
     const p = (o.patch && typeof o.patch === "object" ? o.patch : {}) as Record<string, unknown>;
     const patch: SitePatch = {};
@@ -137,11 +145,20 @@ export function suppliedGetter(api: Record<string, unknown>, cdn: unknown): Medi
  * first, then the rest in order) and the published works checked least recently. Queued works are
  * reserved so the site's own queue tick does not copy the same chapters at the same time.
  */
-export async function ingestPlan(admin: Admin, syncLimit: number): Promise<{ queue: number[]; items: { id: number; title: string | null }[]; sync: number[] }> {
-  const { data: q } = await admin.from("mediocre_queue").select("obra_id, status, title").in("status", ["running", "waiting"]).order("created_at").limit(50);
+type PlanItem = { id: number; title: string | null; status: string; cover: string | null; slug: string | null; chapters_on_site: number; chapters_added: number; updated_at: string };
+export async function ingestPlan(admin: Admin, syncLimit: number): Promise<{ queue: number[]; items: PlanItem[]; sync: number[] }> {
+  const { data: q } = await admin.from("mediocre_queue").select("obra_id, status, title, chapters_added, updated_at").in("status", ["running", "waiting"]).order("created_at").limit(50);
   const rows = [...(q ?? [])].sort((a, b) => (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1));
   const queue = rows.map((r) => Number(r.obra_id)).filter((n) => Number.isSafeInteger(n) && n > 0);
-  const items = rows.map((r) => ({ id: Number(r.obra_id), title: r.title })).filter((i) => queue.includes(i.id));
+  // Capa e capítulos que a obra já tem no site, para a fila do app mostrar e ajudar a limpar.
+  const { data: ss } = queue.length
+    ? await admin.from("series").select("source_mediocre_id, cover_url, slug, title, chapters(count)").in("source_mediocre_id", queue)
+    : { data: [] as never[] };
+  const bySource = new Map((ss ?? []).map((r) => [Number(r.source_mediocre_id), r as { cover_url: string | null; slug: string; title: string; chapters?: { count: number }[] | null }]));
+  const items: PlanItem[] = rows.filter((r) => queue.includes(Number(r.obra_id))).map((r) => {
+    const sr = bySource.get(Number(r.obra_id));
+    return { id: Number(r.obra_id), title: r.title ?? sr?.title ?? null, status: r.status, cover: sr?.cover_url ?? null, slug: sr?.slug ?? null, chapters_on_site: sr?.chapters?.[0]?.count ?? 0, chapters_added: r.chapters_added, updated_at: r.updated_at };
+  });
   if (queue.length) await admin.from("mediocre_queue").update({ next_run_at: reserveUntil() }).in("obra_id", queue).in("status", ["running", "waiting"]);
   if (!syncLimit) return { queue, items, sync: [] };
   const { data: s } = await admin.from("series").select("source_mediocre_id")
@@ -150,16 +167,20 @@ export async function ingestPlan(admin: Admin, syncLimit: number): Promise<{ que
   return { queue, items, sync };
 }
 
-/** Which of these MediocreScan IDs are already on the site, and which are already in the queue (any status). */
-async function ingestCheck(admin: Admin, ids: number[]): Promise<{ imported: number[]; queued: number[] }> {
-  if (!ids.length) return { imported: [], queued: [] };
+/**
+ * Which of these MediocreScan IDs are already on the site, which are actively queued (waiting/running)
+ * and which failed in the queue. Finished queue rows no longer count as "queued".
+ */
+async function ingestCheck(admin: Admin, ids: number[]): Promise<{ imported: number[]; queued: number[]; failed: number[] }> {
+  if (!ids.length) return { imported: [], queued: [], failed: [] };
   const [{ data: s }, { data: q }] = await Promise.all([
     admin.from("series").select("source_mediocre_id").in("source_mediocre_id", ids),
-    admin.from("mediocre_queue").select("obra_id").in("obra_id", ids),
+    admin.from("mediocre_queue").select("obra_id, status").in("obra_id", ids),
   ]);
   return {
     imported: (s ?? []).map((r) => Number(r.source_mediocre_id)),
-    queued: (q ?? []).map((r) => Number(r.obra_id)),
+    queued: (q ?? []).filter((r) => r.status === "running" || r.status === "waiting").map((r) => Number(r.obra_id)),
+    failed: (q ?? []).filter((r) => r.status === "error").map((r) => Number(r.obra_id)),
   };
 }
 
@@ -224,6 +245,17 @@ async function chapterStatus(admin: Admin, obraId: number) {
 
 export async function runIngest(admin: Admin, body: IngestBody, createdBy: string) {
   if (body.action === "chapter_status") return { ...(await chapterStatus(admin, body.obraId)), added: 0, skipped: 0 };
+  if (body.action === "queue_remove") {
+    // Tira da fila (a obra e os capítulos já publicados continuam no site).
+    const { data, error } = await admin.from("mediocre_queue").delete().in("obra_id", body.obraIds).select("obra_id");
+    if (error) throw new Error("Não foi possível tirar da fila.");
+    return { removed: (data ?? []).length, added: 0, skipped: 0 };
+  }
+  if (body.action === "queue_clear") {
+    const { data, error } = await admin.from("mediocre_queue").delete().in("status", ["running", "waiting", "done", "error"]).select("obra_id");
+    if (error) throw new Error("Não foi possível esvaziar a fila.");
+    return { removed: (data ?? []).length, added: 0, skipped: 0 };
+  }
   if (body.action === "site_list") return { ...(await siteList(admin, body)), added: 0, skipped: 0 };
   if (body.action === "site_work") return { ...(await siteWork(admin, body.seriesId)), added: 0, skipped: 0 };
   if (body.action === "site_update") {

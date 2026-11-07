@@ -398,6 +398,8 @@
     return {
       list, search, lists, reading, work, chapter, thumbs, status, plan, enqueue, run, sendChapters,
       chapterStatus: (obraId) => site({ action: "chapter_status", obraId }),
+      queueRemove: (obraIds) => site({ action: "queue_remove", obraIds }),
+      queueClear: () => site({ action: "queue_clear" }),
       // Obras que já estão no site (gerenciamento).
       siteList: (filter, q, page, obraId) => site({ action: "site_list", filter, q: q || "", page: page || 1, obraId: obraId || null }),
       siteWork: (seriesId) => site({ action: "site_work", seriesId }),

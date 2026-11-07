@@ -236,3 +236,9 @@ select { min-height: 40px; padding: 0 10px; border-radius: 10px; border: 1px sol
 .chapters .cap-send.fail { border-color: color-mix(in oklab, var(--danger) 50%, transparent); color: #ff8f92; }
 .chapters .cap-send:disabled { opacity: 1; }
 .work-actions .btn { padding: 0 14px; white-space: nowrap; }
+
+/* fila do site */
+.queue-tools { display: flex; justify-content: flex-end; margin: -4px 0 10px; }
+.queue-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.queue-item .site-row.queue-open { grid-template-columns: 52px 1fr; }
+.queue-item .chip-btn { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border: 1px solid color-mix(in oklab, var(--danger) 45%, transparent); border-radius: 999px; white-space: nowrap; }
