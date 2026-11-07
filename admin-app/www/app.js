@@ -615,6 +615,9 @@
       case "sending": clearInterval(countdown); setStatus(`Enviando capítulos ${e.from}${e.to > e.from ? ` e ${e.to}` : ""} de ${e.total}…`); break;
       case "progress": setBar(e.done, e.total); note.done = e.done; native.update(note.work, `${e.done} de ${e.total} capítulos · ${queueLeft} obra(s) na vez`, e.done, e.total); break;
       case "waiting": count(e.ms, (s) => setStatus(`Próximo envio em ${s} s`)); break;
+      case "api-wait":
+        count(e.ms, (sec) => setStatus(`Aguardando ${sec} s para o próximo pedido à MediocreScan (1 por minuto).`));
+        break;
       case "net-retry":
         log(`Falha de conexão ${e.where} (${e.detail}). Nova tentativa ${e.attempt}/${e.max} em ${Math.round(e.ms / 1000)} s.`);
         native.update(note.work, `Sem conexão. Tentando de novo (${e.attempt}/${e.max})…`, note.done, note.total);

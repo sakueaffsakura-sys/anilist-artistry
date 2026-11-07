@@ -11,7 +11,8 @@
   const API_HOSTS = ["https://api.mediocretoons.net"];
   const CDN = "https://cdn.mediocrescan.com";
   // 2 capítulos por envio e 1 minuto de espera antes dos próximos 2.
-  const PACE = { perSend: 2, waitMs: 60000, lockMs: 60000, maxLocksInRow: 5, gapMs: 1500, netRetries: 3, netWaitMs: 20000 };
+  // apiGapMs: durante o envio, 1 pedido à API da MediocreScan por minuto (as páginas no CDN não contam).
+  const PACE = { perSend: 2, waitMs: 60000, lockMs: 60000, maxLocksInRow: 5, gapMs: 1500, apiGapMs: 60000, netRetries: 3, netWaitMs: 20000 };
   const LIST_PAGE = { "/obras/adicionados-recentes": 20, "/obras/atualizadas-recentes": 30 };
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -50,7 +51,7 @@
   function createEngine(deps) {
     const emit = (e) => { try { deps.onEvent && deps.onEvent(e); } catch (_) { /* tela não deve parar o envio */ } };
     // lastPairAt vale para o app inteiro: entre lotes, entre obras e entre envios seguidos.
-    let apiIdx = 0, lastCall = 0, locksInRow = 0, stopFlag = false, running = false, lastLockEnd = null, lastPairAt = null;
+    let apiIdx = 0, lastApiCall = null, lastCdnCall = null, locksInRow = 0, stopFlag = false, running = false, lastLockEnd = null, lastPairAt = null;
 
     function checkStop() { if (stopFlag) throw new Stopped(); }
     /** Espera em pedaços curtos para o botão "Parar" responder rápido. */
@@ -94,10 +95,16 @@
       let netFails = 0;
       for (;;) {
         checkStop();
-        // Intervalo calmo no envio (ou com envio rodando); navegação só evita toques duplos.
-        const gap = lastCall + (patient || running ? PACE.gapMs : 250) - deps.now();
-        if (gap > 0) await wait(gap);
-        lastCall = deps.now();
+        // Durante o envio: 1 minuto entre pedidos à API; navegação fora do envio só evita toques duplos.
+        const slow = patient || running;
+        const last = kind === "api" ? lastApiCall : lastCdnCall;
+        const gapMs = kind === "api" ? (slow ? PACE.apiGapMs : 250) : (slow ? PACE.gapMs : 250);
+        const gap = last === null ? 0 : last + gapMs - deps.now();
+        if (gap > 0) {
+          if (kind === "api" && gap > 2000) emit({ type: "api-wait", ms: gap });
+          await wait(gap);
+        }
+        if (kind === "api") lastApiCall = deps.now(); else lastCdnCall = deps.now();
         let r;
         try {
           r = await deps.fetch((kind === "cdn" ? CDN : API_HOSTS[apiIdx]) + path, {
@@ -231,6 +238,36 @@
       for (let i = 0; i < works.length; i += 50) await site({ action: "enqueue", items: works.slice(i, i + 50).map((w) => ({ obraId: w.id, title: w.name || w.title || null })) });
     }
 
+    /** Capítulos da lista da obra, por ID (para não pedir cada capítulo à API quando der). */
+    function listEntries(work) {
+      const w = unwrap(work);
+      const map = new Map();
+      (w && Array.isArray(w.capitulos) ? w.capitulos : []).forEach((c) => { const cid = Number(c && (c.cap_id ?? c.id)); if (Number.isSafeInteger(cid)) map.set(cid, c); });
+      return { map, obrId: Number(w && (w.obr_id ?? w.id)) || null };
+    }
+    /**
+     * Dados + conteúdo de um capítulo. Se a lista da obra já tem o UUID, vai direto às páginas no CDN
+     * (nenhum pedido à API); senão pede o capítulo à API, respeitando 1 pedido por minuto.
+     */
+    async function chapterData(capId, entries) {
+      const e = entries.map.get(capId);
+      if (e && typeof e.cap_uuid === "string") {
+        const meta = Object.assign({ obr_id: entries.obrId }, e);
+        const path = contentPath(meta);
+        if (path) {
+          let content = null;
+          try { content = await mediocre("cdn", path); } catch (err) { if (err instanceof Stopped || err instanceof Fatal) throw err; }
+          if (content) return { meta, content };
+        }
+      }
+      const meta = unwrap(await mediocre("api", `/capitulos/${capId}`));
+      if (!meta || typeof meta !== "object") return null;
+      const path = contentPath(meta);
+      let content = null;
+      if (path) { try { content = await mediocre("cdn", path); } catch (err) { if (err instanceof Stopped || err instanceof Fatal) throw err; } }
+      return { meta, content };
+    }
+
     /** Envia UMA obra inteira; se parar no meio, o site guarda onde parou. */
     async function sendWork(id, name) {
       const work = await mediocre("api", `/obras/${id}`);
@@ -242,6 +279,7 @@
       const w = await site({ action: "work", obraId: id, work, publish: true });
       const pending = Array.isArray(w.pendingCapIds) ? w.pendingCapIds : [];
       const total = Number.isSafeInteger(w.remaining) ? w.remaining : pending.length;
+      const entries = listEntries(work);
       const title = (unwrap(work) && unwrap(work).obr_nome) || name || `Obra ${id}`;
       emit({ type: "work-start", id, name: title, slug: w.slug, created: w.created, total });
       let added = 0, skipped = 0, tried = 0;
@@ -253,15 +291,9 @@
           const chapters = [];
           for (const capId of group) {
             try {
-              const meta = unwrap(await mediocre("api", `/capitulos/${capId}`));
-              if (!meta || typeof meta !== "object") continue;
-              const path = contentPath(meta);
-              let content = null;
-              if (path) {
-                try { content = await mediocre("cdn", path); }
-                catch (e) { if (e instanceof Stopped || e instanceof Fatal) throw e; content = null; }
-              }
-              chapters.push({ capId, meta, content });
+              const data = await chapterData(capId, entries);
+              if (!data) continue;
+              chapters.push({ capId, meta: data.meta, content: data.content });
             } catch (e) {
               if (e instanceof Stopped || e instanceof Fatal) throw e;
               emit({ type: "log", text: `Capítulo ${capId}: ${e.message}` });
@@ -305,6 +337,7 @@
         if (!work) throw new Fatal("Obra não encontrada na MediocreScan.");
         const w = await site({ action: "work", obraId: id, work, publish: true });
         const pending = new Set(Array.isArray(w.pendingCapIds) ? w.pendingCapIds : []);
+        const entries = listEntries(work);
         const todo = capIds.filter((c) => pending.has(c));
         capIds.filter((c) => !pending.has(c)).forEach((c) => { already++; emit({ type: "chapter-state", id, capId: c, state: "site" }); });
         for (let i = 0; i < todo.length; i += PACE.perSend) {
@@ -315,12 +348,9 @@
           const chapters = [];
           for (const capId of group) {
             try {
-              const meta = unwrap(await mediocre("api", `/capitulos/${capId}`));
-              if (!meta || typeof meta !== "object") { emit({ type: "chapter-state", id, capId, state: "fail" }); skipped++; continue; }
-              const path = contentPath(meta);
-              let content = null;
-              if (path) { try { content = await mediocre("cdn", path); } catch (e) { if (e instanceof Stopped || e instanceof Fatal) throw e; } }
-              chapters.push({ capId, meta, content });
+              const data = await chapterData(capId, entries);
+              if (!data) { emit({ type: "chapter-state", id, capId, state: "fail" }); skipped++; continue; }
+              chapters.push({ capId, meta: data.meta, content: data.content });
             } catch (e) {
               if (e instanceof Stopped || e instanceof Fatal) throw e;
               emit({ type: "chapter-state", id, capId, state: "fail" }); skipped++;

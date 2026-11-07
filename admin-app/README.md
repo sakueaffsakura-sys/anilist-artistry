@@ -6,6 +6,9 @@ que não está bloqueado) e envia ao site pelo endpoint `/api/public/mediocre-in
 - **Entrar:** e-mail e senha da conta de administrador do site, ou um código de envio gerado no painel
   (admin/mediocre → "Gerar código da automação"), para quem entra no site com o Google.
 - **Chave da MediocreScan:** colada no app; fica só no celular e vai somente para a MediocreScan.
+- **Pedidos à API:** durante o envio, no máximo 1 pedido por minuto a `api.mediocretoons.net` (as páginas no
+  CDN não contam). Quando a lista de capítulos da obra já traz o UUID, o app vai direto às páginas sem pedir o
+  capítulo à API.
 - **Ritmo:** uma obra por vez até o último capítulo, 2 capítulos por envio, 1 minuto de espera antes dos próximos 2 e
   pausa de 1 minuto quando a API trava (para depois de 5 travamentos seguidos). Falha de conexão é tentada
   de novo 3 vezes (20 s entre elas) em vez de pular o capítulo. Parar no meio guarda o ponto na
