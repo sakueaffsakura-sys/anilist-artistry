@@ -648,6 +648,45 @@ export type Database = {
         }
         Relationships: []
       }
+      mediocre_ingest_tokens: {
+        Row: {
+          chapters_added: number
+          created_at: string
+          created_by: string
+          errors: number
+          expires_at: string
+          id: string
+          last_used_at: string | null
+          revoked_at: string | null
+          token_hash: string
+          works_received: number
+        }
+        Insert: {
+          chapters_added?: number
+          created_at?: string
+          created_by: string
+          errors?: number
+          expires_at: string
+          id?: string
+          last_used_at?: string | null
+          revoked_at?: string | null
+          token_hash: string
+          works_received?: number
+        }
+        Update: {
+          chapters_added?: number
+          created_at?: string
+          created_by?: string
+          errors?: number
+          expires_at?: string
+          id?: string
+          last_used_at?: string | null
+          revoked_at?: string | null
+          token_hash?: string
+          works_received?: number
+        }
+        Relationships: []
+      }
       mediocre_queue: {
         Row: {
           attempts: number
