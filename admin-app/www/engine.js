@@ -12,7 +12,7 @@
   const CDN = "https://cdn.mediocrescan.com";
   // 5 capítulos por envio e 1 min 12 s de espera antes dos próximos 5.
   // apiGapMs: durante o envio, 1 pedido à API da MediocreScan por minuto (as páginas no CDN não contam).
-  const PACE = { perSend: 5, waitMs: 72000, lockMs: 60000, maxLocksInRow: 5, gapMs: 1500, apiGapMs: 60000, netRetries: 3, netWaitMs: 20000 };
+  const PACE = { perSend: 5, waitMs: 72000, lockMs: 60000, lockSteps: [60000, 120000, 300000, 600000, 900000], maxLocksInRow: 5, gapMs: 1500, apiGapMs: 60000, netRetries: 3, netWaitMs: 20000 };
   const LIST_PAGE = { "/obras/adicionados-recentes": 20, "/obras/atualizadas-recentes": 30 };
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -27,8 +27,8 @@
     return [];
   }
   function contentPath(m) {
-    const obra = m && m.obr_id, num = m && m.cap_num, uuid = m && m.cap_uuid;
-    return Number.isSafeInteger(obra) && obra > 0 && typeof num === "number" && num >= 0 && typeof uuid === "string" && UUID.test(uuid)
+    const obra = Number(m && m.obr_id), num = m && m.cap_num !== "" && m.cap_num !== null ? Number(m.cap_num) : NaN, uuid = m && m.cap_uuid;
+    return Number.isSafeInteger(obra) && obra > 0 && Number.isFinite(num) && num >= 0 && typeof uuid === "string" && UUID.test(uuid)
       ? `/obras/${obra}/capitulos/${num}/${uuid}.json` : null;
   }
   function coverOf(o, id) {
@@ -87,9 +87,11 @@
 
     async function lockPause(reason) {
       locksInRow++;
-      if (locksInRow > PACE.maxLocksInRow) throw new Fatal(`A MediocreScan continua travada (${reason}). Tente de novo mais tarde.`);
-      emit({ type: "pause", ms: PACE.lockMs, reason, count: locksInRow, max: PACE.maxLocksInRow });
-      await wait(PACE.lockMs);
+      if (locksInRow > PACE.maxLocksInRow) throw new Fatal(`A MediocreScan continua recusando os pedidos (${reason}) depois de 5 esperas. Tente mais tarde${reason === "IP bloqueado" ? " ou troque de rede (Wi-Fi ↔ dados móveis)" : ""}; o envio continua de onde parou.`);
+      // Travou de novo logo depois: espera mais a cada vez (1, 2, 5, 10, 15 min) para não prolongar o bloqueio.
+      const ms = PACE.lockSteps[Math.min(locksInRow - 1, PACE.lockSteps.length - 1)] || PACE.lockMs;
+      emit({ type: "pause", ms, reason, count: locksInRow, max: PACE.maxLocksInRow });
+      await wait(ms);
       lastLockEnd = deps.now(); savePace();
       emit({ type: "resume" });
     }
@@ -296,10 +298,11 @@
           const group = pending.slice(i, i + PACE.perSend);
           emit({ type: "sending", from: tried + 1, to: tried + group.length, total });
           const chapters = [];
-          for (const capId of group) {
+          for (const [k, capId] of group.entries()) {
+            emit({ type: "fetching", n: k + 1, of: group.length, at: tried + k + 1, total });
             try {
               const data = await chapterData(capId, entries);
-              if (!data) continue;
+              if (!data) { emit({ type: "log", text: `Capítulo ${capId}: não encontrado na MediocreScan.` }); continue; }
               chapters.push({ capId, meta: data.meta, content: data.content });
             } catch (e) {
               if (e instanceof Stopped || e instanceof Fatal) throw e;
@@ -309,6 +312,7 @@
           tried += group.length;
           skipped += group.length - chapters.length;
           if (chapters.length) {
+            emit({ type: "posting", count: chapters.length });
             const r = await site({ action: "chapters", obraId: id, chapters });
             added += r.added || 0;
             skipped += r.skipped || 0;
@@ -353,7 +357,8 @@
           group.forEach((c) => emit({ type: "chapter-state", id, capId: c, state: "sending" }));
           emit({ type: "sending", from: i + 1, to: i + group.length, total: todo.length });
           const chapters = [];
-          for (const capId of group) {
+          for (const [k, capId] of group.entries()) {
+            emit({ type: "fetching", n: k + 1, of: group.length, at: i + k + 1, total: todo.length });
             try {
               const data = await chapterData(capId, entries);
               if (!data) { emit({ type: "chapter-state", id, capId, state: "fail" }); skipped++; continue; }
@@ -365,6 +370,7 @@
             }
           }
           if (chapters.length) {
+            emit({ type: "posting", count: chapters.length });
             const r = await site({ action: "chapters", obraId: id, chapters });
             added += r.added || 0; skipped += r.skipped || 0;
             // O site responde em conjunto; quem falhou aparece na conferência do fim.
