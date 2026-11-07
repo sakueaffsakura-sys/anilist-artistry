@@ -5,7 +5,7 @@
 //
 // Ritmo (a API bloqueia envios múltiplos):
 //   • uma obra por vez, até o fim: só passa para outra depois de enviar todos os capítulos;
-//   • 2 capítulos por envio e espera de 1 minuto antes dos próximos 2;
+//   • 5 capítulos por envio e espera de 1 min 12 s antes dos próximos 5;
 //   • se a API travar por excesso de pedidos, pausa 1 minuto e continua do mesmo ponto;
 //   • se o tempo da execução acabar no meio de uma obra, ela fica "em andamento" e a próxima
 //     execução recomeça por ela.
@@ -27,8 +27,8 @@ const CODE = (process.env.CODIGO_ENVIO || "").trim();
 const MANUAL = [...new Set((process.env.OBRAS || "").split(/[\s,;]+/).filter((s) => /^\d{1,9}$/.test(s)).map(Number))];
 const BUDGET_MS = Math.min(Number(process.env.TEMPO_MAXIMO_MIN) || 20, 50) * 60_000;
 
-const CHAPTERS_PER_SEND = 2; // capítulos por envio
-const WAIT_BETWEEN_SENDS_MS = 60_000; // 1 minuto antes dos próximos 2 capítulos
+const CHAPTERS_PER_SEND = 5; // capítulos por envio
+const WAIT_BETWEEN_SENDS_MS = 72_000; // 1 min 12 s antes dos próximos 5 capítulos
 const LOCK_PAUSE_MS = 60_000; // pausa quando a API trava por excesso de pedidos
 const MAX_PAUSES_IN_A_ROW = 5; // depois disso a execução para; a próxima tenta de novo
 const API_GAP_MS = 60_000; // 1 pedido por minuto à API da MediocreScan
@@ -129,7 +129,7 @@ function listOf(data) {
   return [];
 }
 
-/** Envia UMA obra inteira: 2 capítulos por vez, 20 s entre envios, até acabar ou o tempo acabar. */
+/** Envia UMA obra inteira: 5 capítulos por vez, 1 min 12 s entre envios, até acabar ou o tempo acabar. */
 async function pull(id, { publish }) {
   const work = await mget("api", `/obras/${id}`);
   if (!work) {

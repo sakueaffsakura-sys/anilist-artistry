@@ -9,7 +9,7 @@ que não está bloqueado) e envia ao site pelo endpoint `/api/public/mediocre-in
 - **Pedidos à API:** durante o envio, no máximo 1 pedido por minuto a `api.mediocretoons.net` (as páginas no
   CDN não contam). Quando a lista de capítulos da obra já traz o UUID, o app vai direto às páginas sem pedir o
   capítulo à API.
-- **Ritmo:** uma obra por vez até o último capítulo, 2 capítulos por envio, 1 minuto de espera antes dos próximos 2 e
+- **Ritmo:** uma obra por vez até o último capítulo, 5 capítulos por envio, 1 min 12 s de espera antes dos próximos 5 e
   pausa de 1 minuto quando a API trava (para depois de 5 travamentos seguidos). Falha de conexão é tentada
   de novo 3 vezes (20 s entre elas) em vez de pular o capítulo. Parar no meio guarda o ponto na
   fila do site, e a obra é retomada primeiro.
@@ -36,7 +36,7 @@ histórico de envios fica salvo no celular (Configurações → Histórico de en
 
 ## Capítulos
 Na página da obra, cada capítulo mostra **No site ✓** quando o número já está publicado; os outros têm o
-botão **Enviar** ao lado. Capítulos escolhidos vão de 2 em 2 com a mesma espera do envio completo, e os que já
+botão **Enviar** ao lado. Capítulos escolhidos vão de 5 em 5 com a mesma espera do envio completo, e os que já
 estão no site são pulados sem baixar nada (o site também ignora repetidos em vez de contar erro).
 
 ## Obras no site

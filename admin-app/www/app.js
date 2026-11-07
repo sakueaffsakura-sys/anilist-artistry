@@ -662,7 +662,7 @@
         if (!e.total) setStatus("Nenhum capítulo novo.");
         break;
       case "sending":
-        beatRun(); clearInterval(countdown); setStatus(`Enviando capítulos ${e.from}${e.to > e.from ? ` e ${e.to}` : ""} de ${e.total}…`);
+        beatRun(); clearInterval(countdown); setStatus(`Enviando capítulos ${e.from}${e.to > e.from ? ` a ${e.to}` : ""} de ${e.total}…`);
         log(`${note.work || "Envio"}: buscando capítulos ${e.from}${e.to > e.from ? `–${e.to}` : ""} de ${e.total}.`);
         break;
       case "progress":
@@ -670,7 +670,7 @@
         $("run-queue").textContent = `${e.done} de ${e.total} capítulos · ${queueLeft} obra(s) na vez`;
         log(`${note.work || "Envio"}: ${e.done} de ${e.total} prontos (+${e.added} no site${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}).`);
         native.update(note.work, `${e.done} de ${e.total} capítulos · ${queueLeft} obra(s) na vez`, e.done, e.total); break;
-      case "waiting": count(e.ms, (s) => setStatus(`Próximo envio em ${s} s`)); break;
+      case "waiting": count(e.ms, (s) => setStatus(`Próximos 5 capítulos em ${s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s} s`}`)); break;
       case "api-wait":
         count(e.ms, (sec) => setStatus(`Aguardando ${sec} s para o próximo pedido à MediocreScan (1 por minuto).`));
         break;
@@ -725,7 +725,7 @@
   $("open-settings").onclick = () => {
     $("token").value = state.token; $("site-url-2").value = state.site;
     $("account").textContent = state.session && state.session.mode === "email" ? `Conectado como ${state.session.email}.` : "Conectado com código do painel.";
-    $("app-version").textContent = `Versão do app: ${window.BM_VERSION || "teste"} · 2 capítulos por minuto.`;
+    $("app-version").textContent = `Versão do app: ${window.BM_VERSION || "teste"} · 5 capítulos a cada 1 min 12 s.`;
     $("settings").showModal();
   };
   $("form-settings").onsubmit = () => {
