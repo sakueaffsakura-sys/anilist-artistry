@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { BookOpen, ChevronLeft, ChevronRight, Bookmark, Star, Quote, CirclePlus } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Bookmark, Star } from "lucide-react";
 import type { SeriesRow } from "@/lib/queries";
 import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
 import { Button } from "@/components/ui/button";
@@ -91,16 +91,16 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
             <img src={coverUrl(active.cover_url)} alt={`Capa de ${active.title}`} className="aspect-[2/3] w-full object-cover" decoding="async" fetchPriority="high" draggable={false} />
           </Link>
           <div className="min-w-0">
-            <p className="hero-model-status mb-1 text-sm font-bold md:text-base">{active.status}</p>
-            <h2 className="break-words font-display text-xl font-extrabold leading-tight md:text-3xl lg:text-4xl"><Link to="/obra/$slug" params={{ slug: active.slug }}>{active.title}</Link></h2>
+            <p className="hero-model-status mb-2 text-sm font-bold md:text-base">{active.status}</p>
+            <h2 className="break-words font-display text-xl font-extrabold leading-[1.1] tracking-[-0.01em] md:text-4xl lg:text-5xl"><Link to="/obra/$slug" params={{ slug: active.slug }}>{active.title}</Link></h2>
             <div className="mt-5 flex flex-wrap gap-2 text-xs md:text-sm">
               {normalizeGenres(active.genres ?? []).slice(0, 3).map((genre) => <span key={genre} className="hero-model-tag rounded-lg px-2.5 py-1">{genre}</span>)}
             </div>
-            {active.synopsis ? <p className="hero-model-synopsis mt-5 hidden text-sm font-semibold italic leading-relaxed line-clamp-3 md:[display:-webkit-box] md:text-base"><Quote className="mr-1 inline h-4 w-4" />{active.synopsis.replace(/<[^>]*>/g, "")}</p> : null}
+            {active.synopsis ? <p className="hero-model-synopsis mt-5 hidden max-w-2xl text-sm leading-relaxed line-clamp-3 md:[display:-webkit-box] md:text-base">{active.synopsis.replace(/<[^>]*>/g, "")}</p> : null}
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3 text-xs md:text-sm">
               <span className="hero-model-rating flex items-center gap-2 text-xl font-extrabold md:text-2xl"><span className="flex gap-0.5" aria-hidden="true">{Array.from({ length: 5 }, (_, star) => <Star key={star} className={`h-4 w-4 md:h-5 md:w-5 ${star < Math.round(Number(active.rating) / 2) ? "fill-current" : "fill-none opacity-40"}`} />)}</span>{Number(active.rating).toFixed(1)}</span>
-              <span className="hero-model-tag inline-flex items-center gap-2 rounded-full px-3 py-0.5"><CirclePlus className="hero-model-status h-3 w-3" />{chapterCount(active)} capítulos</span>
-              <span className="hero-model-tag inline-flex items-center gap-2 rounded-full px-3 py-0.5"><CirclePlus className="hero-model-status h-3 w-3" />{active.kind}</span>
+              <span className="hero-model-tag inline-flex items-center gap-2 rounded-full px-3 py-0.5">{chapterCount(active)} capítulos</span>
+              <span className="hero-model-tag inline-flex items-center gap-2 rounded-full px-3 py-0.5">{active.kind}</span>
             </div>
             {active.chapters.length ? <div className="mt-5 flex flex-wrap gap-3">
               {active.chapters.slice(0, 2).map((chapter) => <Link key={chapter.id} to="/obra/$slug/$chapter" params={{ slug: active.slug, chapter: formatChapter(chapter.number) }} className="hero-model-chapter inline-flex items-center overflow-hidden rounded-lg text-xs" title={chapter.title ?? `Capítulo ${formatChapter(chapter.number)}`}><span className="hero-model-chapter-icon px-2 py-2"><BookOpen className="h-3.5 w-3.5" /></span><span className="px-1.5 font-semibold">Cap. {formatChapter(chapter.number)}</span><span className="hero-model-synopsis pr-2 text-[10px]">{timeAgo(chapter.created_at)}</span></Link>)}
@@ -108,10 +108,12 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
             <div className="mt-8 flex flex-wrap items-center justify-between gap-5 md:mt-10">
               <div className="flex flex-wrap items-center gap-3">
                 <Button asChild className="hero-model-read h-12 rounded-full pl-1.5 pr-5 text-sm font-medium md:h-14 md:text-base"><Link to="/obra/$slug" params={{ slug: active.slug }}><span className="hero-model-action-icon mr-1 grid h-9 w-9 place-items-center rounded-full md:h-10 md:w-10"><BookOpen className="h-5 w-5" /></span>Ver todos os capítulos</Link></Button>
-                <Button variant="ghost" className="hero-model-favorite h-12 rounded-full pl-1.5 pr-4 text-sm md:h-14 md:text-base" aria-label={favoriteIds.has(active.id) ? "Remover dos favoritos" : "Favoritar"} aria-pressed={favoriteIds.has(active.id)} disabled={toggleFavorite.isPending} onClick={() => toggleFavorite.mutate({ id: active.id, saved: favoriteIds.has(active.id) })}><span className="hero-model-action-icon grid h-9 w-9 place-items-center rounded-full md:h-10 md:w-10"><Bookmark className={`hero-model-bookmark h-5 w-5 ${favoriteIds.has(active.id) ? "fill-current" : ""}`} /></span>{favoriteIds.has(active.id) ? "Nos favoritos" : "Add aos Favoritos"}</Button>
+                <Button variant="ghost" className="hero-model-favorite h-12 rounded-full pl-1.5 pr-4 text-sm md:h-14 md:text-base" aria-label={favoriteIds.has(active.id) ? "Remover dos favoritos" : "Favoritar"} aria-pressed={favoriteIds.has(active.id)} disabled={toggleFavorite.isPending} onClick={() => toggleFavorite.mutate({ id: active.id, saved: favoriteIds.has(active.id) })}><span className="hero-model-action-icon grid h-9 w-9 place-items-center rounded-full md:h-10 md:w-10"><Bookmark className={`hero-model-bookmark h-5 w-5 ${favoriteIds.has(active.id) ? "fill-current" : ""}`} /></span>{favoriteIds.has(active.id) ? "Nos favoritos" : "Favoritar"}</Button>
               </div>
               {slides.length > 1 ? <div className="ml-auto flex items-end gap-3">
-                <span className="hero-model-dot mb-0.5 mr-5 h-2 w-4 rounded-full" aria-label={`Destaque ${index + 1} de ${slides.length}`} />
+                {slides.length <= 12 ? <div className="hero-model-dots mb-0.5 mr-4" role="group" aria-label="Escolher destaque">
+                  {slides.map((slide, dot) => <button key={slide.id} type="button" aria-label={`Destaque ${dot + 1} de ${slides.length}: ${slide.title}`} aria-current={dot === index ? "true" : undefined} onClick={() => setIndex(dot)} />)}
+                </div> : <span className="hero-model-synopsis mb-0.5 mr-4 text-xs font-semibold tabular-nums">{index + 1} / {slides.length}</span>}
                 <Button size="icon" variant="outline" className="hero-model-nav h-12 w-12 rounded-full" aria-label="Destaque anterior" onClick={() => go(-1)}><ChevronLeft className="h-4 w-4" /></Button>
                 <Button size="icon" variant="outline" className="hero-model-nav h-12 w-12 rounded-full" aria-label="Próximo destaque" onClick={() => go(1)}><ChevronRight className="h-4 w-4" /></Button>
               </div> : null}

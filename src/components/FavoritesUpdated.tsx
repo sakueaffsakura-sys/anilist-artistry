@@ -15,10 +15,7 @@ export function FavoritesUpdated({ rows }: { rows: SeriesRow[] }) {
   return (
     <section aria-label="Favoritas atualizadas" className="relative min-w-0 max-w-full py-4 md:py-8">
       <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-destructive/15 text-destructive">
-          <Heart className="h-[18px] w-[18px]" />
-        </div>
-        <h2 className="text-lg font-bold">Favoritas Atualizadas</h2>
+        <h2 className="section-title"><Heart className="h-[18px] w-[18px]" />Favoritas atualizadas</h2>
         <div className="ml-auto hidden items-center justify-end gap-2 md:flex">
           <button
             type="button"
@@ -57,10 +54,10 @@ export function FavoritesUpdated({ rows }: { rows: SeriesRow[] }) {
                   <Link
                     to="/obra/$slug"
                     params={{ slug: item.slug }}
-                    className="relative mb-2 block aspect-[3/4] w-full shrink-0 overflow-hidden rounded-[1.35rem] border border-destructive/30 bg-card/60 text-left no-underline transition-[transform,border-color,box-shadow] duration-200 group-hover:-translate-y-0.5 group-hover:border-destructive/45 group-hover:shadow-[0_18px_42px_rgba(0,0,0,0.45)] active:scale-95"
+                    className="relative mb-2 block aspect-[3/4] w-full shrink-0 overflow-hidden rounded-md border border-destructive/30 bg-card/60 text-left no-underline transition-[transform,border-color,box-shadow] duration-200 group-hover:-translate-y-0.5 group-hover:border-destructive/45 group-hover:shadow-[0_18px_42px_rgba(0,0,0,0.45)] active:scale-95"
                   >
                     <span
-                      className="pointer-events-none absolute inset-0 z-[2] rounded-[1.35rem] shadow-[inset_0_0_0_2px_var(--destructive)] opacity-60"
+                      className="pointer-events-none absolute inset-0 z-[2] rounded-md shadow-[inset_0_0_0_2px_var(--destructive)] opacity-60"
                       aria-hidden="true"
                     />
                     <img

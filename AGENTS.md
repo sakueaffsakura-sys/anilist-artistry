@@ -15,6 +15,7 @@
 - Work pages (`/catalogo`, `/obra/*`) live under `_authenticated` and require both sign-in and a chosen profile (`hasProfileChosen` in `src/lib/active-profile.ts`, set by `switchTo`); gates redirect to `/perfis` and the fullscreen picker blocks the app until a profile is picked.
 - Work rankings: `/ranking`; reader XP: `/ranking-leitores`.
 - Use Sora headings and Manrope body; profiles contain dense achievements in a scannable bento layout.
+- Visual identity "tinta & retícula": ink background, paper-colored text, brand orange; shelf titles are narration boxes (`section-title`, paper box with a hard orange offset shadow), covers and highlights use panel frames with hard shadows, and screentone dots (`--tone-dot`) appear only on the home highlight, the work header and the chapter ending. Motion is limited to the highlight entrance and responses to the reader's own actions; no ambient layers or pointer-tracking glows.
 - Shared presentation uses semantic CSS tokens and scoped site-content/site-header/admin classes; reader dimensions and user-selected reading preferences remain independent.
 - Keep novels on the shared work details route, but give them a dedicated text reader while manga/comics retain the image reader, so both formats share catalog data without compromising reading ergonomics.
 - Bun regression tests live in tests/ outside the application compiler inputs so test-runner globals do not change the hosted runtime's DOM types.

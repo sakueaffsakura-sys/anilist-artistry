@@ -385,6 +385,7 @@ function SeriesPage() {
             className="h-full w-full scale-110 object-cover opacity-30 blur-2xl"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/80 to-background" />
+          <div className="work-hero-tone" aria-hidden="true" />
         </div>
 
         <main className="work-overview relative z-10 mx-auto max-w-7xl px-4 pb-8 pt-6 sm:px-6 lg:px-8 md:pt-10">
@@ -399,38 +400,39 @@ function SeriesPage() {
             {/* Cover */}
             <div className="flex flex-col items-center md:w-[260px] md:shrink-0">
               <div className="mb-2 flex flex-wrap justify-center gap-2 md:hidden">
-                <span className="rounded-full border border-border bg-surface-2 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{obra.kind}</span>
-                <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">{obra.status}</span>
+                <span className="rounded-full border border-border bg-surface-2 px-3 py-1 text-xs font-semibold text-muted-foreground">{obra.kind}</span>
+                <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300">{obra.status}</span>
                 <AgeRatingBadge value={obra.age_rating} />
               </div>
               <img
                 src={coverUrl(obra.cover_url)}
                 alt={obra.title}
-                className="aspect-[2/3] w-[200px] rounded-lg border border-border object-cover shadow-[var(--shadow-card)] md:w-full"
+                className="work-cover aspect-[2/3] w-[200px] object-cover md:w-full"
               />
             </div>
 
             {/* Info */}
             <div className="min-w-0 w-full flex-1 text-center md:text-left">
               <div className="mb-3 hidden flex-wrap items-center gap-3 md:flex">
-                <span className="rounded border border-border px-2 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">{obra.kind}</span>
-                <span className="rounded border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-400">{obra.status}</span>
+                <span className="rounded-full border border-border bg-surface-2/70 px-3 py-1 text-xs font-semibold text-muted-foreground">{obra.kind}</span>
+                <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">{obra.status}</span>
                 <AgeRatingBadge value={obra.age_rating} size="sm" />
               </div>
-              <h1 className="font-display text-2xl font-black leading-tight md:text-3xl">{obra.title}</h1>
+              <h1 className="font-display text-3xl font-extrabold leading-[1.1] tracking-[-0.01em] md:text-5xl">{obra.title}</h1>
               {obra.alt_titles ? (
-                <p className="mt-1 text-xs text-muted-foreground">{obra.alt_titles}</p>
+                <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{obra.alt_titles}</p>
               ) : null}
 
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground md:justify-start">
-                <span className="inline-flex items-center gap-1.5"><BookOpen className="h-4 w-4" /> {obra.chapters.length} capítulos</span>
-                <span className="inline-flex items-center gap-1.5 font-bold text-gold"><Star className="h-4 w-4 fill-gold" /> {average.toFixed(1).replace(".", ",")}</span>
-                <span className="inline-flex items-center gap-1.5"><MessageCircle className="h-4 w-4" /> {comments.data?.length ?? 0}</span>
-              </div>
+              <dl className="work-facts mt-5 text-left">
+                <div><dt>Capítulos</dt><dd className="tabular-nums">{obra.chapters.length}</dd></div>
+                <div><dt>Nota</dt><dd className="inline-flex items-center gap-1.5 tabular-nums text-gold"><Star className="h-4 w-4 fill-gold" />{average.toFixed(1).replace(".", ",")}</dd></div>
+                <div><dt>Comentários</dt><dd className="tabular-nums">{comments.data?.length ?? 0}</dd></div>
+                <div><dt>Atualizada</dt><dd>{new Date(obra.updated_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</dd></div>
+              </dl>
 
               <div className="mt-4 flex flex-wrap justify-center gap-1.5 md:justify-start md:gap-2">
                 {normalizeGenres(obra.genres).map((genre) => (
-                  <span key={genre} className="rounded-lg border border-border bg-surface-2/60 px-2.5 py-1 text-xs text-muted-foreground">{genre}</span>
+                  <Link key={genre} to="/catalogo" search={{ tag: genre }} title={`Ver obras de ${genre}`} className="rounded-full border border-border bg-surface-2/60 px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground">{genre}</Link>
                 ))}
               </div>
 
@@ -444,7 +446,7 @@ function SeriesPage() {
 
               {obra.synopsis ? (
                 <div className="mt-4 text-left">
-                  <p className={`whitespace-pre-line text-sm leading-relaxed text-foreground/80 ${expanded ? "" : "line-clamp-4"}`}>
+                  <p className={`max-w-[68ch] whitespace-pre-line text-[15px] leading-relaxed text-foreground/85 ${expanded ? "" : "line-clamp-4"}`}>
                     {obra.synopsis}
                   </p>
                   {synopsisLong ? (
@@ -462,7 +464,7 @@ function SeriesPage() {
                   <Link
                     to="/obra/$slug/$chapter"
                     params={{ slug: obra.slug, chapter: formatChapter((readIds.size > 0 && continueChapter ? continueChapter : firstChapter!).number) }}
-                    className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-black uppercase tracking-wider text-primary-foreground shadow-lg shadow-primary/25 transition hover:brightness-110 active:scale-[0.97]"
+                    className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-[4px_4px_0_var(--ink)] transition hover:brightness-110 active:translate-x-0.5 active:translate-y-0.5 active:shadow-[2px_2px_0_var(--ink)]"
                   >
                     <Play className="h-3.5 w-3.5 fill-current" />
                     {readIds.size > 0 && continueChapter ? `Continuar cap. ${formatChapter(continueChapter.number)}` : "Ler primeiro"}
@@ -472,7 +474,7 @@ function SeriesPage() {
                   <Link
                     to="/obra/$slug/$chapter"
                     params={{ slug: obra.slug, chapter: formatChapter(lastChapter.number) }}
-                    className="flex items-center gap-2 rounded-full bg-foreground/[0.06] px-4 py-2.5 text-xs font-black uppercase tracking-wider text-muted-foreground transition hover:bg-foreground/10 hover:text-foreground active:scale-[0.97]"
+                    className="flex items-center gap-2 rounded-full border border-border bg-surface/70 px-5 py-3 text-sm font-semibold text-foreground/85 transition hover:border-foreground/40 hover:text-foreground active:scale-[0.97]"
                   >
                     <Forward className="h-3.5 w-3.5" /> Ler último
                   </Link>
@@ -486,7 +488,7 @@ function SeriesPage() {
                       type="button"
                       onClick={() => toggleFavorite.mutate()}
                       disabled={toggleFavorite.isPending}
-                      className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-[11px] font-black uppercase tracking-wider transition disabled:opacity-50 ${
+                      className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition disabled:opacity-50 ${
                         favorite.data
                           ? "bg-rose-500 text-white shadow-lg shadow-rose-500/25 hover:bg-rose-400"
                           : "bg-foreground/[0.06] text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
@@ -500,7 +502,7 @@ function SeriesPage() {
                     <StatusButton userId={user.id} seriesId={obra.id} />
                   </>
                 ) : (
-                  <Link to="/auth" className="flex items-center gap-1.5 rounded-full bg-foreground/[0.06] px-4 py-2 text-[11px] font-black uppercase tracking-wider text-muted-foreground hover:text-foreground">
+                  <Link to="/auth" className="flex items-center gap-1.5 rounded-full bg-foreground/[0.06] px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground">
                     <Heart className="h-3.5 w-3.5" /> Entrar para favoritar
                   </Link>
                 )}
@@ -565,10 +567,6 @@ function SeriesPage() {
                     <ToolbarButton disabled={markAll.isPending || readIds.size === 0} onClick={() => markAll.mutate("unread")} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Desmarcar todos" />
                   </div>
                 ) : null}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {firstChapter ? <Button asChild className="h-11 gap-2"><Link to="/obra/$slug/$chapter" params={{ slug: obra.slug, chapter: formatChapter(firstChapter.number) }}><Play className="h-4 w-4" />Primeiro capítulo</Link></Button> : null}
-                  {lastChapter ? <Button asChild variant="outline" className="h-11 gap-2 border-primary/40 text-primary"><Link to="/obra/$slug/$chapter" params={{ slug: obra.slug, chapter: formatChapter(lastChapter.number) }}><Forward className="h-4 w-4" />Capítulo mais recente</Link></Button> : null}
-                </div>
               </div>
               <ul className="mt-4 max-h-[70vh] divide-y divide-border/60 overflow-y-auto rounded-xl border border-border bg-background/40">
                 {visibleChapters.map((chapter) => {
@@ -581,25 +579,21 @@ function SeriesPage() {
                         params={{ slug: obra.slug, chapter: formatChapter(chapter.number) }}
                         className="flex min-w-0 flex-1 items-center gap-4 text-left"
                       >
-                        <span className="relative h-14 w-11 shrink-0 overflow-hidden rounded-md bg-surface-2 shadow-md transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110">
-                          <img src={coverUrl(obra.cover_url)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
-                          {isRead ? <span className="absolute inset-0 grid place-items-center bg-background/70 text-primary"><Check className="h-[18px] w-[18px]" strokeWidth={2.5} /></span> : null}
+                        <span className={`chapter-num ${isRead ? "chapter-num-read" : ""}`} aria-hidden="true">
+                          {isRead ? <Check className="h-[18px] w-[18px]" strokeWidth={2.5} /> : formatChapter(chapter.number)}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-1.5">
-                            <BookOpen className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-                            <ArrowRight className="h-3.5 w-3.5 shrink-0 -translate-x-1.5 text-primary opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100" />
-                            <span className={`truncate font-bold transition-colors group-hover:text-primary ${isRead ? "text-emerald-500/90" : ""}`}>
-                              Cap. #{formatChapter(chapter.number)}
-                              {chapter.title ? <span className="ml-2 font-semibold text-muted-foreground transition-colors group-hover:text-primary">| {chapter.title}</span> : null}
-                            </span>
+                          <span className="block truncate font-bold transition-colors group-hover:text-primary">
+                            Capítulo {formatChapter(chapter.number)}
                           </span>
-                          {isRead ? (
-                            <span className="mt-1 inline-block rounded border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-400">Lido</span>
+                          {chapter.title || isRead ? (
+                            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                              {[chapter.title, isRead ? "Lido" : null].filter(Boolean).join(" — ")}
+                            </span>
                           ) : null}
                         </span>
-                        <span className="hidden shrink-0 text-xs font-medium text-muted-foreground/70 transition-colors group-hover:text-primary sm:block">
-                          {new Date(chapter.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+                        <span className="hidden shrink-0 text-xs tabular-nums text-muted-foreground sm:block">
+                          {new Date(chapter.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
                         </span>
                       </Link>
                       {commentCount > 0 ? (
@@ -628,7 +622,7 @@ function SeriesPage() {
                   </li>
                 ) : null}
               </ul>
-              <p className="pt-4 text-center text-xs text-muted-foreground">Total de capítulos encontrados: {visibleChapters.length}</p>
+              <p className="pt-4 text-center text-xs text-muted-foreground">{visibleChapters.length === obra.chapters.length ? `${visibleChapters.length} capítulos` : `${visibleChapters.length} de ${obra.chapters.length} capítulos`}</p>
               </TabsContent>
               </div>
               </Tabs>
@@ -637,7 +631,7 @@ function SeriesPage() {
             {/* Sidebar */}
             <aside className="min-w-0 space-y-8">
               <section>
-                <h2 className="flex items-center gap-3 border-b border-border pb-4 font-display text-base font-bold"><Sparkles className="h-4 w-4 text-primary" />Obras relacionadas</h2>
+                <h2 className="section-title"><Sparkles className="h-4 w-4" />Obras relacionadas</h2>
                 <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-6">
                   {(recommended.data ?? []).map((r) => (
                     <Link key={r.id} to="/obra/$slug" params={{ slug: r.slug }} className="group min-w-0">
@@ -704,12 +698,12 @@ function SeriesPage() {
               <div className="flex items-center gap-3">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary"><MessageCircle className="h-4 w-4" /></span>
                 <div>
-                  <h2 className="text-sm font-bold">Comentários</h2>
+                  <h2 className="font-display text-lg font-bold">Comentários</h2>
                   <p className="text-xs text-muted-foreground">{comments.data?.length ?? 0} comentários</p>
                 </div>
               </div>
               <div className="flex gap-1.5">
-                {([["new", "Mais Recentes"], ["old", "Mais Antigos"]] as const).map(([k, label]) => (
+                {([["new", "Mais recentes"], ["old", "Mais antigos"]] as const).map(([k, label]) => (
                   <button
                     key={k}
                     onClick={() => setCommentSort(k)}
@@ -755,7 +749,7 @@ function ToolbarButton({ icon, label, onClick, disabled }: { icon: ReactNode; la
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex items-center justify-center gap-1.5 rounded-full border border-border bg-foreground/[0.03] px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition hover:bg-foreground/[0.08] hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+      className="flex items-center justify-center gap-1.5 rounded-full border border-border bg-foreground/[0.03] px-4 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-foreground/[0.08] hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
     >
       {icon}
       {label}

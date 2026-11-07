@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { AlignJustify, BookOpen, ChevronDown, ChevronLeft, ChevronRight, ChevronsDown, Home, Infinity, List, Maximize2, MessageCircle, Minus, Moon, Palette, Plus, Settings2, SunMedium } from "lucide-react";
+import { AlignJustify, BookOpen, ChevronDown, ChevronLeft, ChevronRight, ChevronsDown, Home, List, Maximize2, MessageCircle, Minus, Moon, Palette, Plus, Settings2, SunMedium } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -301,7 +301,7 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
               <BookOpen className="h-5 w-5 sm:hidden" />
             </Link>
             <span aria-hidden="true" className="hidden text-border sm:block">·</span>
-            <span className="truncate text-sm font-bold text-primary">Cap. {formatChapter(current.number)}</span>
+            <span className="truncate text-sm font-bold">Capítulo {formatChapter(current.number)}</span>
 
             <div className="ml-auto flex items-center gap-1">
               <Button
@@ -340,6 +340,7 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
             </div>
           </div>
 
+          <span className="reader-progress" aria-hidden="true" />
           {showNovelSettings ? (
             <div className="border-t border-border/60 bg-background/95 px-3 py-3 shadow-lg">
               <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-2 sm:justify-end">
@@ -412,12 +413,9 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
           <Button variant="ghost" size="icon" type="button" onClick={() => history.back()} className={iconBtn} aria-label="Voltar">
             <ChevronLeft className="h-5 w-5" />
           </Button>
-          <Link to="/obra/$slug" params={{ slug }} className="ml-2 flex items-center gap-1.5 text-sm font-bold hover:text-primary">
-            <BookOpen className="h-4 w-4" /> Obra
-          </Link>
-          <h1 className="ml-1 flex min-w-0 items-center gap-2 text-xs sm:ml-3 sm:text-sm">
-            <span className="hidden truncate text-muted-foreground sm:block">{obra.title}</span>
-            <span className="shrink-0 font-bold text-primary">Cap. {formatChapter(current.number)}</span>
+          <h1 className="ml-1 min-w-0 leading-tight">
+            <Link to="/obra/$slug" params={{ slug }} className="block max-w-[46vw] truncate text-xs text-muted-foreground transition-colors hover:text-primary sm:max-w-80 sm:text-[13px]">{obra.title}</Link>
+            <span className="block text-sm font-bold">Capítulo {formatChapter(current.number)}{pages.length ? <span className="ml-2 hidden text-xs font-medium text-muted-foreground sm:inline">{pages.length} páginas</span> : null}</span>
           </h1>
           <div className="ml-auto flex items-center gap-1">
             <Button variant="ghost" size="icon" type="button" disabled={!prev} onClick={() => go("prev")} className={iconBtn} aria-label="Capítulo anterior">
@@ -426,15 +424,16 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
             <Button variant="ghost" size="icon" type="button" disabled={!next} onClick={() => go("next")} className={iconBtn} aria-label="Próximo capítulo">
               <ChevronRight className="h-5 w-5" />
             </Button>
-            <Link to="/obra/$slug" params={{ slug }} className={`${iconBtn} hidden sm:grid`} aria-label="Lista de capítulos">
-              <Infinity className="h-5 w-5" />
+            <Link to="/obra/$slug" params={{ slug }} className={`${iconBtn} hidden sm:grid`} aria-label="Lista de capítulos" title="Lista de capítulos">
+              <List className="h-5 w-5" />
             </Link>
             <Button
               variant="ghost"
               size="icon"
               type="button"
               className={`${iconBtn} hidden sm:grid`}
-              aria-label="Tema"
+              aria-label="Escurecer páginas"
+              title="Escurecer páginas"
               onClick={() => document.documentElement.classList.toggle("reader-dim")}
             >
               <Palette className="h-5 w-5" />
@@ -466,6 +465,7 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
             </Link>
           </div>
         </div>
+        <span className="reader-progress" aria-hidden="true" />
       </header>
       )}
 
@@ -473,7 +473,7 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
         {isNovel ? (
           <article className="px-5 pb-16 pt-10 sm:px-8 sm:pt-14">
             <header className="mb-10 border-b border-border/70 pb-7 text-center">
-              <p className="mb-3 text-xs font-bold uppercase text-primary">{obra.title}</p>
+              <p className="mb-3 text-sm font-semibold text-primary">{obra.title}</p>
               <h1 className="font-display text-2xl font-extrabold sm:text-3xl">
                 Capítulo {formatChapter(current.number)}
               </h1>
@@ -533,18 +533,26 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
         )}
       </main>
 
-      <div className={`mx-auto flex ${isNovel ? novelWidth : "max-w-3xl"} items-center justify-between gap-3 border-t border-border/70 px-4 py-8`}>
-        <Button variant="outline" disabled={!prev} onClick={() => go("prev")} className="font-semibold">
-          <ChevronLeft className="mr-1 h-4 w-4" /> Anterior
-        </Button>
-        <Button asChild variant="ghost" className="font-semibold">
-          <Link to="/obra/$slug" params={{ slug }}>
-            Capítulos
-          </Link>
-        </Button>
-        <Button disabled={!next} onClick={() => go("next")} className="font-semibold">
-          Próximo <ChevronRight className="ml-1 h-4 w-4" />
-        </Button>
+      <div className={`mx-auto ${isNovel ? novelWidth : "max-w-3xl"} px-4 py-10`}>
+        <div className="reader-end p-5 sm:p-7">
+          <p className="text-sm text-muted-foreground">Fim do capítulo {formatChapter(current.number)}</p>
+          <p className="mt-1 font-display text-xl font-extrabold sm:text-2xl">{next ? `A seguir: capítulo ${formatChapter(next.number)}` : "Você está em dia com esta obra"}</p>
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            {next ? (
+              <Button onClick={() => go("next")} className="h-11 rounded-full px-6 font-bold shadow-[4px_4px_0_var(--ink)]">
+                Ler capítulo {formatChapter(next.number)} <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            ) : null}
+            <Button variant="outline" disabled={!prev} onClick={() => go("prev")} className="h-11 rounded-full font-semibold">
+              <ChevronLeft className="mr-1 h-4 w-4" /> Anterior
+            </Button>
+            <Button asChild variant="ghost" className="h-11 rounded-full font-semibold">
+              <Link to="/obra/$slug" params={{ slug }}>
+                <List className="mr-1 h-4 w-4" /> Todos os capítulos
+              </Link>
+            </Button>
+          </div>
+        </div>
       </div>
 
       <section className="mx-auto max-w-3xl px-4 pb-16">
