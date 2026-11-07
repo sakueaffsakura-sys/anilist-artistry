@@ -37,8 +37,14 @@
   const whoText = () => (state.session && state.session.mode === "code" ? `${appVersion()} · código do painel · ${host(state.site)}` : `${appVersion()} · ${state.session ? state.session.email : ""} · ${host(state.site)}`);
 
   /* ---------- motor ---------- */
+  /** Pedido que não responde em ms vira erro de conexão (o envio espera e tenta de novo). */
+  function withTimeout(promise, ms) {
+    let t;
+    return Promise.race([promise, new Promise((_, reject) => { t = setTimeout(() => reject(new Error("tempo esgotado")), ms); })]).finally(() => clearTimeout(t));
+  }
   const engine = BMEngine.createEngine({
-    fetch: (url, init) => fetch(url, init),
+    // Sem resposta em tempo: conta como falha de conexão e tenta de novo (antes um pedido travado parava o envio para sempre).
+    fetch: (url, init) => withTimeout(fetch(url, init), /mediocre-ingest/.test(String(url)) ? 120000 : 45000),
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
     now: () => Date.now(),
     mediocreToken: () => state.token,
@@ -611,7 +617,7 @@
     renderSiteStatus(); updateMeta(); updateSendAll();
   }
   function setStatus(text, warn) { const e = $("run-status"); e.textContent = text; e.classList.toggle("pause", Boolean(warn)); }
-  function setBar(done, total) { const pct = total ? Math.round((done / total) * 100) : 0; $("run-bar").firstElementChild.style.width = `${pct}%`; $("run-bar").setAttribute("aria-valuenow", String(pct)); }
+  function setBar(done, total) { const pct = total ? (done > 0 ? Math.max(2, Math.round((done / total) * 100)) : 0) : 0; $("run-bar").firstElementChild.style.width = `${pct}%`; $("run-bar").setAttribute("aria-valuenow", String(pct)); }
   /* Histórico guardado no celular: sobrevive se o app fechar, para sabermos por que o envio parou. */
   const LOG_KEY = "bm-estudio-log";
   function saveLog(line) {
@@ -648,8 +654,15 @@
         log(`${e.name}: ${e.created ? "criada no site" : "já estava no site"}, ${e.total} capítulo(s) para enviar.`);
         if (!e.total) setStatus("Nenhum capítulo novo.");
         break;
-      case "sending": clearInterval(countdown); setStatus(`Enviando capítulos ${e.from}${e.to > e.from ? ` e ${e.to}` : ""} de ${e.total}…`); break;
-      case "progress": setBar(e.done, e.total); note.done = e.done; native.update(note.work, `${e.done} de ${e.total} capítulos · ${queueLeft} obra(s) na vez`, e.done, e.total); break;
+      case "sending":
+        clearInterval(countdown); setStatus(`Enviando capítulos ${e.from}${e.to > e.from ? ` e ${e.to}` : ""} de ${e.total}…`);
+        log(`${note.work || "Envio"}: buscando capítulos ${e.from}${e.to > e.from ? `–${e.to}` : ""} de ${e.total}.`);
+        break;
+      case "progress":
+        setBar(e.done, e.total); note.done = e.done;
+        $("run-queue").textContent = `${e.done} de ${e.total} capítulos · ${queueLeft} obra(s) na vez`;
+        log(`${note.work || "Envio"}: ${e.done} de ${e.total} prontos (+${e.added} no site${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}).`);
+        native.update(note.work, `${e.done} de ${e.total} capítulos · ${queueLeft} obra(s) na vez`, e.done, e.total); break;
       case "waiting": count(e.ms, (s) => setStatus(`Próximo envio em ${s} s`)); break;
       case "api-wait":
         count(e.ms, (sec) => setStatus(`Aguardando ${sec} s para o próximo pedido à MediocreScan (1 por minuto).`));
