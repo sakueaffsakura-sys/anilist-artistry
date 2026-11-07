@@ -86,3 +86,11 @@ Aplicada `0045_prevent_duplicate_work_titles.sql`: reservas atômicas internas c
 Aplicada `0049_series_mediocre_source.sql`: coluna `source_mediocre_id` com índice único parcial em `series`, para impedir importar a mesma obra da MediocreScan duas vezes.
 | 0050_mediocre_token_and_cache.sql | Token MediocreScan salvo pelo painel e cópia das respostas da API (somente servidor). Aplicada 2026-11-03. |
 | 0052_mediocre_bypass_and_block.sql | Chave de liberação Cloudflare e pausa de sincronização do MediocreScan. |
+
+## Prateleiras da página inicial — 2026-11-07
+
+Aplicada `0056_series_shelf_indexes.sql` e registrada no histórico Drizzle com o hash do arquivo. Antes, foram conferidos o histórico (56 registros, último 0055) e os índices de `series`: nenhum dos quatro existia.
+
+A migration cria índices parciais em `series` (`WHERE published`) por `created_at`, `views`, `pinned` + `updated_at` e `title`. Sem eles, Lançamentos, Rankings e Atualizados Recentes contavam os capítulos de todas as obras antes de ordenar. Com o cache frio isso levava até 4,9 s, acima do limite de 3 s dos visitantes sem conta, que recebiam erro 500 e prateleiras vazias. Depois da migration: 42 ms, 91 ms e 4 ms (`EXPLAIN ANALYZE` como `anon`).
+
+Só cria índices: nenhum dado, coluna ou política foi alterado, então não houve backup de dados. Reversão: `DROP INDEX` dos quatro índices e remoção do registro no histórico.
