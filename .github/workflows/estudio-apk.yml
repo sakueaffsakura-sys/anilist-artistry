@@ -38,6 +38,9 @@ jobs:
           if [ -z "$f" ]; then echo "::error::capacitor.js não encontrado em @capacitor/core/dist: $(ls node_modules/@capacitor/core/dist | tr '\n' ' ')"; exit 1; fi
           cp "$f" www/capacitor.js
           echo "window.BM_VERSION = '1.${{ github.run_number }}';" > www/version.js
+          # Cada versão carrega os próprios arquivos (evita o WebView usar os antigos do cache).
+          sed -i -E 's#src="(capacitor|version|parse|engine|app)\.js"#src="\1.js?v=${{ github.run_number }}"#g; s#href="style\.css"#href="style.css?v=${{ github.run_number }}"#' www/index.html
+          grep -c "?v=${{ github.run_number }}" www/index.html
       - name: Gerar o projeto Android
         env:
           BUILD_NUMBER: ${{ github.run_number }}

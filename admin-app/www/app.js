@@ -33,7 +33,8 @@
     try { state.session = await authRequest("refresh_token", { refresh_token: s.refresh }); save(); return true; } catch (_) { return false; }
   }
   const siteHeaders = () => { const s = state.session; if (!s) return {}; return s.mode === "code" ? { "x-ingest-token": s.code } : { authorization: `Bearer ${s.access}` }; };
-  const whoText = () => (state.session && state.session.mode === "code" ? `Código do painel · ${host(state.site)}` : `${state.session ? state.session.email : ""} · ${host(state.site)}`);
+  const appVersion = () => (window.BM_VERSION ? `v${window.BM_VERSION}` : "teste");
+  const whoText = () => (state.session && state.session.mode === "code" ? `${appVersion()} · código do painel · ${host(state.site)}` : `${appVersion()} · ${state.session ? state.session.email : ""} · ${host(state.site)}`);
 
   /* ---------- motor ---------- */
   const engine = BMEngine.createEngine({

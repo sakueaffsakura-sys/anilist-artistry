@@ -30,6 +30,8 @@ for (const f of ["EnvioService.java", "EstudioPlugin.java"]) {
 
 writeFileSync(main, `package ${pkg};
 
+import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.WindowManager;
 import android.webkit.WebView;
@@ -42,6 +44,26 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         // Tela acesa enquanto o app está aberto na frente.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        clearCacheAfterUpdate();
+    }
+
+    /** Depois de instalar uma versão nova, apaga o cache do WebView para não rodar os arquivos antigos. */
+    private void clearCacheAfterUpdate() {
+        try {
+            long code = Build.VERSION.SDK_INT >= 28
+                ? getPackageManager().getPackageInfo(getPackageName(), 0).getLongVersionCode()
+                : getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
+            SharedPreferences prefs = getSharedPreferences("estudio", MODE_PRIVATE);
+            if (prefs.getLong("lastVersionCode", -1) != code) {
+                if (getBridge() != null && getBridge().getWebView() != null) {
+                    getBridge().getWebView().clearCache(true);
+                    getBridge().getWebView().reload();
+                }
+                prefs.edit().putLong("lastVersionCode", code).apply();
+            }
+        } catch (Exception ignored) {
+            // Sem limpeza: o carregamento com a versão no endereço dos arquivos já evita o cache.
+        }
     }
 
     @Override
