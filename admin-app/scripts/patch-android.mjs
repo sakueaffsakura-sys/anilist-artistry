@@ -1,6 +1,6 @@
 // Ajustes no projeto Android gerado pelo Capacitor (roda no GitHub, depois de "cap add android").
 import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 const build = Number(process.env.BUILD_NUMBER) || 1;
 
@@ -10,7 +10,6 @@ let g = readFileSync(gradle, "utf8");
 g = g.replace(/versionCode\s+\d+/, `versionCode ${build}`).replace(/versionName\s+"[^"]*"/, `versionName "1.${build}"`);
 writeFileSync(gradle, g);
 
-// Tela acesa enquanto o app está aberto: o envio leva minutos e não pode parar com a tela apagada.
 function find(dir, name) {
   for (const f of readdirSync(dir)) {
     const p = join(dir, f);
@@ -22,18 +21,66 @@ function find(dir, name) {
 const main = find("android/app/src/main/java", "MainActivity.java");
 if (!main) throw new Error("MainActivity.java não encontrado");
 const pkg = /package\s+([\w.]+);/.exec(readFileSync(main, "utf8"))[1];
+const javaDir = dirname(main);
+
+// Serviço em primeiro plano + plugin (envio continua com o app minimizado ou a tela apagada).
+for (const f of ["EnvioService.java", "EstudioPlugin.java"]) {
+  writeFileSync(join(javaDir, f), readFileSync(join("android-src", f), "utf8").replace("package __PKG__;", `package ${pkg};`));
+}
+
 writeFileSync(main, `package ${pkg};
 
 import android.os.Bundle;
 import android.view.WindowManager;
+import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        registerPlugin(EstudioPlugin.class);
         super.onCreate(savedInstanceState);
+        // Tela acesa enquanto o app está aberto na frente.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        keepWebViewRunning();
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        keepWebViewRunning();
+    }
+
+    /** Durante um envio, o app continua trabalhando mesmo minimizado. */
+    private void keepWebViewRunning() {
+        if (!EnvioService.running || getBridge() == null) return;
+        WebView web = getBridge().getWebView();
+        if (web == null) return;
+        web.onResume();
+        web.resumeTimers();
     }
 }
 `);
-console.log(`Android ajustado: versão 1.${build}, tela acesa durante o uso.`);
+
+// Permissões e declaração do serviço.
+const manifestPath = "android/app/src/main/AndroidManifest.xml";
+let m = readFileSync(manifestPath, "utf8");
+const perms = [
+  "android.permission.FOREGROUND_SERVICE",
+  "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+  "android.permission.POST_NOTIFICATIONS",
+  "android.permission.WAKE_LOCK",
+  "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+].filter((p) => !m.includes(`"${p}"`)).map((p) => `    <uses-permission android:name="${p}" />`).join("\n");
+if (perms) m = m.replace(/<\/manifest>\s*$/, `${perms}\n</manifest>\n`);
+if (!m.includes(".EnvioService")) {
+  m = m.replace("</application>", `        <service android:name=".EnvioService" android:exported="false" android:foregroundServiceType="dataSync" />\n    </application>`);
+}
+writeFileSync(manifestPath, m);
+
+console.log(`Android ajustado: versão 1.${build}, envio em segundo plano com notificação.`);
