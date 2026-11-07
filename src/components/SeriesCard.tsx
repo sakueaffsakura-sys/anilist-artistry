@@ -1,32 +1,49 @@
+import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Heart, Star } from "lucide-react";
+import { Heart, Star } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { coverUrl } from "@/lib/media";
 import { useSession } from "@/hooks/useAuth";
+import { useFavoriteIds } from "@/hooks/useFavoriteIds";
 import { AgeRatingBadge } from "@/components/AgeRatingBadge";
 import { activeProfileId } from "@/lib/active-profile";
-import { Button } from "@/components/ui/button";
+import { formatRating } from "@/lib/format";
+import { kindLabel } from "@/lib/work-categories";
 import { cn } from "@/lib/utils";
 import { SeriesChapterLinks, type ChapterRef } from "@/components/SeriesChapterLinks";
+
 type Props = {
   slug: string;
   title: string;
+  /** Título com marcação (ex.: termo buscado destacado); o texto puro continua em `title`. */
+  titleNode?: ReactNode;
   cover?: string | null;
   rating?: number | null;
   chapters?: number | null;
   chapterList?: ChapterRef[];
+  /** Andamento de leitura (0–100), mostrado como barra no pé da capa. */
   progress?: number | null;
+  /** Etiqueta curta no canto de baixo da capa (ex.: "Cap. 12"). */
   badge?: string | null;
   ageRating?: string | null | undefined;
+  kind?: string | null;
   showTitle?: boolean;
+  /** Estado do favorito; sem ele o cartão consulta os favoritos do perfil ativo. */
   favorite?: boolean;
   seriesId?: string;
+  /** Selo "Novo" no canto da capa. */
+  isNew?: boolean;
+  /** Linha de informação abaixo do título; sem ela aparecem nota, capítulos e formato. */
+  meta?: ReactNode;
 };
+
+/** Cartão de obra único do site: capa, selos discretos, favorito e uma linha de informação. */
 export function SeriesCard({
   slug,
   title,
+  titleNode,
   cover,
   rating,
   chapters,
@@ -34,15 +51,20 @@ export function SeriesCard({
   progress,
   badge,
   ageRating,
+  kind,
   showTitle = true,
-  favorite = false,
+  favorite: favoriteProp,
   seriesId,
+  isNew = false,
+  meta,
 }: Props) {
   const { user } = useSession();
   const queryClient = useQueryClient();
+  const favoriteIds = useFavoriteIds();
+  const favorite = favoriteProp ?? (seriesId ? favoriteIds.has(seriesId) : false);
   const toggleFav = useMutation({
     mutationFn: async () => {
-      if (!user || !seriesId) throw new Error("Entre para favoritar");
+      if (!user || !seriesId) throw new Error("Entre na sua conta para favoritar.");
       if (favorite) {
         const { error } = await supabase
           .from("favorites")
@@ -61,7 +83,7 @@ export function SeriesCard({
       queryClient.invalidateQueries({ queryKey: ["favorites"] });
       queryClient.invalidateQueries({ queryKey: ["favorite-ids"] });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao favoritar"),
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível atualizar os favoritos."),
   });
   const onHeart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -72,88 +94,56 @@ export function SeriesCard({
     }
     toggleFav.mutate();
   };
+  const score = Number(rating ?? 0);
+  const defaultMeta = score > 0 || chapters || kind ? (
+    <p className="card-meta mt-1">
+      {score > 0 ? <span className="inline-flex items-center gap-1 font-semibold text-foreground"><Star className="fill-gold text-gold" />{formatRating(score)}</span> : null}
+      {chapters ? <span>{chapters.toLocaleString("pt-BR")} cap.</span> : null}
+      {kind ? <span className="truncate">{kindLabel(kind)}</span> : null}
+    </p>
+  ) : null;
+
   return (
-    <div className="group flex h-full w-full min-w-0 flex-col rounded-lg">
+    <div className="group flex h-full w-full min-w-0 flex-col">
       <Link
         to="/obra/$slug"
         params={{ slug }}
-        className="series-cover group/cover relative z-0 block aspect-[2/3] w-full shrink-0 overflow-hidden rounded-lg border border-border bg-surface-2 transition-[transform,box-shadow,border-color] duration-200 hover:border-primary/50 motion-safe:hover:-translate-y-1"
+        className="series-cover relative z-0 block aspect-[2/3] w-full shrink-0 overflow-hidden rounded-md"
       >
-        <img
-          src={coverUrl(cover)}
-          alt={title}
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-cover transition-transform duration-200 ease-out group-hover/cover:scale-105"
-        />
-        {favorite ? <span aria-hidden="true" className="series-favorite-outline pointer-events-none absolute inset-0 z-[2] rounded-lg" /> : null}
-        <Button type="button" size="icon" variant="ghost"
-          title={favorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-          aria-label={favorite ? "Remover obra dos favoritos" : "Adicionar obra aos favoritos"}
-          onClick={onHeart} disabled={toggleFav.isPending}
-          className={cn("absolute right-1.5 top-1.5 z-30 h-7 w-7 rounded-full border border-cover-foreground/20 bg-cover-overlay text-cover-foreground hover:bg-cover-overlay hover:text-favorite", favorite && "border-favorite/50 text-favorite")}>
-          <Heart className={cn("h-3.5 w-3.5", favorite && "fill-current")} />
-        </Button>
-        <div className="pointer-events-none absolute left-2 top-2 z-[3] flex flex-col items-start gap-1.5 antialiased">
-          {rating || chapters ? (
-            <span
-              title={`Média ${Number(rating ?? 0).toFixed(1).replace(".", ",")} · ${chapters ?? 0} capítulos`}
-              className="pointer-events-none inline-flex items-center gap-1.5 rounded-full border border-cover-foreground/15 bg-cover-overlay px-3 py-1 shadow-sm"
-            >
-              {rating ? (
-                <>
-                  <Star className="h-3.5 w-3.5 shrink-0 fill-gold text-gold" />
-                  <span className="text-xs font-black leading-none text-cover-foreground tabular-nums">
-                    {Number(rating).toFixed(1).replace(".", ",")}
-                  </span>
-                </>
-              ) : null}
-              {rating && chapters ? (
-                <span aria-hidden="true" className="mx-0.5 h-3.5 w-px shrink-0 bg-cover-foreground/25" />
-              ) : null}
-              {chapters ? (
-                <>
-                  <BookOpen className="h-3 w-3 shrink-0 text-primary" />
-                  <span className="text-xs font-black leading-none tracking-tight text-primary tabular-nums">
-                    {chapters}
-                  </span>
-                </>
-              ) : null}
-            </span>
-          ) : null}
+        <img src={coverUrl(cover)} alt={title} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+        <div className="pointer-events-none absolute left-1.5 top-1.5 z-[3] flex flex-col items-start gap-1">
+          {isNew ? <span className="badge-new">Novo</span> : null}
           <AgeRatingBadge value={ageRating} size="sm" variant="solid" />
-          {favorite ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-favorite/40 bg-cover-overlay px-2.5 py-1 shadow-sm">
-              <Heart className="h-3 w-3 shrink-0 fill-favorite text-favorite" />
-              <span className="text-[11px] font-extrabold leading-none text-favorite">
-                Favorito
-              </span>
-            </span>
-          ) : null}
         </div>
-        {badge ? (
-          <span className="absolute bottom-1.5 right-1.5 z-[3] rounded-md bg-primary px-1.5 py-0.5 text-[11px] font-bold text-primary-foreground">
-            {badge}
-          </span>
-        ) : null}
+        <button
+          type="button"
+          title={favorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+          aria-label={favorite ? `Remover ${title} dos favoritos` : `Adicionar ${title} aos favoritos`}
+          aria-pressed={favorite}
+          onClick={onHeart}
+          disabled={toggleFav.isPending}
+          className={cn(
+            "absolute right-1.5 top-1.5 z-[4] grid h-7 w-7 place-items-center rounded-full bg-cover-overlay text-cover-foreground hover:text-favorite disabled:opacity-60",
+            favorite && "text-favorite",
+          )}
+        >
+          <Heart className={cn("h-3.5 w-3.5", favorite && "fill-current")} />
+        </button>
+        {badge ? <span className="cover-badge absolute bottom-1.5 left-1.5 z-[3]">{badge}</span> : null}
         {typeof progress === "number" ? (
-          <div className="absolute inset-x-0 bottom-0 z-[3] series-cover-shade p-2 pt-6">
-            <div className="h-1 w-full overflow-hidden rounded-full bg-cover-foreground/15">
-              <div className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
+          <div className="absolute inset-x-0 bottom-0 z-[3] series-cover-shade px-1.5 pb-1.5 pt-6">
+            <div className="h-1 w-full overflow-hidden rounded-full bg-cover-foreground/20">
+              <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, progress))}%` }} />
             </div>
           </div>
         ) : null}
-        <div className="series-cover-shade pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover/cover:opacity-100" />
       </Link>
       {showTitle ? (
-        <div className="flex min-h-0 flex-1 flex-col px-0.5 pt-2">
-          <div className="min-h-10 shrink-0">
-            <Link to="/obra/$slug" params={{ slug }} className="block no-underline">
-              <h3 className="line-clamp-2 text-sm font-semibold leading-snug transition-colors group-hover:text-primary">
-                {title}
-              </h3>
-            </Link>
-          </div>
+        <div className="flex min-h-0 flex-1 flex-col pt-2">
+          <h3 className="line-clamp-2 text-[13px] font-semibold leading-snug sm:text-sm">
+            <Link to="/obra/$slug" params={{ slug }} className="hover:text-primary">{titleNode ?? title}</Link>
+          </h3>
+          {meta ?? defaultMeta}
           {chapterList && chapterList.length > 0 ? (
             <SeriesChapterLinks slug={slug} chapters={chapterList} favorite={favorite} />
           ) : null}

@@ -42,7 +42,7 @@ export function ShowcaseLayout({ children }: { children: ReactNode }) {
 
 export function RetryError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+    <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
       <span>{message}</span>
       <Button size="sm" variant="outline" onClick={onRetry}><RefreshCw className="mr-1 h-4 w-4" />Tentar novamente</Button>
     </div>
@@ -52,7 +52,7 @@ export function RetryError({ message, onRetry }: { message: string; onRetry: () 
 export function SkeletonGrid() {
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5" aria-label="Carregando obras..." role="status">
-      {Array.from({ length: 10 }, (_, i) => <div key={i} className="aspect-[2/3] animate-pulse rounded-xl bg-muted" />)}
+      {Array.from({ length: 10 }, (_, i) => <div key={i} className="aspect-[2/3] animate-pulse rounded-lg bg-muted" />)}
     </div>
   );
 }
@@ -69,7 +69,7 @@ export function PublicWorkCard({ row, showIa }: { row: Row; showIa?: boolean | u
   if (!id) return null;
   return (
     <Link to="/mediocre/obra/$id" params={{ id }} className="group block space-y-2">
-      <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-muted">
+      <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-muted">
         {img && <img src={img} alt={name} loading="lazy" className="h-full w-full object-cover transition-transform group-hover:scale-105" />}
         {ia && <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">IA</span>}
       </div>

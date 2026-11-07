@@ -78,7 +78,7 @@ export function SupportConversation({ userId, staff }: { userId: string; staff: 
           const mine = m.from_staff === staff;
           return (
             <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm ${mine ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>
+              <div className={`max-w-[80%] whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-sm ${mine ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>
                 {m.body}
                 <div className="mt-1 text-[10px] opacity-70">
                   {m.from_staff ? "Suporte" : "Você"} · {new Date(m.created_at).toLocaleString("pt-BR", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
@@ -123,7 +123,7 @@ export function SupportChat() {
 
   if (!open) return null;
   return (
-    <div className="fixed bottom-36 right-4 z-50 flex h-[460px] w-[calc(100vw-2rem)] max-w-sm flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl md:bottom-20">
+    <div className="fixed bottom-36 right-4 z-50 flex h-[460px] w-[calc(100vw-2rem)] max-w-sm flex-col overflow-hidden rounded-lg border border-border bg-card shadow-2xl md:bottom-20">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2 font-semibold"><Headset className="h-4 w-4 text-primary" /> Suporte</div>
         <button onClick={() => setOpen(false)} aria-label="Fechar"><X className="h-4 w-4" /></button>

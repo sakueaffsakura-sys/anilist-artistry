@@ -5,7 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft, Download } from "lucide-react";
 import { toast } from "sonner";
-import { SiteHeader } from "@/components/SiteHeader";
+import { AdminShell } from "@/components/AdminShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -122,18 +122,15 @@ function NovaObra() {
   });
 
   return (
-    <div className="min-h-screen">
-      <SiteHeader />
-      <main className="mx-auto max-w-2xl px-4 py-8">
-        <Button asChild variant="ghost" size="sm" className="mb-4">
-          <Link to="/admin">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Voltar ao painel
-          </Link>
-        </Button>
-        <h1 className="font-display text-2xl font-extrabold">Nova obra</h1>
+    <AdminShell
+      title="Nova obra"
+      subtitle="Preencha pelo link do AniList ou à mão; depois envie os capítulos pela página da obra."
+      actions={<Button asChild variant="secondary" size="sm"><Link to="/admin/obras"><ArrowLeft className="h-4 w-4" /> Obras</Link></Button>}
+    >
+      <div className="max-w-2xl">
 
-        <section className="mt-4 rounded-2xl border border-border bg-surface p-5">
-          <h2 className="flex items-center gap-2 font-display text-base font-extrabold">
+        <section className="rounded-lg border border-border bg-surface p-4 sm:p-5">
+          <h2 className="flex items-center gap-2 font-display text-[15px] font-bold">
             <Download className="h-4 w-4 text-primary" /> Preencher com um link do AniList
           </h2>
           <form
@@ -159,7 +156,7 @@ function NovaObra() {
         </section>
 
         <form
-          className="mt-6 space-y-4 rounded-2xl border border-border bg-surface p-5"
+          className="mt-4 space-y-4 rounded-lg border border-border bg-surface p-4 sm:p-5"
           onSubmit={(event) => {
             event.preventDefault();
             create.mutate();
@@ -230,8 +227,8 @@ function NovaObra() {
             {create.isPending ? "Criando…" : "Criar obra"}
           </Button>
         </form>
-      </main>
-    </div>
+      </div>
+    </AdminShell>
   );
 }
 

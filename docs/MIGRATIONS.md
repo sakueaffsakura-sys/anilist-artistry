@@ -94,3 +94,11 @@ Aplicada `0056_series_shelf_indexes.sql` e registrada no histórico Drizzle com 
 A migration cria índices parciais em `series` (`WHERE published`) por `created_at`, `views`, `pinned` + `updated_at` e `title`. Sem eles, Lançamentos, Rankings e Atualizados Recentes contavam os capítulos de todas as obras antes de ordenar. Com o cache frio isso levava até 4,9 s, acima do limite de 3 s dos visitantes sem conta, que recebiam erro 500 e prateleiras vazias. Depois da migration: 42 ms, 91 ms e 4 ms (`EXPLAIN ANALYZE` como `anon`).
 
 Só cria índices: nenhum dado, coluna ou política foi alterado, então não houve backup de dados. Reversão: `DROP INDEX` dos quatro índices e remoção do registro no histórico.
+
+## Regras de acesso calculadas uma vez — 2026-11-07
+
+Aplicada `0057_rls_initplan_series_chapters.sql` e registrada no histórico Drizzle com o hash do arquivo. Antes, conferidos o histórico (57 registros, último 0056) e as políticas de `series` e `chapters`.
+
+As políticas `maintenance_restriction` (restritiva, todos os comandos) de `series` e `chapters`, e `staff read all series`/`staff read all chapters` (leitura da equipe), passaram a chamar `maintenance_access_allowed()` e `has_role()` dentro de `(select ...)`. Assim o Postgres calcula cada função uma vez por consulta em vez de uma vez por linha; o resultado não depende da linha. Contar os capítulos para o painel caiu de 5,4 s para 0,4 s (limite de 8 s para contas logadas), e as contagens de capítulos das prateleiras também ficam mais leves.
+
+Nomes, comandos, papéis e tipo das políticas não mudaram; a regra em si é a mesma, só muda quando é calculada. Nenhum dado foi alterado. Conferido depois: visitante, leitor e administrador continuam vendo as mesmas contagens. Reversão: `ALTER POLICY` voltando às expressões sem `(select ...)` e remoção do registro no histórico.

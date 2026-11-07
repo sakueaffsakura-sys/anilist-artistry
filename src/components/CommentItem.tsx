@@ -52,7 +52,7 @@ export function CommentItem({
   const usernames = [username, comment.parent?.username].filter((n): n is string => Boolean(n));
 
   return (
-    <li className="relative -mx-3 -my-1 scroll-mt-32 rounded-xl p-3">
+    <li className="relative -mx-3 -my-1 scroll-mt-32 rounded-lg p-3">
       <div className="relative z-[1] flex items-start gap-3">
         <Link
           to="/u/$username"

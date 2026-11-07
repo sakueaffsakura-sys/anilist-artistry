@@ -69,15 +69,13 @@ function MediocrePanel() {
   };
 
   return (
-    <AdminShell title="MediocreScan API" subtitle="Painel de obras, atualizações e capítulos" adminOnly>
+    <AdminShell
+      title="MediocreScan"
+      subtitle="Obras, atualizações e capítulos da API, prontos para publicar."
+      adminOnly
+      actions={<Button variant="secondary" size="sm" disabled={q.isFetching || !isAdmin} onClick={() => q.refetch()}><RefreshCw className={`h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />Atualizar</Button>}
+    >
       <div className="space-y-5">
-        <header className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold">MediocreScan API</h1>
-            <p className="text-sm text-muted-foreground">Painel de obras, atualizações e capítulos</p>
-          </div>
-          <Button variant="outline" size="sm" disabled={q.isFetching || !isAdmin} onClick={() => q.refetch()}><RefreshCw className={`mr-1 h-4 w-4 ${q.isFetching ? "animate-spin" : ""}`} />Atualizar</Button>
-        </header>
 
         {isAdmin && <BlockBanner />}
         {isAdmin && <TokenSettings />}
@@ -87,7 +85,7 @@ function MediocrePanel() {
 
         <nav className="flex gap-2 overflow-x-auto pb-1" aria-label="Consultas">
           {TABS.map((t) => (
-            <Button key={t.id} size="sm" variant={tab === t.id ? "default" : "outline"} className="shrink-0" onClick={() => setTab(t.id)} aria-pressed={tab === t.id}>{t.label}</Button>
+            <button key={t.id} type="button" className="chip chip-sm" onClick={() => setTab(t.id)} aria-pressed={tab === t.id}>{t.label}</button>
           ))}
         </nav>
 

@@ -50,9 +50,9 @@ export function StatusButton({ userId, seriesId }: { userId: string; seriesId: s
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="font-semibold">
-          <Icon className="mr-2 h-4 w-4 text-primary" /> {current?.label ?? "Status"}
-          <ChevronDown className="ml-1 h-4 w-4" />
+        <Button variant="secondary" className="h-10">
+          <Icon className="h-4 w-4 text-primary" /> {current?.label ?? "Status de leitura"}
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
@@ -109,8 +109,8 @@ export function AddToListButton({ userId, seriesId }: { userId: string; seriesId
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="font-semibold">
-          <ListPlus className="mr-2 h-4 w-4" /> Adicionar a listas
+        <Button variant="secondary" className="h-10">
+          <ListPlus className="h-4 w-4" /> Adicionar à lista
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56">

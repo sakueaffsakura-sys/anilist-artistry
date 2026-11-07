@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Clock, History, Trash2, X } from "lucide-react";
+import { History, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
-import { Chips, PageTitle } from "@/components/LibraryBits";
+import { PageTitle } from "@/components/LibraryBits";
+import { kindLabel } from "@/lib/work-categories";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useAuth";
@@ -62,8 +63,9 @@ function Historico() {
     });
   }, [history.data]);
 
+  const kinds = useMemo(() => ["Todos", ...new Set(entries.map((e) => kindLabel(e.series.kind)).filter(Boolean))], [entries]);
   const filtered = entries.filter(
-    (e) => (kind === "Todos" || e.series.kind === kind) && (!onlyChapter || e.chapters),
+    (e) => (kind === "Todos" || kindLabel(e.series.kind) === kind) && (!onlyChapter || e.chapters),
   );
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["hist-page"] });
@@ -86,78 +88,63 @@ function Historico() {
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <main className="mx-auto max-w-7xl px-4 py-10">
+      <main className="site-content mx-auto max-w-7xl px-4 py-6 sm:px-6 md:py-8 lg:px-8">
         <PageTitle
-          icon={<History className="h-7 w-7" />}
+          icon={<History />}
           title="Histórico"
-          subtitle="Últimas obras que abriste"
+          subtitle="Obras que você abriu, da mais recente para a mais antiga."
           right={
-            <Button variant="outline" onClick={() => clearAll.mutate()} disabled={entries.length === 0}>
-              <Trash2 className="mr-2 h-4 w-4" /> Limpar histórico
+            <Button variant="secondary" size="sm" onClick={() => clearAll.mutate()} disabled={entries.length === 0 || clearAll.isPending}>
+              <Trash2 className="h-4 w-4" /> Limpar
             </Button>
           }
         />
-        <p className="mb-6 text-sm text-muted-foreground">
-          Clique na capa ou no título para abrir. Passe o rato na capa para remover.
-        </p>
 
-        <div className="rounded-xl border border-border bg-surface p-5">
-          <p className="mb-2 text-xs font-semibold text-muted-foreground">Formato</p>
-          <Chips value={kind === "Todos" ? "Todas" : kind} onChange={(v) => setKind(v === "Todas" ? "Todos" : v)} options={["Todas", "Comic", "Manga", "Manhwa", "Manhua", "Shoujo", "Yaoi", "Yuri", "Novel"]} />
-          <div className="mt-4 flex items-center justify-end gap-2">
-            <button
-              onClick={() => setOnlyChapter(false)}
-              className={`rounded-full border px-3 py-1 text-xs font-semibold ${!onlyChapter ? "border-primary bg-primary/15 text-primary" : "border-border"}`}
-            >
-              Obras todas
-            </button>
-            <button
-              onClick={() => setOnlyChapter(true)}
-              className={`flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold ${onlyChapter ? "border-primary bg-primary/15 text-primary" : "border-border"}`}
-            >
-              <BookOpen className="h-3.5 w-3.5" /> Só com capítulo
-            </button>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="chip-row" role="group" aria-label="Formato">
+            {kinds.map((k) => <button key={k} type="button" className="chip chip-sm" aria-pressed={kind === k} onClick={() => setKind(k)}>{k === "Todos" ? "Todos" : k}</button>)}
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {filtered.length} de {entries.length} entradas
-          </p>
+          <div className="flex gap-1.5">
+            <button type="button" className="chip chip-sm" aria-pressed={!onlyChapter} onClick={() => setOnlyChapter(false)}>Todas</button>
+            <button type="button" className="chip chip-sm" aria-pressed={onlyChapter} onClick={() => setOnlyChapter(true)}>Só com capítulo</button>
+          </div>
         </div>
+        <p className="mt-3 text-[13px] text-muted-foreground">{filtered.length.toLocaleString("pt-BR")} de {entries.length.toLocaleString("pt-BR")} obras</p>
 
-        <div className="mt-6 grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+        <div className="mt-4 grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
           {filtered.map((e) => (
-            <div key={e.series_id} className="group">
-              <div className="relative overflow-hidden rounded-xl border border-border">
-                <Link to="/obra/$slug" params={{ slug: e.series.slug }}>
-                  <img src={coverUrl(e.series.cover_url)} alt={e.series.title} className="aspect-[2/3] w-full object-cover" loading="lazy" />
+            <div key={e.series_id} className="group min-w-0">
+              <div className="relative">
+                <Link to="/obra/$slug" params={{ slug: e.series.slug }} className="series-cover block aspect-[2/3] overflow-hidden rounded-md">
+                  <img src={coverUrl(e.series.cover_url)} alt={e.series.title} className="h-full w-full object-cover" loading="lazy" decoding="async" />
                 </Link>
-                <span className="absolute left-2 top-2 flex items-center gap-1 rounded-md bg-background/85 px-2 py-0.5 text-[11px] font-bold backdrop-blur">
-                  <Clock className="h-3 w-3" /> {timeAgo(e.updated_at)}
-                </span>
+                <span className="cover-badge absolute bottom-1.5 left-1.5">{timeAgo(e.updated_at)}</span>
                 <button
+                  type="button"
                   onClick={() => removeOne.mutate(e.series_id)}
-                  aria-label="Remover do histórico"
-                  className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-background/85 opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive"
+                  aria-label={`Tirar ${e.series.title} do histórico`}
+                  title="Tirar do histórico"
+                  className="absolute right-1.5 top-1.5 grid h-7 w-7 place-items-center rounded-full bg-cover-overlay text-cover-foreground hover:text-destructive md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <Link to="/obra/$slug" params={{ slug: e.series.slug }} className="mt-2 line-clamp-2 block text-sm font-bold hover:text-primary">
-                {e.series.title}
-              </Link>
+              <h3 className="mt-2 line-clamp-2 text-[13px] font-semibold leading-snug sm:text-sm">
+                <Link to="/obra/$slug" params={{ slug: e.series.slug }} className="hover:text-primary">{e.series.title}</Link>
+              </h3>
               {e.chapters ? (
                 <Link
                   to="/obra/$slug/$chapter"
                   params={{ slug: e.series.slug, chapter: formatChapter(e.chapters.number) }}
-                  className="mt-2 flex items-center justify-between rounded-lg bg-surface-2 px-3 py-2 text-xs hover:bg-surface-2/70"
+                  className="card-meta mt-1 font-semibold text-primary hover:underline"
                 >
-                  <span className="font-bold">Cap. {formatChapter(e.chapters.number)}</span>
-                  <span className="text-muted-foreground">{timeAgo(e.updated_at)}</span>
+                  Continuar no cap. {formatChapter(e.chapters.number)}
                 </Link>
               ) : null}
             </div>
           ))}
         </div>
-        {filtered.length === 0 ? (
+        {history.isSuccess && filtered.length === 0 ? (
           <p className="mt-10 text-center text-sm text-muted-foreground">Nenhuma leitura registrada ainda.</p>
         ) : null}
       </main>

@@ -10,7 +10,7 @@ export function TopRated({ rows }: { rows: SeriesRow[] }) {
   return (
     <section aria-label="Muito bem avaliados" className="relative min-w-0 max-w-full py-4 md:py-8">
       <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
           <Star className="h-[18px] w-[18px] fill-primary" />
         </div>
         <h2 className="relative shrink-0 text-lg font-bold md:text-2xl">
@@ -28,7 +28,7 @@ export function TopRated({ rows }: { rows: SeriesRow[] }) {
               key={item.id}
               to="/obra/$slug"
               params={{ slug: item.slug }}
-              className="group relative block h-[min(62vw,340px)] w-[min(72vw,280px)] shrink-0 overflow-hidden rounded-2xl border border-foreground/10 bg-card/50 shadow-[0_12px_40px_rgba(0,0,0,0.45)] transition-transform duration-200 active:scale-[0.98]"
+              className="group relative block h-[min(62vw,340px)] w-[min(72vw,280px)] shrink-0 overflow-hidden rounded-lg border border-foreground/10 bg-card/50 shadow-[0_12px_40px_rgba(0,0,0,0.45)] transition-transform duration-200 active:scale-[0.98]"
             >
               <img
                 alt={item.title}

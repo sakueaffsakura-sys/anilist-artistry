@@ -69,7 +69,7 @@ function SupportAdmin() {
   return (
     <AdminShell title="Suporte" subtitle="Conversas individuais de cada conta" adminOnly>
       <div className="grid gap-4 md:grid-cols-[280px_1fr]">
-        <div className="max-h-[70vh] overflow-y-auto rounded-xl border border-border bg-card">
+        <div className="max-h-[70vh] overflow-y-auto rounded-lg border border-border bg-card">
           {threads.length === 0 && <p className="p-4 text-sm text-muted-foreground">Nenhuma conversa aberta.</p>}
           {threads.map((t) => (
             <button
@@ -88,7 +88,7 @@ function SupportAdmin() {
             </button>
           ))}
         </div>
-        <div className="flex h-[70vh] flex-col overflow-hidden rounded-xl border border-border bg-card">
+        <div className="flex h-[70vh] flex-col overflow-hidden rounded-lg border border-border bg-card">
           {selected ? (
             <>
               <div className="flex items-center justify-between border-b border-border px-4 py-3">

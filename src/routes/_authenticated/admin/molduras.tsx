@@ -84,7 +84,7 @@ function FramesAdmin() {
 
   return (
     <AdminShell adminOnly title="Molduras" subtitle="Disponibilize molduras para os perfis — GIF, APNG e WebP animados continuam animados.">
-      <div className="rounded-2xl border border-border bg-surface p-5">
+      <div className="rounded-lg border border-border bg-surface p-5">
         <div className="grid gap-3 md:grid-cols-[1fr_2fr_auto_auto]">
           <Input placeholder="Nome da moldura" value={name} onChange={(e) => setName(e.target.value)} />
           <Input placeholder="Link da imagem (https://...png / .gif / .webp)" value={url} onChange={(e) => setUrl(e.target.value)} />
@@ -96,7 +96,7 @@ function FramesAdmin() {
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {(frames ?? []).map((f) => (
-          <div key={f.id} className={`rounded-2xl border border-border bg-surface p-4 ${f.active ? "" : "opacity-50"}`}>
+          <div key={f.id} className={`rounded-lg border border-border bg-surface p-4 ${f.active ? "" : "opacity-50"}`}>
             <div className="grid place-items-center py-3"><FramedAvatar frame={f.image_url} size={90} /></div>
             <Input defaultValue={f.name} className="mt-2 h-8 text-xs" onBlur={(e) => e.target.value !== f.name && rename(f.id, e.target.value)} />
             <div className="mt-2 flex gap-2">

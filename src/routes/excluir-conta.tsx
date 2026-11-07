@@ -50,13 +50,13 @@ function ExcluirContaPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
-      <h1 className="font-display text-3xl font-extrabold">Excluir conta</h1>
+      <h1 className="font-display text-3xl font-bold">Excluir conta</h1>
       <p className="mt-2 text-sm text-muted-foreground">
         Esta página explica como apagar definitivamente sua conta do Better Mangá, tanto pelo site
         quanto pelo aplicativo Android.
       </p>
 
-      <section className="mt-8 space-y-3 rounded-2xl border border-border bg-surface p-6 shadow-[var(--shadow-card)]">
+      <section className="mt-8 space-y-3 rounded-lg border border-border bg-surface p-6 shadow-[var(--shadow-card)]">
         <h2 className="font-display text-lg font-bold">O que é apagado</h2>
         <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
           <li>Seu perfil, nome de usuário, avatar e nível;</li>
@@ -71,7 +71,7 @@ function ExcluirContaPage() {
         </p>
       </section>
 
-      <section className="mt-6 space-y-3 rounded-2xl border border-border bg-surface p-6 shadow-[var(--shadow-card)]">
+      <section className="mt-6 space-y-3 rounded-lg border border-border bg-surface p-6 shadow-[var(--shadow-card)]">
         <h2 className="font-display text-lg font-bold">Como excluir</h2>
         <ol className="list-decimal space-y-1.5 pl-5 text-sm text-muted-foreground">
           <li>Entre na sua conta (pelo site ou pelo aplicativo) com o e-mail e senha cadastrados.</li>
@@ -84,7 +84,7 @@ function ExcluirContaPage() {
         </p>
       </section>
 
-      <section className="mt-6 rounded-2xl border border-destructive/40 bg-destructive/5 p-6">
+      <section className="mt-6 rounded-lg border border-destructive/40 bg-destructive/5 p-6">
         <div className="flex items-start gap-3">
           <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
           <div className="min-w-0 flex-1">

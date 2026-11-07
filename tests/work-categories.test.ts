@@ -31,3 +31,17 @@ describe("Work categories", () => {
     expect(suggestWorkKind({ format: "ONE_SHOT" })).toBe("One-shot");
   });
 });
+describe("Work category labels", () => {
+  it("shows legacy names as the main category and English in Portuguese", async () => {
+    const { kindLabel, kindValues, PUBLIC_KINDS, sameKind } = await import("../src/lib/work-categories");
+    expect(kindLabel("Comic2")).toBe("Comic");
+    expect(kindLabel("Shoujo2")).toBe("Shoujo");
+    expect(kindLabel("English")).toBe("Em inglês");
+    expect(kindLabel("Manhwa")).toBe("Manhwa");
+    expect(PUBLIC_KINDS).not.toContain("Comic2");
+    expect(PUBLIC_KINDS).not.toContain("Shoujo2");
+    expect(kindValues("Comic")).toEqual(["Comic", "Comic2"]);
+    expect(kindValues("Manga")).toEqual(["Manga"]);
+    expect(sameKind("Shoujo2", "Shoujo")).toBe(true);
+  });
+});

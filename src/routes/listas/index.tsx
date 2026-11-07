@@ -115,17 +115,17 @@ function ListasPage() {
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <main className="mx-auto max-w-7xl px-4 py-10">
+      <main className="site-content mx-auto max-w-7xl px-4 py-6 sm:px-6 md:py-8 lg:px-8">
         <PageTitle
-          icon={<ListOrdered className="h-7 w-7" />}
+          icon={<ListOrdered />}
           title="Listas"
           subtitle="Organize obras e descubra listas da comunidade"
           right={
             user ? (
               <Dialog open={open} onOpenChange={setOpen}>
                 <DialogTrigger asChild>
-                  <Button className="font-semibold">
-                    <Plus className="mr-2 h-4 w-4" /> Nova lista
+                  <Button size="sm">
+                    <Plus className="h-4 w-4" /> Nova lista
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
@@ -143,36 +143,35 @@ function ListasPage() {
           }
         />
 
-        <div className="flex flex-wrap gap-2">
-          <TabButton active={tab === "publicas"} onClick={() => setTab("publicas")} icon={<Globe className="h-4 w-4" />} label="Públicas" />
-          <TabButton active={tab === "minhas"} onClick={() => setTab("minhas")} icon={<ListOrdered className="h-4 w-4" />} label="Minhas" />
-          <TabButton active={tab === "seguidas"} onClick={() => setTab("seguidas")} icon={<Bookmark className="h-4 w-4" />} label="Seguidas" />
+        <div className="chip-row" role="tablist" aria-label="Quais listas">
+          <TabButton active={tab === "publicas"} onClick={() => setTab("publicas")} icon={<Globe />} label="Públicas" />
+          <TabButton active={tab === "minhas"} onClick={() => setTab("minhas")} icon={<ListOrdered />} label="Minhas" />
+          <TabButton active={tab === "seguidas"} onClick={() => setTab("seguidas")} icon={<Bookmark />} label="Seguidas" />
         </div>
 
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="relative flex-1">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 flex-1 basis-56">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={nick}
               onChange={(e) => setNick(e.target.value)}
-              placeholder="Filtrar pelo @nick do criador..."
-              className="h-11 bg-surface pl-9"
+              placeholder="Filtrar pelo @nick de quem criou…"
+              aria-label="Filtrar pelo criador"
+              className="h-9 pl-9"
             />
           </div>
-          <label className="text-xs text-muted-foreground">
-            Ordenar por
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-              className="mt-1 block h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-foreground sm:w-52"
-            >
-              <option value="recent">Recentes</option>
-              <option value="size">Mais obras</option>
-            </select>
-          </label>
+          <select
+            aria-label="Ordenar listas"
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            className="h-9 rounded-md border border-border bg-surface-2 px-3 text-[13px] text-foreground"
+          >
+            <option value="recent">Mais recentes</option>
+            <option value="size">Mais obras</option>
+          </select>
         </div>
-        <p className="mt-4 text-sm text-muted-foreground">
-          {tab === "publicas" ? "Explora listas públicas da comunidade." : tab === "minhas" ? "Suas listas." : "Listas que você segue."}
+        <p className="mt-3 text-[13px] text-muted-foreground">
+          {tab === "publicas" ? "Listas públicas da comunidade." : tab === "minhas" ? "As listas que você criou." : "Listas que você segue."}
         </p>
 
         {needsLogin ? (
@@ -180,37 +179,33 @@ function ListasPage() {
             <Link to="/auth" className="text-primary">Entre</Link> para ver suas listas.
           </p>
         ) : (
-          <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {shown.map((l) => {
-              const covers = l.list_items.map((i) => i.series?.cover_url ?? null);
-              const extra = covers.length - 4;
+              const covers = l.list_items.map((i) => i.series?.cover_url ?? null).filter(Boolean).slice(0, 3);
               return (
                 <Link
                   key={l.id}
                   to="/listas/$id"
                   params={{ id: l.id }}
-                  className="overflow-hidden rounded-xl border border-border bg-surface transition-colors hover:border-primary/60"
+                  className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3 hover:border-primary/50"
                 >
-                  <div className="grid aspect-[3/4] grid-cols-2 grid-rows-2 gap-px bg-border">
-                    {[0, 1, 2, 3].map((i) => (
-                      <div key={i} className="relative bg-surface-2">
-                        {covers[i] ? (
-                          <img src={coverUrl(covers[i])} alt="" className="h-full w-full object-cover" loading="lazy" />
-                        ) : null}
-                        {i === 3 && extra > 0 ? (
-                          <span className="absolute inset-0 grid place-items-center bg-background/60 text-lg font-bold">
-                            +{extra}
-                          </span>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="p-3">
-                    <p className="truncate font-bold">{l.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      @{l.author} · {l.list_items.length} obras
-                    </p>
-                  </div>
+                  <span className="relative block h-[84px] w-[96px] shrink-0" aria-hidden="true">
+                    {covers.length ? covers.map((cover, i) => (
+                      <img
+                        key={i}
+                        src={coverUrl(cover)}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="absolute top-0 h-[84px] w-[56px] rounded-md border-2 border-surface object-cover"
+                        style={{ left: i * 20, zIndex: 3 - i }}
+                      />
+                    )) : <span className="grid h-[84px] w-[56px] place-items-center rounded-md bg-surface-2 text-muted-foreground"><ListOrdered className="h-5 w-5" /></span>}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="line-clamp-2 font-semibold leading-snug">{l.title}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">@{l.author} · {l.list_items.length.toLocaleString("pt-BR")} {l.list_items.length === 1 ? "obra" : "obras"}</span>
+                  </span>
                 </Link>
               );
             })}

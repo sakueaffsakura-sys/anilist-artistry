@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Heart, Library, Play, Search, ArrowUpRight, Users } from "lucide-react";
+import { Heart, Library, Play, Search, Users } from "lucide-react";
 import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
-import { Chips, CollectionCard, PageTitle, STATUSES, TabButton } from "@/components/LibraryBits";
+import { kindLabel, sameKind } from "@/lib/work-categories";
+import { CollectionCard, FORMATS, PageTitle, STATUSES, TabButton } from "@/components/LibraryBits";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useAuth";
 import { Pager } from "@/components/Pager";
@@ -132,7 +133,7 @@ function Colecao() {
 
   const filtered = items
     .filter((i) => i.series.title.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
-    .filter((i) => kind === "Todos" || i.series.kind === kind)
+    .filter((i) => kind === "Todos" || sameKind(i.series.kind, kind))
     .sort((a, b) =>
       sort === "rating"
         ? Number(b.series.rating) - Number(a.series.rating)
@@ -165,41 +166,49 @@ function Colecao() {
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <main className="site-content collection-layout mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="border-b border-border pb-6 mb-6"><PageTitle icon={<Library className="h-7 w-7" />} title="Minha Coleção" subtitle={profile.name} right={<Button asChild variant="outline" size="sm"><Link to="/perfis"><Users className="h-4 w-4" /> Perfis</Link></Button>} />
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-3"><div><p className="font-display text-2xl font-bold">{favorites.data?.length ?? "—"}</p><p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground"><Heart className="h-3.5 w-3.5 text-favorite" /> Favoritos</p></div><div><p className="font-display text-2xl font-bold">{continuing.length}</p><p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground"><Play className="h-3.5 w-3.5 text-primary" /> Continuar lendo</p></div><div className="hidden sm:flex sm:items-center sm:justify-end"><Button asChild variant="ghost"><Link to="/catalogo">Explorar obras <ArrowUpRight className="h-4 w-4" /></Link></Button></div></div>
-        </div>
+      <main className="site-content collection-layout mx-auto max-w-7xl px-4 py-6 sm:px-6 md:py-8 lg:px-8">
+        <PageTitle
+          icon={<Library />}
+          title="Biblioteca"
+          subtitle={`Perfil ${profile.name} · ${(favorites.data?.length ?? 0).toLocaleString("pt-BR")} favoritos · ${continuing.length.toLocaleString("pt-BR")} em leitura`}
+          right={<Button asChild variant="secondary" size="sm"><Link to="/perfis"><Users className="h-4 w-4" /> Trocar perfil</Link></Button>}
+        />
 
-        <div className="flex flex-wrap gap-2">
-          <TabButton active={tab === "favoritos"} onClick={() => { setPage(1); setTab("favoritos"); }} icon={<Heart className="h-4 w-4" />} label="Favoritos" count={favorites.data?.length} />
-          <TabButton active={tab === "continuando"} onClick={() => { setPage(1); setTab("continuando"); }} icon={<Play className="h-4 w-4" />} label="Continuar lendo" count={continuing.length} />
+        <div className="chip-row" role="tablist" aria-label="Seções da biblioteca">
+          <TabButton active={tab === "favoritos"} onClick={() => { setPage(1); setTab("favoritos"); }} icon={<Heart />} label="Favoritos" count={favorites.data?.length} />
+          <TabButton active={tab === "continuando"} onClick={() => { setPage(1); setTab("continuando"); }} icon={<Play />} label="Continuar lendo" count={continuing.length} />
           {STATUSES.map((s) => (
-            <TabButton key={s.key} active={tab === s.key} onClick={() => { setPage(1); setTab(s.key); }} icon={<s.icon className="h-4 w-4" />} label={s.label} count={countFor(s.key)} />
+            <TabButton key={s.key} active={tab === s.key} onClick={() => { setPage(1); setTab(s.key); }} icon={<s.icon />} label={s.label} count={countFor(s.key)} />
           ))}
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <div className="relative min-w-0 basis-full sm:basis-auto sm:flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Buscar na coleção" placeholder="Buscar na coleção…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="bg-surface pl-9" /></div>
-          <p className="text-sm text-muted-foreground">{filtered.length} obras</p>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 flex-1 basis-56">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input aria-label="Buscar na biblioteca" placeholder="Buscar na biblioteca…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="h-9 pl-9" />
+          </div>
           <select
-            aria-label="Ordenar coleção"
+            aria-label="Ordenar biblioteca"
             value={sort}
             onChange={(e) => { setSort(e.target.value); setPage(1); }}
-            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+            className="h-9 rounded-md border border-border bg-surface-2 px-3 text-[13px]"
           >
             <option value="recent">Mais recentes</option>
             <option value="rating">Melhor avaliadas</option>
-            <option value="title">Título (A-Z)</option>
+            <option value="title">A–Z</option>
           </select>
         </div>
 
-        <div className="mt-4 border-b border-border pb-5">
-          <Chips value={kind} onChange={(v) => { setKind(v); setPage(1); }} />
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <div className="chip-row min-w-0 flex-1" role="group" aria-label="Formato">
+            {FORMATS.map((k) => <button key={k} type="button" className="chip chip-sm" aria-pressed={kind === k} onClick={() => { setKind(k); setPage(1); }}>{k === "Todos" ? "Todos" : kindLabel(k)}</button>)}
+          </div>
         </div>
+        <p className="mt-3 text-[13px] text-muted-foreground">{filtered.length.toLocaleString("pt-BR")} {filtered.length === 1 ? "obra" : "obras"}</p>
 
         {(tab === "favoritos" ? favorites : tab === "continuando" ? history : statuses).isPending ? <p role="status" className="py-8 text-muted-foreground">Carregando coleção…</p> : null}
-        {(tab === "favoritos" ? favorites : tab === "continuando" ? history : statuses).isError ? <div role="alert" className="py-8"><p className="mb-3 text-muted-foreground">Não foi possível carregar a coleção.</p><Button variant="outline" onClick={() => void (tab === "favoritos" ? favorites : tab === "continuando" ? history : statuses).refetch()}>Tentar novamente</Button></div> : null}
-        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+        {(tab === "favoritos" ? favorites : tab === "continuando" ? history : statuses).isError ? <div role="alert" className="py-8"><p className="mb-3 text-muted-foreground">Não foi possível carregar a coleção.</p><Button variant="secondary" onClick={() => void (tab === "favoritos" ? favorites : tab === "continuando" ? history : statuses).refetch()}>Tentar novamente</Button></div> : null}
+        <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
           {filtered.slice((page - 1) * 24, page * 24).map((i) => (
             <CollectionCard
               key={i.series.id}

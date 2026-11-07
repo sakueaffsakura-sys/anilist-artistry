@@ -120,8 +120,8 @@ function AuthPage() {
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-background" />
         <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-background/40" />
         <div className="absolute bottom-12 left-12 max-w-xl">
-          <img src="https://cdn.mediocrescan.com/usuarios/156358/056c603c2288529c82b19ad4906b02c7f5a67be8.webp" alt="" className="mb-5 h-14 w-auto rounded-2xl object-contain" />
-          <p className="font-display text-5xl font-extrabold leading-[1.05] tracking-tight">Milhares de capítulos traduzidos, todo dia.</p>
+          <img src="https://cdn.mediocrescan.com/usuarios/156358/056c603c2288529c82b19ad4906b02c7f5a67be8.webp" alt="" className="mb-5 h-14 w-auto rounded-lg object-contain" />
+          <p className="font-display text-5xl font-bold leading-[1.05] tracking-tight">Milhares de capítulos traduzidos, todo dia.</p>
           <p className="mt-4 text-muted-foreground">Comic, mangá, manhwa e novel em português.</p>
         </div>
       </aside>
@@ -140,7 +140,7 @@ function AuthPage() {
             ))}
           </div>
 
-          <h1 className="mt-8 font-display text-3xl font-extrabold">{mode === "in" ? "Bem-vindo de volta" : "Crie sua conta"}</h1>
+          <h1 className="mt-8 font-display text-3xl font-bold">{mode === "in" ? "Bem-vindo de volta" : "Crie sua conta"}</h1>
           <p className="mt-2 text-sm text-muted-foreground">{mode === "in" ? "Entre para continuar de onde parou." : "Favorite obras, salve seu progresso e comente."}</p>
 
           <Button type="button" variant="secondary" onClick={google} className="mt-6 h-12 w-full rounded-full font-semibold">
@@ -153,7 +153,7 @@ function AuthPage() {
           </div>
 
           {sent ? (
-            <p className="rounded-2xl border border-border bg-surface p-4 text-sm">
+            <p className="rounded-lg border border-border bg-surface p-4 text-sm">
               Enviamos um e-mail de confirmação para <strong>{email}</strong>. Clique no link para ativar sua conta.
             </p>
           ) : (

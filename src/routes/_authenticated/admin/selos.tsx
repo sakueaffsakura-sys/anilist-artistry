@@ -99,7 +99,7 @@ function BadgesAdmin() {
 
   return (
     <AdminShell title="Selos de evento" subtitle="Crie selos, abra/encerre eventos e entregue selos a usuários." adminOnly>
-      <div className="mb-6 grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-2">
+      <div className="mb-6 grid gap-3 rounded-lg border border-border bg-card p-4 md:grid-cols-2">
         <label className="text-sm">Nome<Input placeholder="ex: NATAL 2026" value={name} onChange={(e) => setName(e.target.value)} /></label>
         <label className="text-sm">Descrição (opcional)<Input value={desc} onChange={(e) => setDesc(e.target.value)} /></label>
         <label className="text-sm">Imagem do selo (link)<Input placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} /></label>
@@ -113,7 +113,7 @@ function BadgesAdmin() {
       </div>
       <div className="grid gap-3">
         {(events ?? []).map((ev) => (
-          <div key={ev.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3">
+          <div key={ev.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3">
             <img src={ev.image_url} alt={ev.name} className="h-12 w-12 object-contain" />
             <div className="min-w-40 flex-1">
               <p className="font-semibold">{ev.name}</p>

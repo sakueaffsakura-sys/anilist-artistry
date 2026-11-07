@@ -5,7 +5,7 @@ name: Telas do site
 on:
   push:
     branches: ["site-*"]
-    paths: ["src/**", "public/**", ".github/telas/**", ".github/workflows/site-telas.yml", "package.json", "bun.lock"]
+    paths: ["src/**", "public/**", "tests/**", ".github/telas/**", ".github/workflows/site-telas.yml", "package.json", "bun.lock"]
   workflow_dispatch:
     inputs:
       obra:
@@ -44,6 +44,12 @@ jobs:
           mkdir -p telas
           bunx tsc --noEmit -p tsconfig.json > telas/tipos.txt 2>&1 && echo "Sem erros de tipo." >> telas/tipos.txt || true
           tail -n 40 telas/tipos.txt
+      - name: Testes (não bloqueia)
+        continue-on-error: true
+        run: |
+          mkdir -p telas
+          bun test > telas/testes.txt 2>&1 || true
+          tail -n 25 telas/testes.txt
       - name: Abrir o site
         run: |
           # O servidor lê as variáveis públicas do banco em tempo de execução (as mesmas do .env).

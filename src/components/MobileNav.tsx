@@ -2,7 +2,11 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen,
+  BookPlus,
+  History,
   House,
+  ListOrdered,
+  Users,
   LogOut,
   Menu as MenuIcon,
   Search,
@@ -26,10 +30,10 @@ import {
 
 const ITEMS = [
   { to: "/", label: "Início", icon: House, exact: true },
-  { to: "/catalogo", label: "Pesquisar", icon: Search, exact: false },
-  { to: "/biblioteca", label: "Coleção", icon: BookOpen, exact: false },
+  { to: "/catalogo", label: "Buscar", icon: Search, exact: false },
+  { to: "/biblioteca", label: "Biblioteca", icon: BookOpen, exact: false },
+  { to: "/ranking", label: "Ranking", icon: Trophy, exact: true },
   { to: "/reels", label: "Reels", icon: Clapperboard, exact: false },
-  { to: "/ranking", label: "Obras", icon: Trophy, exact: true },
 ] as const;
 
 export function MobileNav() {
@@ -50,9 +54,9 @@ export function MobileNav() {
   return (
     <nav
       aria-label="Navegação do celular"
-      className="mobile-site-nav fixed inset-x-0 bottom-0 z-[100] border-t border-border/70 bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
+      className="mobile-site-nav fixed inset-x-0 bottom-0 z-[100] border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden"
     >
-      <div className="flex h-16 w-full items-stretch overflow-hidden px-1">
+      <div className="flex h-14 w-full items-stretch overflow-hidden px-1">
         <div className="flex w-full items-stretch gap-1">
           {ITEMS.map((item) => {
             const active = item.exact
@@ -64,33 +68,13 @@ export function MobileNav() {
                 key={item.to}
                 to={item.to}
                 activeOptions={{ exact: item.exact }}
-                className={cn("relative my-1 flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-md transition-colors", active && "bg-primary/10")}
+                className="relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5"
                 aria-current={active ? "page" : undefined}
               >
-                <Icon
-                  className={
-                    "h-[18px] w-[18px] transition-all duration-300 " +
-                    (active
-                      ? "scale-110 text-primary drop-shadow-[0_0_8px_color-mix(in_oklab,var(--primary)_70%,transparent)]"
-                      : "text-muted-foreground")
-                  }
-                />
-                <span
-                  className={
-                    "text-[9px] font-extrabold  transition-colors duration-200 " +
-                    (active ? "text-foreground" : "text-muted-foreground")
-                  }
-                >
+                <Icon className={cn("h-5 w-5", active ? "text-primary" : "text-muted-foreground")} />
+                <span className={cn("text-[11px] font-semibold", active ? "text-foreground" : "text-muted-foreground")}>
                   {item.label}
                 </span>
-                <span
-                  className={
-                    "absolute bottom-0 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full transition-opacity " +
-                    (active
-                      ? "bg-primary opacity-100 shadow-[0_0_8px_color-mix(in_oklab,var(--primary)_90%,transparent)]"
-                      : "opacity-0")
-                  }
-                />
               </Link>
             );
           })}
@@ -100,19 +84,29 @@ export function MobileNav() {
               <Button
                 variant="ghost"
                 type="button"
-                className="my-1 h-auto min-w-0 flex-1 flex-col gap-1 px-0"
+                className="h-auto min-w-0 flex-1 flex-col gap-0.5 rounded-none px-0 hover:bg-transparent"
                 aria-label="Menu"
               >
-                <MenuIcon className="h-[18px] w-[18px] text-muted-foreground transition-all duration-300" />
-                <span className="text-[9px] font-extrabold  text-muted-foreground transition-colors duration-200">
+                <MenuIcon className="h-5 w-5 text-muted-foreground" />
+                <span className="text-[11px] font-semibold text-muted-foreground">
                   Menu
                 </span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="end" className="w-48">
+            <DropdownMenuContent side="top" align="end" className="w-52">
+              <DropdownMenuItem asChild>
+                <Link to="/listas" className="flex items-center gap-2">
+                  <ListOrdered className="h-4 w-4" /> Listas
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link to="/ranking-leitores" className="flex items-center gap-2">
-                  <Trophy className="h-4 w-4" /> Ranking de leitores
+                  <Users className="h-4 w-4" /> Ranking de leitores
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/pedidos" className="flex items-center gap-2">
+                  <BookPlus className="h-4 w-4" /> Pedir uma obra
                 </Link>
               </DropdownMenuItem>
               {user ? (
@@ -128,7 +122,7 @@ export function MobileNav() {
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link to="/historico" className="flex items-center gap-2">
-                      <House className="h-4 w-4" /> Histórico
+                      <History className="h-4 w-4" /> Histórico
                     </Link>
                   </DropdownMenuItem>
                   {isStaff ? (

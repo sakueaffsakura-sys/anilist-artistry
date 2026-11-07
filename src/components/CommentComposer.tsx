@@ -100,7 +100,7 @@ export function CommentComposer({ pending, onSubmit, replyTo, onCancelReply }: C
   }, [replyTo]);
 
   return (
-    <div className="rounded-xl border-2 border-dashed border-border bg-surface/60 p-4 transition-colors focus-within:border-primary/40">
+    <div className="rounded-lg border-2 border-dashed border-border bg-surface/60 p-4 transition-colors focus-within:border-primary/40">
       {replyTo ? (
         <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
           Respondendo a @{replyTo}
@@ -194,7 +194,7 @@ export function CommentComposer({ pending, onSubmit, replyTo, onCancelReply }: C
         </button>
 
         {showEmojis ? (
-          <div className="absolute left-0 top-full z-20 mt-2 grid w-64 grid-cols-8 gap-1 rounded-xl border border-border bg-popover p-2 shadow-xl">
+          <div className="absolute left-0 top-full z-20 mt-2 grid w-64 grid-cols-8 gap-1 rounded-lg border border-border bg-popover p-2 shadow-xl">
             {EMOJIS.map((emoji) => (
               <button
                 key={emoji}

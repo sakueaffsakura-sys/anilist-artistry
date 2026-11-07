@@ -152,7 +152,7 @@ function ReelsPage() {
           <Button size="sm" className="pointer-events-auto shrink-0 rounded-full" onClick={() => setComposer(true)}><Plus className="h-4 w-4" /> Publicar</Button>
         </div>
         {composer ? <div className="absolute inset-x-3 top-16 z-30"><Composer userId={user!.id} onClose={() => setComposer(false)} onDone={() => { setComposer(false); setView("mine"); refresh(); }} /></div> : null}
-        <div className="h-full snap-y snap-mandatory overflow-y-auto overscroll-contain [scrollbar-width:none] lg:rounded-2xl lg:border lg:border-border">
+        <div className="h-full snap-y snap-mandatory overflow-y-auto overscroll-contain [scrollbar-width:none] lg:rounded-lg lg:border lg:border-border">
           {reels.isLoading ? <div className="flex h-full items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div> : null}
           {reels.isError ? <p className="flex h-full items-center justify-center text-muted-foreground">Não foi possível carregar os vídeos.</p> : null}
           {reels.data?.length === 0 ? (
@@ -258,7 +258,7 @@ function Composer({ userId, onClose, onDone }: { userId: string; onClose: () => 
     toast.success("Vídeo publicado!"); onDone();
   }
   return (
-    <section className="mb-4 space-y-3 rounded-xl border border-border bg-surface p-4">
+    <section className="mb-4 space-y-3 rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between"><h2 className="font-bold">Novo reel</h2><Button size="icon" variant="ghost" aria-label="Fechar" onClick={onClose}><X /></Button></div>
       <input type="file" accept="video/mp4,video/webm" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full text-sm" />
       <Textarea value={caption} maxLength={500} onChange={(e) => setCaption(e.target.value)} placeholder="Legenda (opcional)" />
