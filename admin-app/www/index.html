@@ -15,28 +15,24 @@
         <span class="brand-mark" aria-hidden="true">BM</span>
         <div>
           <h1>Estúdio</h1>
-          <p>Publique obras da MediocreScan no Better Mangá pelo seu celular.</p>
+          <p>Leia e publique obras da MediocreScan no Better Mangá pelo seu celular.</p>
         </div>
       </div>
-
       <div class="segmented" role="tablist" aria-label="Forma de entrar">
         <button type="button" role="tab" id="tab-email" aria-selected="true">E-mail e senha</button>
         <button type="button" role="tab" id="tab-code" aria-selected="false">Código do painel</button>
       </div>
-
       <form id="form-email" class="stack">
         <label>E-mail<input id="email" type="email" autocomplete="username" required /></label>
         <label>Senha<input id="password" type="password" autocomplete="current-password" required /></label>
         <p class="hint">Use a mesma conta de administrador do site.</p>
         <button class="btn primary" type="submit">Entrar</button>
       </form>
-
       <form id="form-code" class="stack" hidden>
         <label>Código de envio<input id="code" autocomplete="off" spellcheck="false" required /></label>
         <p class="hint">Se você entra no site com o Google, gere um código no painel em admin/mediocre → "Gerar código da automação" e cole aqui.</p>
         <button class="btn primary" type="submit">Entrar com código</button>
       </form>
-
       <details class="more">
         <summary>Endereço do site</summary>
         <input id="site-url" inputmode="url" spellcheck="false" />
@@ -45,16 +41,25 @@
     </div>
   </section>
 
-  <!-- Principal -->
-  <section id="main" class="screen" hidden>
+  <!-- App -->
+  <section id="main" class="screen app" hidden>
     <header class="topbar">
-      <div class="topbar-title">
-        <span class="brand-mark small" aria-hidden="true">BM</span>
-        <div><strong>Estúdio</strong><span id="who"></span></div>
-      </div>
-      <button type="button" class="icon-btn" id="open-settings" aria-label="Configurações">
-        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Zm7.4-2.5.1-1-.1-1 2.1-1.6-2-3.5-2.5 1a7 7 0 0 0-1.7-1L15 2.5h-4l-.4 2.4a7 7 0 0 0-1.7 1l-2.5-1-2 3.5L6.5 10l-.1 1 .1 1-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.4h4l.4-2.4c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5-2.1-1.6Z"/></svg>
+      <button type="button" class="icon-btn" id="back" aria-label="Voltar" hidden>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>
       </button>
+      <div class="topbar-title">
+        <span class="brand-mark small" id="brand" aria-hidden="true">BM</span>
+        <div class="min0"><strong id="page-title">Estúdio</strong><span id="who"></span></div>
+      </div>
+      <div class="topbar-actions">
+        <button type="button" class="icon-btn" id="open-queue" aria-label="Fila do site">
+          <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path fill="currentColor" d="M4 6h12v2H4zm0 5h12v2H4zm0 5h8v2H4zm14-2v-4h2v4h3l-4 4-4-4z"/></svg>
+          <span class="dot" id="queue-dot" hidden></span>
+        </button>
+        <button type="button" class="icon-btn" id="open-settings" aria-label="Configurações">
+          <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Zm7.4-2.5.1-1-.1-1 2.1-1.6-2-3.5-2.5 1a7 7 0 0 0-1.7-1L15 2.5h-4l-.4 2.4a7 7 0 0 0-1.7 1l-2.5-1-2 3.5L6.5 10l-.1 1 .1 1-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.4h4l.4-2.4c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5-2.1-1.6Z"/></svg>
+        </button>
+      </div>
     </header>
 
     <div id="token-card" class="card warn" hidden>
@@ -65,31 +70,76 @@
       </form>
     </div>
 
-    <nav class="tabs" role="tablist" aria-label="Obras">
-      <button type="button" role="tab" data-tab="novas" aria-selected="true">Novas</button>
-      <button type="button" role="tab" data-tab="atualizadas" aria-selected="false">Atualizadas</button>
-      <button type="button" role="tab" data-tab="buscar" aria-selected="false">Buscar</button>
-      <button type="button" role="tab" data-tab="fila" aria-selected="false">Fila do site</button>
-    </nav>
+    <!-- Listas -->
+    <div id="view-list" class="view">
+      <div id="chips" class="chips" role="tablist" hidden></div>
+      <form id="form-search" class="row search" hidden>
+        <input id="search" type="search" placeholder="Nome ou ID da obra" enterkeyhint="search" />
+        <button class="btn" type="submit">Buscar</button>
+      </form>
+      <div id="list-meta" class="list-meta"></div>
+      <div id="grid" class="grid"></div>
+      <div id="groups"></div>
+      <p id="list-empty" class="empty" hidden></p>
+      <button id="more" type="button" class="btn ghost wide" hidden>Carregar mais</button>
+    </div>
 
-    <form id="form-search" class="row search" hidden>
-      <input id="search" type="search" placeholder="Nome da obra" enterkeyhint="search" />
-      <button class="btn" type="submit">Buscar</button>
-    </form>
+    <!-- Obra -->
+    <article id="view-work" class="view" hidden>
+      <div class="work-hero">
+        <div class="work-banner" id="w-banner"></div>
+        <div class="work-head">
+          <img id="w-cover" class="work-cover" alt="" />
+          <div class="min0">
+            <div id="w-badges" class="badges"></div>
+            <h1 id="w-title"></h1>
+            <p id="w-alt" class="muted small clamp2"></p>
+            <p id="w-meta" class="muted small"></p>
+          </div>
+        </div>
+      </div>
+      <div class="work-actions">
+        <button id="w-publish" type="button" class="btn primary">Publicar no site</button>
+        <button id="w-json" type="button" class="btn ghost">JSON</button>
+      </div>
+      <p id="w-site" class="site-status"></p>
+      <div id="w-tags" class="tags"></div>
+      <p id="w-desc" class="synopsis clamp4"></p>
+      <button id="w-desc-more" type="button" class="link" hidden>Ver mais</button>
+      <div class="section-head">
+        <h2 class="caption">Capítulos</h2>
+        <button id="w-order" type="button" class="btn ghost small">Mais recentes primeiro</button>
+      </div>
+      <ul id="w-chapters" class="chapters"></ul>
+      <p id="w-empty" class="empty" hidden>Nenhum capítulo encontrado.</p>
+    </article>
 
-    <div id="list-meta" class="list-meta"></div>
-    <ul id="list" class="works"></ul>
-    <p id="list-empty" class="empty" hidden></p>
-    <button id="more" type="button" class="btn ghost wide" hidden>Carregar mais</button>
+    <!-- Leitor -->
+    <article id="view-reader" class="view reader" hidden>
+      <div class="reader-tools">
+        <span id="r-info" class="muted small"></span>
+        <div class="row">
+          <button id="r-font-minus" type="button" class="btn ghost small" aria-label="Diminuir texto" hidden>A−</button>
+          <button id="r-font-plus" type="button" class="btn ghost small" aria-label="Aumentar texto" hidden>A+</button>
+          <button id="r-json" type="button" class="btn ghost small">JSON</button>
+        </div>
+      </div>
+      <div id="r-blocks" class="blocks"></div>
+      <p id="r-empty" class="empty" hidden></p>
+      <div class="reader-nav">
+        <button id="r-prev" type="button" class="btn">Anterior</button>
+        <button id="r-next" type="button" class="btn primary">Próximo</button>
+      </div>
+    </article>
 
     <!-- Painel de envio -->
     <section id="sender" class="sender" aria-live="polite">
-      <div class="sender-idle" id="sender-idle">
-        <button id="send-all" type="button" class="btn primary wide">Enviar não enviadas</button>
+      <div id="sender-idle">
+        <button id="send-all" type="button" class="btn primary wide" hidden>Enviar não enviadas</button>
       </div>
-      <div class="sender-run" id="sender-run" hidden>
+      <div id="sender-run" hidden>
         <div class="sender-head">
-          <div class="sender-title">
+          <div class="sender-title min0">
             <strong id="run-work">Preparando…</strong>
             <span id="run-queue"></span>
           </div>
@@ -100,7 +150,32 @@
         <details class="log"><summary>Histórico</summary><ol id="log"></ol></details>
       </div>
     </section>
+
+    <nav class="bottom-nav" aria-label="Seções">
+      <button type="button" data-tab="inicio" aria-current="page">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3 2 11h3v9h6v-6h2v6h6v-9h3z"/></svg>Início</button>
+      <button type="button" data-tab="recentes">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 10.4 3.5 2.1-1 1.7-4.5-2.7V6h2z"/></svg>Recentes</button>
+      <button type="button" data-tab="novas">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z"/></svg>Novas</button>
+      <button type="button" data-tab="paravoce">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="m12 21-1.4-1.3C5.4 15 2 12 2 8.4 2 5.4 4.4 3 7.4 3c1.7 0 3.4.8 4.6 2.1A6.1 6.1 0 0 1 16.6 3C19.6 3 22 5.4 22 8.4c0 3.6-3.4 6.6-8.6 11.3z"/></svg>Para você</button>
+      <button type="button" data-tab="buscar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9.5 3a6.5 6.5 0 0 1 5.2 10.4l5.4 5.4-1.4 1.4-5.4-5.4A6.5 6.5 0 1 1 9.5 3Zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Z"/></svg>Buscar</button>
+    </nav>
   </section>
+
+  <!-- JSON -->
+  <dialog id="json-dialog" class="sheet">
+    <div class="sheet-head">
+      <h2 id="json-title">JSON</h2>
+      <div class="row">
+        <button type="button" class="btn ghost small" id="json-copy">Copiar</button>
+        <button type="button" class="btn small" id="json-close">Fechar</button>
+      </div>
+    </div>
+    <pre id="json-body" class="json"></pre>
+  </dialog>
 
   <!-- Configurações -->
   <dialog id="settings">
@@ -112,13 +187,14 @@
       <p id="account" class="hint"></p>
       <div class="row end">
         <button type="button" class="btn ghost" id="logout">Sair da conta</button>
-        <button type="submit" class="btn primary" id="save-settings">Salvar</button>
+        <button type="submit" class="btn primary">Salvar</button>
       </div>
     </form>
   </dialog>
 
   <div id="toast" class="toast" role="status" hidden></div>
 
+  <script src="parse.js"></script>
   <script src="engine.js"></script>
   <script src="app.js"></script>
 </body>

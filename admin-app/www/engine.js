@@ -64,12 +64,15 @@
       emit({ type: "resume" });
     }
 
-    async function mediocre(kind, path) {
+    /** patient=true (envio): espera 1 min quando a API trava. false (navegação): avisa e não trava a tela. */
+    async function mediocre(kind, path, patient) {
+      if (patient === undefined) patient = true;
       const token = (deps.mediocreToken() || "").trim().replace(/^Bearer\s+/i, "");
       if (!token && kind === "api") throw new Fatal("Cole sua chave da MediocreScan nas configurações.");
       for (;;) {
         checkStop();
-        const gap = lastCall + PACE.gapMs - deps.now();
+        // Intervalo calmo no envio (ou com envio rodando); navegação só evita toques duplos.
+        const gap = lastCall + (patient || running ? PACE.gapMs : 250) - deps.now();
         if (gap > 0) await wait(gap);
         lastCall = deps.now();
         let r;
@@ -83,10 +86,11 @@
         }
         if (kind === "api" && r.status >= 520 && r.status <= 530 && apiIdx < API_HOSTS.length - 1) { apiIdx++; continue; }
         if (r.status === 401) throw new Fatal("A MediocreScan recusou sua chave (401). Cole uma chave nova nas configurações.");
-        if (r.status === 429) { await lockPause("pedidos demais"); continue; }
-        if (r.status === 403) {
-          const body = String(await r.text().catch(() => "")).slice(0, 300);
-          await lockPause(/ip\s+bloquead/i.test(body) ? "IP bloqueado" : "acesso recusado");
+        if (r.status === 429 || r.status === 403) {
+          const body = r.status === 403 ? String(await r.text().catch(() => "")).slice(0, 300) : "";
+          const reason = r.status === 429 ? "pedidos demais" : /ip\s+bloquead/i.test(body) ? "IP bloqueado" : "acesso recusado";
+          if (!patient) throw new Error(`A MediocreScan pediu uma pausa (${reason}). Tente de novo em 1 minuto.`);
+          await lockPause(reason);
           continue;
         }
         locksInRow = 0;
@@ -131,16 +135,55 @@
       return j;
     }
 
-    /** Lista da API ("novas" ou "atualizadas"), página a partir de 1. */
+    const P = root.BMParse;
+    const browse = (path) => mediocre("api", path, false);
+    /** Listas de obras. kind: inicio | novas | atualizadas | ia | recomendacoes. */
     async function list(kind, page) {
-      const path = kind === "atualizadas" ? "/obras/atualizadas-recentes" : "/obras/adicionados-recentes";
-      const qs = page > 1 ? `?offset=${(page - 1) * LIST_PAGE[path]}` : "";
-      return listOf(await mediocre("api", path + qs)).map(toWork).filter(Boolean);
+      const off = (size) => (page > 1 ? `offset=${(page - 1) * size}` : "");
+      let raw;
+      if (kind === "inicio") {
+        try { raw = await browse("/obras/home"); }
+        catch (e) { if (!/400/.test(e.message)) throw e; raw = await browse("/obras/home?formato=1"); }
+      } else if (kind === "ia") raw = await browse("/obras/atualizadas-recentes-ia");
+      else if (kind === "recomendacoes") raw = await browse("/recomendacoes/minhas");
+      else if (kind === "atualizadas") { const q = off(LIST_PAGE["/obras/atualizadas-recentes"]); raw = await browse(`/obras/atualizadas-recentes${q ? `?${q}` : ""}`); }
+      else { const q = off(LIST_PAGE["/obras/adicionados-recentes"]); raw = await browse(`/obras/adicionados-recentes${q ? `?${q}` : ""}`); }
+      return { works: P.parseWorks(raw), raw };
     }
     async function search(text, page) {
-      const q = new URLSearchParams({ string: String(text).replace(/\s+/g, " ").trim().slice(0, 80) });
+      const t = String(text).replace(/\s+/g, " ").trim().slice(0, 80);
+      // Número puro: abre direto pelo ID, como no leitor.
+      if (/^\d{1,9}$/.test(t)) { const w = await work(Number(t)); return { works: w.work ? [w.work] : [], raw: w.raw }; }
+      const q = new URLSearchParams({ string: t });
       if (page > 1) q.set("pagina", String(page));
-      return listOf(await mediocre("api", `/obras/buscar?${q}`)).map(toWork).filter(Boolean);
+      const raw = await browse(`/obras/buscar?${q}`);
+      return { works: P.parseWorks(raw), raw };
+    }
+    async function lists() { const raw = await browse("/listas"); return { lists: P.parseLists(raw), raw }; }
+    async function reading() { const raw = await browse("/readings/user/156358/chapters"); return { chapters: P.findList(raw).map(P.parseChapter).filter(Boolean), raw }; }
+    async function work(id) {
+      const raw = await browse(`/obras/${id}`);
+      if (!raw) throw new Error("Obra não encontrada na MediocreScan.");
+      return { work: P.parseWorkResponse(raw), raw };
+    }
+    /** Conteúdo de um capítulo: dados na API, páginas/texto no CDN (caminho montado só com dados da API). */
+    async function chapter(capId) {
+      const raw = await browse(`/capitulos/${capId}`);
+      if (!raw) throw new Error("Capítulo não encontrado.");
+      const meta = unwrap(raw);
+      const ch = P.parseChapterResponse(raw);
+      const path = contentPath(meta);
+      let blocks = [], contentRaw = null;
+      if (path) {
+        try { contentRaw = await mediocre("cdn", path, false); blocks = contentRaw ? P.normalizeContent(contentRaw, `${CDN}${path}`) : []; }
+        catch (_) { blocks = []; }
+      }
+      if (!blocks.length && ch && ch.text) blocks = P.paragraphs(ch.text);
+      return { chapter: ch, blocks, raw, contentRaw };
+    }
+    async function thumbs(workId) {
+      try { const raw = await mediocre("cdn", `/obras/${workId}/thumbs-capitulos.json`, false); return raw ? P.parseThumbs(raw, `${CDN}/obras/${workId}/`) : {}; }
+      catch (_) { return {}; }
     }
     /** Quais IDs já estão no site e quais já estão na fila. */
     async function status(ids) {
@@ -154,7 +197,7 @@
     }
     const plan = () => site({ action: "plan", syncLimit: 0 });
     async function enqueue(works) {
-      for (let i = 0; i < works.length; i += 50) await site({ action: "enqueue", items: works.slice(i, i + 50).map((w) => ({ obraId: w.id, title: w.name || null })) });
+      for (let i = 0; i < works.length; i += 50) await site({ action: "enqueue", items: works.slice(i, i + 50).map((w) => ({ obraId: w.id, title: w.name || w.title || null })) });
     }
 
     /** Envia UMA obra inteira; se parar no meio, o site guarda onde parou. */
@@ -225,10 +268,10 @@
       try {
         for (const w of works) {
           checkStop();
-          try { totalAdded += (await sendWork(w.id, w.name)).added; done++; }
+          try { totalAdded += (await sendWork(w.id, w.name || w.title)).added; done++; }
           catch (e) {
             if (e instanceof Stopped || e instanceof Fatal) throw e;
-            emit({ type: "log", text: `${w.name || `Obra ${w.id}`}: ${e.message}` });
+            emit({ type: "log", text: `${w.name || w.title || `Obra ${w.id}`}: ${e.message}` });
           }
         }
         emit({ type: "run-done", works: done, added: totalAdded });
@@ -239,7 +282,7 @@
     }
 
     return {
-      list, search, status, plan, enqueue, run,
+      list, search, lists, reading, work, chapter, thumbs, status, plan, enqueue, run,
       stop() { if (running) stopFlag = true; },
       get running() { return running; },
     };
