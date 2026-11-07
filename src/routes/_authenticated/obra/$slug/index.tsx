@@ -43,6 +43,11 @@ import { activeProfileId, hasProfileChosen, isWorkAllowed, useActiveProfile } fr
 const compact = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
 /** Capítulo publicado nos últimos 3 dias. */
 const isFresh = (iso: string) => Date.now() - new Date(iso).getTime() < 3 * 24 * 60 * 60 * 1000;
+/** "out. 2026" (o formato padrão do navegador escreve "out. de 2026" e quebra a linha nas fichas). */
+const monthYear = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString("pt-BR", { month: "short" })} ${d.getFullYear()}`;
+};
 /** Obras longas: atalhos de 100 em 100 capítulos para não rolar a lista inteira. */
 const RANGE_SIZE = 100;
 
@@ -462,7 +467,7 @@ function SeriesPage() {
                 <div><dt><Eye />Leituras</dt><dd className="tabular-nums" title={obra.views.toLocaleString("pt-BR")}>{compact.format(obra.views)}</dd></div>
                 <div><dt><MessageCircle />Comentários</dt><dd className="tabular-nums">{comments.data?.length ?? 0}</dd></div>
                 <div><dt><Clock />Atualizada</dt><dd>{timeAgo(lastChapter?.created_at ?? obra.updated_at)}</dd></div>
-                <div><dt><CalendarDays />No site desde</dt><dd>{new Date(obra.created_at).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })}</dd></div>
+                <div><dt><CalendarDays />No site desde</dt><dd>{monthYear(obra.created_at)}</dd></div>
               </dl>
 
               {user && readCount > 0 ? (
@@ -704,7 +709,7 @@ function SeriesPage() {
                 <section className="side-card">
                   <h2 className="flex items-center gap-2 font-display text-base font-bold"><Play className="h-4 w-4 text-primary" />Ler agora</h2>
                   <p className="mt-1 text-xs text-muted-foreground">{obra.chapters.length} capítulos{lastChapter ? ` · último ${timeAgo(lastChapter.created_at)}` : ""}</p>
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
                     {firstChapter ? <Button asChild className="h-11 gap-2"><Link to="/obra/$slug/$chapter" params={{ slug: obra.slug, chapter: formatChapter(firstChapter.number) }}><Play className="h-4 w-4" />Primeiro capítulo</Link></Button> : null}
                     {lastChapter ? <Button asChild variant="outline" className="h-11 gap-2 border-primary/40 text-primary"><Link to="/obra/$slug/$chapter" params={{ slug: obra.slug, chapter: formatChapter(lastChapter.number) }}><Forward className="h-4 w-4" />Mais recente</Link></Button> : null}
                   </div>

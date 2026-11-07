@@ -98,6 +98,7 @@ for (const [viewName, view] of Object.entries(VIEWS)) {
     const page = await context.newPage();
     page.on("pageerror", (e) => log.push(`[${viewName} ${p.name}] erro na página: ${e.message}`));
     page.on("console", (m) => { if (m.type() === "error") log.push(`[${viewName} ${p.name}] console: ${m.text().slice(0, 300)}`); });
+    page.on("response", (r) => { if (r.status() >= 400) log.push(`[${viewName} ${p.name}] ${r.status()} ${r.request().method()} ${r.url().slice(0, 260)}`); });
     try {
       await page.goto(BASE + p.path, { waitUntil: "domcontentloaded", timeout: 45000 });
       await settle(page);

@@ -262,21 +262,30 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
         lastY = y;
         setAtTop(y < 140);
         setNearEnd(y + window.innerHeight > document.documentElement.scrollHeight - 900);
+        // Página atual: a última que já começou antes do meio da tela. Imagens ainda sem altura
+        // (não carregadas) não contam, senão todas pareceriam estar no topo.
         const middle = window.innerHeight * 0.5;
         let current = 1;
-        document.querySelectorAll<HTMLElement>("[data-reader-page]").forEach((img, i) => {
-          if (img.getBoundingClientRect().top <= middle) current = i + 1;
-        });
+        const imgs = document.querySelectorAll<HTMLElement>("[data-reader-page]");
+        for (let i = 0; i < imgs.length; i++) {
+          const box = imgs[i]!.getBoundingClientRect();
+          if (box.height < 24) continue;
+          if (box.top > middle) break;
+          current = i + 1;
+        }
         setPageNow(current);
       });
     };
     update();
     window.addEventListener("scroll", update, { passive: true });
     window.addEventListener("resize", update);
+    // Cada página que termina de carregar muda a altura da página: recalcula sem esperar rolar.
+    document.addEventListener("load", update, true);
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
+      document.removeEventListener("load", update, true);
     };
   }, [chapterId]);
 

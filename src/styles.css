@@ -608,7 +608,8 @@ body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-even
 .work-cover-wrap { position: relative; }
 .work-cover-wrap::before { content: ""; position: absolute; inset: 12% -10% -6%; z-index: -1; border-radius: 999px; background: radial-gradient(closest-side, color-mix(in oklab, var(--primary) 32%, transparent), transparent); filter: blur(28px); animation: site-drift 18s ease-in-out infinite alternate; pointer-events: none; }
 @media (prefers-reduced-motion: no-preference) { .work-cover-wrap > img { animation: site-float 7s ease-in-out infinite; } }
-.work-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.work-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 480px) { .work-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 1024px) { .work-facts { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 .work-facts > div { position: relative; min-width: 0; overflow: hidden; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--glass-border); background: linear-gradient(160deg, color-mix(in oklab, var(--surface-2) 80%, transparent), color-mix(in oklab, var(--surface) 60%, transparent)); transition: border-color .2s, transform .2s; }
 .work-facts > div:hover { border-color: color-mix(in oklab, var(--primary) 40%, var(--border)); transform: translateY(-2px); }
