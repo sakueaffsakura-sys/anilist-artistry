@@ -49,7 +49,8 @@
    */
   function createEngine(deps) {
     const emit = (e) => { try { deps.onEvent && deps.onEvent(e); } catch (_) { /* tela não deve parar o envio */ } };
-    let apiIdx = 0, lastCall = 0, locksInRow = 0, stopFlag = false, running = false, lastLockEnd = 0;
+    // lastPairAt vale para o app inteiro: entre lotes, entre obras e entre envios seguidos.
+    let apiIdx = 0, lastCall = 0, locksInRow = 0, stopFlag = false, running = false, lastLockEnd = null, lastPairAt = null;
 
     function checkStop() { if (stopFlag) throw new Stopped(); }
     /** Espera em pedaços curtos para o botão "Parar" responder rápido. */
@@ -65,10 +66,14 @@
       await wait(PACE.netWaitMs);
     }
 
-    /** 1 minuto a cada 2 capítulos, contado do início do envio anterior (o tempo de baixar já conta). */
-    async function pairWait(since) {
-      // Depois de uma pausa por travamento, o minuto conta a partir do fim da pausa.
-      const ms = Math.max(0, PACE.waitMs - (deps.now() - Math.max(since, lastLockEnd)));
+    /**
+     * 1 minuto a cada 2 capítulos, sempre: conta do fim do último par enviado, mesmo que tenha sido
+     * de outra obra ou de outro envio. Depois de uma pausa por travamento, conta do fim da pausa.
+     */
+    async function pairWait() {
+      const marks = [lastPairAt, lastLockEnd].filter((v) => v !== null);
+      if (!marks.length) return;
+      const ms = Math.max(0, PACE.waitMs - (deps.now() - Math.max(...marks)));
       if (ms > 0) { emit({ type: "waiting", ms }); await wait(ms); }
     }
 
@@ -241,10 +246,8 @@
       emit({ type: "work-start", id, name: title, slug: w.slug, created: w.created, total });
       let added = 0, skipped = 0, tried = 0;
       try {
-        let pairStart = deps.now();
         for (let i = 0; i < pending.length; i += PACE.perSend) {
-          if (i > 0) await pairWait(pairStart);
-          pairStart = deps.now();
+          await pairWait();
           const group = pending.slice(i, i + PACE.perSend);
           emit({ type: "sending", from: tried + 1, to: tried + group.length, total });
           const chapters = [];
@@ -271,6 +274,7 @@
             added += r.added || 0;
             skipped += r.skipped || 0;
           }
+          lastPairAt = deps.now(); // o próximo par só sai 1 minuto depois deste terminar
           emit({ type: "progress", id, done: Math.min(tried, total), total, added, skipped });
         }
       } finally {
@@ -303,10 +307,8 @@
         const pending = new Set(Array.isArray(w.pendingCapIds) ? w.pendingCapIds : []);
         const todo = capIds.filter((c) => pending.has(c));
         capIds.filter((c) => !pending.has(c)).forEach((c) => { already++; emit({ type: "chapter-state", id, capId: c, state: "site" }); });
-        let pairStart = deps.now();
         for (let i = 0; i < todo.length; i += PACE.perSend) {
-          if (i > 0) await pairWait(pairStart);
-          pairStart = deps.now();
+          await pairWait();
           const group = todo.slice(i, i + PACE.perSend);
           group.forEach((c) => emit({ type: "chapter-state", id, capId: c, state: "sending" }));
           emit({ type: "sending", from: i + 1, to: i + group.length, total: todo.length });
@@ -331,6 +333,7 @@
             // O site responde em conjunto; quem falhou aparece na conferência do fim.
             chapters.forEach((c) => emit({ type: "chapter-state", id, capId: c.capId, state: r.skipped ? "check" : "site" }));
           }
+          lastPairAt = deps.now(); // o próximo par só sai 1 minuto depois deste terminar
           emit({ type: "progress", id, done: Math.min(i + group.length, todo.length), total: todo.length, added, skipped });
         }
         emit({ type: "chapters-done", id, name, added, skipped, already });
