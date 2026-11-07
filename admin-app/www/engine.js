@@ -1,7 +1,7 @@
 /*
  * Estúdio Better Mangá — lógica de envio (sem tela).
  * O celular busca na MediocreScan (pelo IP dele, que não está bloqueado) e envia ao site.
- * Ritmo: uma obra por vez até o fim, 2 capítulos por envio, 20 s entre envios,
+ * Ritmo: uma obra por vez até o fim, 5 capítulos por envio, 1 min 12 s entre envios,
  * pausa de 1 minuto quando a API trava. Roda no app e nos testes (Node).
  */
 (function (root) {
@@ -10,9 +10,9 @@
   // Todas as rotas da API usam o domínio novo; o caminho continua o mesmo.
   const API_HOSTS = ["https://api.mediocretoons.net"];
   const CDN = "https://cdn.mediocrescan.com";
-  // 2 capítulos por envio e 1 minuto de espera antes dos próximos 2.
+  // 5 capítulos por envio e 1 min 12 s de espera antes dos próximos 5.
   // apiGapMs: durante o envio, 1 pedido à API da MediocreScan por minuto (as páginas no CDN não contam).
-  const PACE = { perSend: 2, waitMs: 60000, lockMs: 60000, maxLocksInRow: 5, gapMs: 1500, apiGapMs: 60000, netRetries: 3, netWaitMs: 20000 };
+  const PACE = { perSend: 5, waitMs: 72000, lockMs: 60000, maxLocksInRow: 5, gapMs: 1500, apiGapMs: 60000, netRetries: 3, netWaitMs: 20000 };
   const LIST_PAGE = { "/obras/adicionados-recentes": 20, "/obras/atualizadas-recentes": 30 };
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -52,7 +52,7 @@
     const emit = (e) => { try { deps.onEvent && deps.onEvent(e); } catch (_) { /* tela não deve parar o envio */ } };
     // lastPairAt vale para o app inteiro: entre lotes, entre obras e entre envios seguidos.
     let apiIdx = 0, lastApiCall = null, lastCdnCall = null, locksInRow = 0, stopFlag = false, running = false, lastLockEnd = null, lastPairAt = null;
-    // Horários guardados no celular: se o app reiniciar, a espera de 1 minuto continua valendo.
+    // Horários guardados no celular: se o app reiniciar, a espera entre lotes continua valendo.
     try {
       const saved = deps.pace && deps.pace.load ? deps.pace.load() : null;
       const fresh = (v) => (Number.isFinite(v) && v <= deps.now() && deps.now() - v < 10 * 60_000 ? v : null);
@@ -75,7 +75,7 @@
     }
 
     /**
-     * 1 minuto a cada 2 capítulos, sempre: conta do fim do último par enviado, mesmo que tenha sido
+     * 1 min 12 s a cada 5 capítulos, sempre: conta do fim do último lote enviado, mesmo que tenha sido
      * de outra obra ou de outro envio. Depois de uma pausa por travamento, conta do fim da pausa.
      */
     async function pairWait() {
@@ -313,7 +313,7 @@
             added += r.added || 0;
             skipped += r.skipped || 0;
           }
-          lastPairAt = deps.now(); savePace(); // o próximo par só sai 1 minuto depois deste terminar
+          lastPairAt = deps.now(); savePace(); // o próximo lote só sai 1 min 12 s depois deste terminar
           emit({ type: "progress", id, done: Math.min(tried, total), total, added, skipped });
         }
       } finally {
@@ -332,7 +332,7 @@
 
     /**
      * Envia só os capítulos escolhidos de uma obra (botão ao lado de cada capítulo).
-     * Os que já estão no site são pulados sem buscar nada; o resto vai de 2 em 2 com a mesma espera.
+     * Os que já estão no site são pulados sem buscar nada; o resto vai de 5 em 5 com a mesma espera.
      */
     async function sendChapters(id, capIds, name) {
       if (running) throw new Error("Já existe um envio em andamento.");
@@ -370,7 +370,7 @@
             // O site responde em conjunto; quem falhou aparece na conferência do fim.
             chapters.forEach((c) => emit({ type: "chapter-state", id, capId: c.capId, state: r.skipped ? "check" : "site" }));
           }
-          lastPairAt = deps.now(); savePace(); // o próximo par só sai 1 minuto depois deste terminar
+          lastPairAt = deps.now(); savePace(); // o próximo lote só sai 1 min 12 s depois deste terminar
           emit({ type: "progress", id, done: Math.min(i + group.length, todo.length), total: todo.length, added, skipped });
         }
         emit({ type: "chapters-done", id, name, added, skipped, already });
