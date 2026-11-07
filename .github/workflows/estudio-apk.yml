@@ -37,6 +37,7 @@ jobs:
           f=$(ls node_modules/@capacitor/core/dist/capacitor.js 2>/dev/null || true)
           if [ -z "$f" ]; then echo "::error::capacitor.js não encontrado em @capacitor/core/dist: $(ls node_modules/@capacitor/core/dist | tr '\n' ' ')"; exit 1; fi
           cp "$f" www/capacitor.js
+          echo "window.BM_VERSION = '1.${{ github.run_number }}';" > www/version.js
       - name: Gerar o projeto Android
         env:
           BUILD_NUMBER: ${{ github.run_number }}
