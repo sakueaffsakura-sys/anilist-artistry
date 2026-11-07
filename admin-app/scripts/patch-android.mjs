@@ -42,6 +42,8 @@ import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.WebViewListener;
 
 public class MainActivity extends BridgeActivity {
+    private volatile boolean visible = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(EstudioPlugin.class);
@@ -62,7 +64,11 @@ public class MainActivity extends BridgeActivity {
         getBridge().addWebViewListener(new WebViewListener() {
             @Override
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
-                runOnUiThread(() -> recreate());
+                // Esta tela morreu: o serviço para de mandar eventos para ela (a próxima tela busca o que perdeu).
+                EnvioService.listener = null;
+                // Na frente: recria a tela. Atrás: só fecha (recriar em segundo plano gasta memória e o Android
+                // encerraria de novo); o envio continua no serviço e a tela volta ao abrir o app.
+                runOnUiThread(() -> { if (visible) recreate(); else finish(); });
                 return true;
             }
         });
@@ -88,7 +94,14 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    public void onResume() {
+        super.onResume();
+        visible = true;
+    }
+
+    @Override
     public void onPause() {
+        visible = false;
         super.onPause();
         keepWebViewRunning();
     }

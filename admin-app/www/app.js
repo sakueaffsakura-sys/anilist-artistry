@@ -143,8 +143,11 @@
         const fresh = (r.events || []).filter((e) => e && e.seq > lastSeq).sort((a, b) => a.seq - b.seq);
         if (fresh.length) fresh.forEach(handleNative);
         else if (r.running) (r.snapshot || []).forEach((e) => onEngineEvent(Object.assign({}, e, { silent: true })));
+        const was = nativeRunning;
         nativeRunning = Boolean(r.running);
         if (nativeRunning) { showRunning(); if (!$("run-status").textContent) setStatus("Enviando em segundo plano…"); }
+        else if (nativeWaiters.length) { const w = nativeWaiters; nativeWaiters = []; w.forEach((f) => f(null)); }
+        if (was && !nativeRunning) setTimeout(() => { if (!busy()) { $("sender-run").hidden = true; $("sender-idle").hidden = false; repaint(); } }, 6000);
         repaint();
         return r;
       } catch (_) { return null; } finally { syncing = null; }
@@ -159,6 +162,8 @@
   }
   if (NATIVE && Native.addListener) { try { Native.addListener("engine", onNativeLive); } catch (_) { /* sem eventos ao vivo: a tela busca ao voltar */ } }
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && state.session) syncNative(); });
+  // Rede de segurança: se algum evento ao vivo se perder, a tela confere o andamento a cada 30 s.
+  setInterval(() => { if (nativeRunning && document.visibilityState === "visible") syncNative(); }, 30_000);
   /** Pede uma vez para o Android não "economizar bateria" no app, senão o envio para com a tela apagada. */
   async function askBattery() {
     if (!Native || state.batteryAsked) return;
@@ -849,8 +854,10 @@
     $("token").value = state.token; $("site-url-2").value = state.site;
     $("account").textContent = state.session && state.session.mode === "email" ? `Conectado como ${state.session.email}.` : "Conectado com código do painel.";
     $("app-version").textContent = `Versão do app: ${window.BM_VERSION || "teste"} · 5 capítulos a cada 1 min 12 s · ${NATIVE ? "envio nativo (continua com o app fechado)" : "envio pela tela"}.`;
+    $("open-battery").hidden = $("battery-hint").hidden = !NATIVE;
     $("settings").showModal();
   };
+  $("open-battery").onclick = () => { if (Native) Native.openAppSettings().catch(() => toast("Abra Configurações → Aplicativos → BM Estúdio → Bateria.")); };
   $("form-settings").onsubmit = () => {
     state.token = $("token").value.trim(); state.site = normalizeSite($("site-url-2").value) || DEFAULT_SITE;
     save(); $("token-card").hidden = Boolean(state.token); $("who").textContent = whoText(); toast("Configurações salvas."); route();
@@ -895,6 +902,7 @@
       showResumeCard(() => startNative(job), Date.now() - (Number(nat.beat) || 0) < AUTO_RESUME_MS);
       return;
     }
+    if (NATIVE) clearRun(); // marca da versão antiga (envio pela tela) não vale mais
     const cut = NATIVE ? null : interruptedRun();
     if (cut) { log(`Envio interrompido (${cut.what}): o app foi fechado, atualizado ou encerrado pelo Android antes de terminar.`); clearRun(); }
     try {

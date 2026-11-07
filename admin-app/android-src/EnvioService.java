@@ -134,7 +134,10 @@ public class EnvioService extends Service {
                 ? build(workName, done + " de " + total + " capítulos", (int) Math.min(Integer.MAX_VALUE, done), (int) Math.min(Integer.MAX_VALUE, total), 0, true)
                 : build("Preparando o envio…", "", -1, 0, 0, false);
         if (!goForeground(first)) {
-            if (!busy) stopSelf();
+            if (!busy) {
+                emitLocal("run-error", "message", "O Android não deixou o envio rodar em segundo plano. Abra o app e toque em Continuar.", "works", 0, "added", 0);
+                stopSelf();
+            }
             return;
         }
         if (busy) {
