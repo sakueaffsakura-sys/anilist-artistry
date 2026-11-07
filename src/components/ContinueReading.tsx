@@ -45,7 +45,10 @@ export function ContinueReading({ rows, userId }: { rows: ContinueRow[]; userId:
     <section aria-label="Continue lendo" className="relative min-w-0 max-w-full pb-4 md:pb-8">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
-          <h2 className="section-title shrink-0"><BookMarked className="h-[18px] w-[18px]" />Continue lendo</h2>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+            <BookMarked className="h-[18px] w-[18px]" />
+          </div>
+          <h2 className="shrink-0 text-lg font-bold">Continue Lendo</h2>
         </div>
         <div className="hidden shrink-0 items-center gap-2 md:flex">
            <Button
@@ -87,12 +90,12 @@ export function ContinueReading({ rows, userId }: { rows: ContinueRow[]; userId:
               return (
                 <div
                   key={row.series.id}
-                   className="continue-reading-card group relative flex h-full w-[160px] min-w-[160px] max-w-[160px] shrink-0 flex-col rounded-md transition-[transform,box-shadow] duration-200 ease-out hover:z-[5] hover:-translate-y-1.5 motion-reduce:transform-none motion-reduce:transition-none"
+                   className="continue-reading-card group relative flex h-full w-[160px] min-w-[160px] max-w-[160px] shrink-0 flex-col rounded-[1.35rem] transition-[transform,box-shadow] duration-200 ease-out hover:z-[5] hover:-translate-y-1.5 motion-reduce:transform-none motion-reduce:transition-none"
                 >
                   <Link
                     to="/obra/$slug"
                     params={{ slug: row.series.slug }}
-                    className="relative block aspect-[2/3] w-full shrink-0 overflow-hidden rounded-md border border-foreground/10 bg-card/60 text-left no-underline transition-transform duration-200 ease-out active:scale-[0.98]"
+                    className="relative block aspect-[2/3] w-full shrink-0 overflow-hidden rounded-[1.35rem] border border-foreground/10 bg-card/60 text-left no-underline transition-transform duration-200 ease-out active:scale-[0.98]"
                   >
                     <img
                       src={coverUrl(row.series.cover_url)}

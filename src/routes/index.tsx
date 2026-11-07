@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { BookOpenText, RotateCw, Trophy } from "lucide-react";
+import { ArrowRight, BookOpenText, Compass, Eye, RotateCw, Sparkle, Trophy } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
 import { SeriesCard } from "@/components/SeriesCard";
 import { HeroCarousel } from "@/components/HeroCarousel";
@@ -17,6 +17,10 @@ import { EventBadges } from "@/components/EventBadges";
 import { HomeDiscovery } from "@/components/HomeDiscovery";
 import { fetchHomeSections } from "@/lib/home-section-queries";
 import { RECENT_UPDATES_LIMIT } from "@/lib/recent-updates";
+
+/** Atalhos da home para o catálogo filtrado (os gêneros mais procurados no site). */
+const GENRE_SHORTCUTS = ["Ação", "Fantasia", "Romance", "Artes Marciais", "Murim", "Isekai", "Regressão", "Sistema", "Comédia", "Drama", "Sobrenatural", "Terror", "Escolar", "Aventura"];
+const compact = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
 
 export const Route = createFileRoute("/")({
   staticData: { sitemap: true },
@@ -144,6 +148,18 @@ function Home() {
           <FavoritesUpdated rows={favorites.data ?? []} />
         ) : null}
 
+        <section aria-labelledby="genre-shortcuts" className="mb-8">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 id="genre-shortcuts" className="flex items-center gap-2 font-display text-base font-bold"><Compass className="h-4 w-4 text-primary" />Explorar por gênero</h2>
+            <Link to="/catalogo" search={{ q: "", kind: "Todos" }} className="see-all">Catálogo <ArrowRight className="h-3.5 w-3.5" /></Link>
+          </div>
+          <div className="genre-strip">
+            {GENRE_SHORTCUTS.map((genre) => (
+              <Link key={genre} to="/catalogo" search={{ tag: genre }} className="genre-chip"><Sparkle className="h-3.5 w-3.5" /><span>{genre}</span></Link>
+            ))}
+          </div>
+        </section>
+
         {releases.isPending ? <LoadingShelf label="Carregando lançamentos" /> : null}
         {(releases.data?.length ?? 0) > 0 ? <Releases rows={releases.data ?? []} /> : null}
 
@@ -155,9 +171,9 @@ function Home() {
 
         {novels.isPending ? <LoadingShelf label="Carregando novels" /> : null}
         {novels.isSuccess ? <div className="cv-auto">{(
-          <SectionRow icon={<BookOpenText className="h-5 w-5" />} title="Novels"
+          <SectionRow icon={<BookOpenText className="h-5 w-5" />} title="Novels" count={novels.data.length}
             subtitle="Últimos capítulos em texto"
-            action={<Button asChild variant="ghost" size="sm" className="text-primary"><Link to="/catalogo" search={{ kind: "Novel" }}>Ver todas</Link></Button>}>
+            action={<Link to="/catalogo" search={{ kind: "Novel" }} className="see-all">Ver todas <ArrowRight className="h-3.5 w-3.5" /></Link>}>
             {novels.data.length ? <HScroll>
               {novels.data.map((item) => <div key={item.id} className="w-[160px] shrink-0">
                 <SeriesCard slug={item.slug} title={item.title} cover={item.cover_url} rating={item.rating}
@@ -173,16 +189,12 @@ function Home() {
             icon={<Trophy className="h-5 w-5" />}
             title="Rankings"
             subtitle="As 10 obras mais lidas no Better Mangá"
-            action={
-              <Button asChild variant="ghost" size="sm" className="text-primary">
-                <Link to="/ranking">Ver todos</Link>
-              </Button>
-            }
+            action={<Link to="/ranking" className="see-all">Ver ranking completo <ArrowRight className="h-3.5 w-3.5" /></Link>}
           >
             <HScroll>
               {(ranking.data ?? []).map((item, index) => (
                 <div key={item.id} className="w-[178px] shrink-0">
-                  <div className="rank-item">
+                  <div className="rank-item" data-rank={index + 1}>
                     <span className="rank-number" aria-label={`${index + 1}º lugar`}>
                       {index + 1}
                     </span>
@@ -196,6 +208,7 @@ function Home() {
                         seriesId={item.id}
                         ageRating={item.age_rating}
                       />
+                      {item.views > 0 ? <span className="rank-views" title={`${item.views.toLocaleString("pt-BR")} leituras`}><Eye className="h-3 w-3" />{compact.format(item.views)} leituras</span> : null}
                     </div>
                   </div>
                 </div>

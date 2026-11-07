@@ -5,12 +5,15 @@ export function SectionRow({
   title,
   action,
   subtitle,
+  count,
   children,
 }: {
   icon: ReactNode;
   title: string;
   action?: ReactNode;
   subtitle?: string;
+  /** Quantidade mostrada ao lado do título (ex.: obras na prateleira). */
+  count?: number;
   children: ReactNode;
 }) {
   return (
@@ -20,6 +23,7 @@ export function SectionRow({
           <h2 className="section-title">
             <span className="text-primary">{icon}</span>
             {title}
+            {typeof count === "number" && count > 0 ? <span className="section-count" aria-label={`${count} obras`}>{count}</span> : null}
           </h2>
           {subtitle ? <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p> : null}
         </div>
