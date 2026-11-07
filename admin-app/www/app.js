@@ -593,7 +593,7 @@
     if (!confirm(`Enviar ${list.length} obra(s), uma de cada vez? Cada obra vai até o último capítulo antes da próxima. Pode minimizar o app: o envio continua e aparece na notificação.`)) return;
     startRun(list);
   };
-  let queueLeft = 0, countdown = null;
+  let queueLeft = 0, countdown = null, fetchNote = "";
   async function startRun(list) {
     if (engine.running) return;
     if (!state.token) { toast("Cole a chave da MediocreScan primeiro."); $("token-card").hidden = false; return; }
@@ -662,7 +662,7 @@
         if (!e.total) setStatus("Nenhum capítulo novo.");
         break;
       case "sending":
-        beatRun(); clearInterval(countdown); setStatus(`Enviando capítulos ${e.from}${e.to > e.from ? ` a ${e.to}` : ""} de ${e.total}…`);
+        fetchNote = ""; beatRun(); clearInterval(countdown); setStatus(`Enviando capítulos ${e.from}${e.to > e.from ? ` a ${e.to}` : ""} de ${e.total}…`);
         log(`${note.work || "Envio"}: buscando capítulos ${e.from}${e.to > e.from ? `–${e.to}` : ""} de ${e.total}.`);
         break;
       case "progress":
@@ -671,15 +671,26 @@
         log(`${note.work || "Envio"}: ${e.done} de ${e.total} prontos (+${e.added} no site${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}).`);
         native.update(note.work, `${e.done} de ${e.total} capítulos · ${queueLeft} obra(s) na vez`, e.done, e.total); break;
       case "waiting": count(e.ms, (s) => setStatus(`Próximos 5 capítulos em ${s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s} s`}`)); break;
+      case "posting": clearInterval(countdown); fetchNote = ""; setStatus(`Publicando ${e.count} capítulo(s) no site…`); break;
+      case "fetching":
+        fetchNote = `capítulo ${e.at} de ${e.total} (${e.n}º de ${e.of} deste lote)`;
+        clearInterval(countdown); setStatus(`Baixando ${fetchNote}…`);
+        break;
       case "api-wait":
-        count(e.ms, (sec) => setStatus(`Aguardando ${sec} s para o próximo pedido à MediocreScan (1 por minuto).`));
+        count(e.ms, (sec) => setStatus(fetchNote ? `Baixando ${fetchNote}: o próximo pedido à MediocreScan sai em ${sec} s (1 por minuto).` : `Aguardando ${sec} s para o próximo pedido à MediocreScan (1 por minuto).`));
         break;
       case "net-retry":
         log(`Falha de conexão ${e.where} (${e.detail}). Nova tentativa ${e.attempt}/${e.max} em ${Math.round(e.ms / 1000)} s.`);
         native.update(note.work, `Sem conexão. Tentando de novo (${e.attempt}/${e.max})…`, note.done, note.total);
         count(e.ms, (sec) => setStatus(`Falha de conexão ${e.where}. Tentando de novo em ${sec} s (${e.attempt}/${e.max}).`, true));
         break;
-      case "pause": native.update(note.work, "A MediocreScan travou. Voltando em 1 minuto…", note.done, note.total); log(`A MediocreScan travou (${e.reason}). Pausa ${e.count}/${e.max}.`); count(e.ms, (s) => setStatus(`A MediocreScan travou por excesso de pedidos. Voltando em ${s} s.`, true)); break;
+      case "pause": {
+        const mins = Math.round(e.ms / 60000);
+        native.update(note.work, `A MediocreScan recusou (${e.reason}). Nova tentativa em ${mins} min…`, note.done, note.total);
+        log(`A MediocreScan recusou o pedido (${e.reason}). Espera ${e.count}/${e.max}: ${mins} min.`);
+        count(e.ms, (s) => setStatus(`A MediocreScan recusou o pedido (${e.reason}). Tentativa ${e.count} de ${e.max}: tenta de novo em ${s >= 60 ? `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s` : `${s} s`}.`, true));
+        break;
+      }
       case "resume": clearInterval(countdown); setStatus("Continuando…"); break;
       case "chapters-start":
         note = { work: e.name, total: e.count, done: 0 };
