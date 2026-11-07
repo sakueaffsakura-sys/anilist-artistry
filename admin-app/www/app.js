@@ -666,6 +666,7 @@
   $("open-settings").onclick = () => {
     $("token").value = state.token; $("site-url-2").value = state.site;
     $("account").textContent = state.session && state.session.mode === "email" ? `Conectado como ${state.session.email}.` : "Conectado com código do painel.";
+    $("app-version").textContent = `Versão do app: ${window.BM_VERSION || "teste"} · 2 capítulos por minuto.`;
     $("settings").showModal();
   };
   $("form-settings").onsubmit = () => {

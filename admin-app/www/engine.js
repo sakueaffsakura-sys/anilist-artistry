@@ -49,7 +49,7 @@
    */
   function createEngine(deps) {
     const emit = (e) => { try { deps.onEvent && deps.onEvent(e); } catch (_) { /* tela não deve parar o envio */ } };
-    let apiIdx = 0, lastCall = 0, locksInRow = 0, stopFlag = false, running = false;
+    let apiIdx = 0, lastCall = 0, locksInRow = 0, stopFlag = false, running = false, lastLockEnd = 0;
 
     function checkStop() { if (stopFlag) throw new Stopped(); }
     /** Espera em pedaços curtos para o botão "Parar" responder rápido. */
@@ -65,11 +65,19 @@
       await wait(PACE.netWaitMs);
     }
 
+    /** 1 minuto a cada 2 capítulos, contado do início do envio anterior (o tempo de baixar já conta). */
+    async function pairWait(since) {
+      // Depois de uma pausa por travamento, o minuto conta a partir do fim da pausa.
+      const ms = Math.max(0, PACE.waitMs - (deps.now() - Math.max(since, lastLockEnd)));
+      if (ms > 0) { emit({ type: "waiting", ms }); await wait(ms); }
+    }
+
     async function lockPause(reason) {
       locksInRow++;
       if (locksInRow > PACE.maxLocksInRow) throw new Fatal(`A MediocreScan continua travada (${reason}). Tente de novo mais tarde.`);
       emit({ type: "pause", ms: PACE.lockMs, reason, count: locksInRow, max: PACE.maxLocksInRow });
       await wait(PACE.lockMs);
+      lastLockEnd = deps.now();
       emit({ type: "resume" });
     }
 
@@ -233,8 +241,10 @@
       emit({ type: "work-start", id, name: title, slug: w.slug, created: w.created, total });
       let added = 0, skipped = 0, tried = 0;
       try {
+        let pairStart = deps.now();
         for (let i = 0; i < pending.length; i += PACE.perSend) {
-          if (i > 0) { emit({ type: "waiting", ms: PACE.waitMs }); await wait(PACE.waitMs); }
+          if (i > 0) await pairWait(pairStart);
+          pairStart = deps.now();
           const group = pending.slice(i, i + PACE.perSend);
           emit({ type: "sending", from: tried + 1, to: tried + group.length, total });
           const chapters = [];
@@ -293,8 +303,10 @@
         const pending = new Set(Array.isArray(w.pendingCapIds) ? w.pendingCapIds : []);
         const todo = capIds.filter((c) => pending.has(c));
         capIds.filter((c) => !pending.has(c)).forEach((c) => { already++; emit({ type: "chapter-state", id, capId: c, state: "site" }); });
+        let pairStart = deps.now();
         for (let i = 0; i < todo.length; i += PACE.perSend) {
-          if (i > 0) { emit({ type: "waiting", ms: PACE.waitMs }); await wait(PACE.waitMs); }
+          if (i > 0) await pairWait(pairStart);
+          pairStart = deps.now();
           const group = todo.slice(i, i + PACE.perSend);
           group.forEach((c) => emit({ type: "chapter-state", id, capId: c, state: "sending" }));
           emit({ type: "sending", from: i + 1, to: i + group.length, total: todo.length });
