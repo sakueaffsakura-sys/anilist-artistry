@@ -1,0 +1,16 @@
+{
+  "name": "estudio-better-manga",
+  "private": true,
+  "version": "1.0.0",
+  "description": "App Android de administração: publica no Better Mangá obras da MediocreScan buscadas pelo celular.",
+  "scripts": {
+    "android:prepare": "cap add android && node scripts/patch-android.mjs && cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.0",
+    "@capacitor/core": "^7.4.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.0"
+  }
+}

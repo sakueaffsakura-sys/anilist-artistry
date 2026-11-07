@@ -93,16 +93,17 @@ export function suppliedGetter(api: Record<string, unknown>, cdn: unknown): Medi
  * first, then the rest in order) and the published works checked least recently. Queued works are
  * reserved so the site's own queue tick does not copy the same chapters at the same time.
  */
-export async function ingestPlan(admin: Admin, syncLimit: number): Promise<{ queue: number[]; sync: number[] }> {
-  const { data: q } = await admin.from("mediocre_queue").select("obra_id, status").in("status", ["running", "waiting"]).order("created_at").limit(50);
+export async function ingestPlan(admin: Admin, syncLimit: number): Promise<{ queue: number[]; items: { id: number; title: string | null }[]; sync: number[] }> {
+  const { data: q } = await admin.from("mediocre_queue").select("obra_id, status, title").in("status", ["running", "waiting"]).order("created_at").limit(50);
   const rows = [...(q ?? [])].sort((a, b) => (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1));
   const queue = rows.map((r) => Number(r.obra_id)).filter((n) => Number.isSafeInteger(n) && n > 0);
+  const items = rows.map((r) => ({ id: Number(r.obra_id), title: r.title })).filter((i) => queue.includes(i.id));
   if (queue.length) await admin.from("mediocre_queue").update({ next_run_at: reserveUntil() }).in("obra_id", queue).in("status", ["running", "waiting"]);
-  if (!syncLimit) return { queue, sync: [] };
+  if (!syncLimit) return { queue, items, sync: [] };
   const { data: s } = await admin.from("series").select("source_mediocre_id")
     .not("source_mediocre_id", "is", null).order("mediocre_synced_at", { ascending: true, nullsFirst: true }).limit(syncLimit);
   const sync = (s ?? []).map((r) => Number(r.source_mediocre_id)).filter((n) => Number.isSafeInteger(n) && n > 0 && !queue.includes(n));
-  return { queue, sync };
+  return { queue, items, sync };
 }
 
 /** Which of these MediocreScan IDs are already on the site, and which are already in the queue (any status). */

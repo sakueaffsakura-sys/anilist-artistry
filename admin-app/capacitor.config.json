@@ -1,0 +1,9 @@
+{
+  "appId": "net.bettermanga.estudio",
+  "appName": "BM Estúdio",
+  "webDir": "www",
+  "android": { "backgroundColor": "#14151b" },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}
