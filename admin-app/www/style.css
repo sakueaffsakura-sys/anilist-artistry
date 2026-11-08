@@ -242,3 +242,18 @@ select { min-height: 40px; padding: 0 10px; border-radius: 10px; border: 1px sol
 .queue-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .queue-item .site-row.queue-open { grid-template-columns: 52px 1fr; }
 .queue-item .chip-btn { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border: 1px solid color-mix(in oklab, var(--danger) 45%, transparent); border-radius: 999px; white-space: nowrap; }
+
+/* ---------- pedidos dos leitores ---------- */
+.icon-btn .count { position: absolute; top: 2px; right: 0; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--primary); color: var(--ink); font-size: 11px; font-weight: 900; line-height: 18px; text-align: center; }
+.req-intro { margin: 0 2px 12px; }
+.req-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.req-card { margin: 0; }
+.req-card h2 { margin: 0; font-size: 16px; line-height: 1.3; overflow-wrap: anywhere; }
+.req-card .s { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+.req-card .notes { margin: 8px 0 0; padding-left: 10px; border-left: 2px solid var(--border); font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.req-card .row { flex-wrap: wrap; margin-top: 10px; }
+.req-count { display: inline-block; margin-right: 6px; padding: 1px 8px; border-radius: 999px; background: var(--primary); color: var(--ink); font-size: 12px; font-weight: 900; }
+.pick-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.pick-item .site-row { grid-template-columns: 52px 1fr; }
+.pick-item .btn { white-space: nowrap; }
+#pick-head { margin-bottom: 12px; }

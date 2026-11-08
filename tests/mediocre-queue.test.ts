@@ -17,10 +17,11 @@ function fixture(numbers = [1, 2], failure = "empty", tags?: unknown[]) {
   };
   const admin = { from(table: string) {
     const filters: ((r: Row) => boolean)[] = [];
-    let change: Row | undefined, insert: Row | undefined, head = false, limit = Infinity, order = "";
+    let change: Row | undefined, insert: Row | undefined, head = false, limit = Infinity;
+    const orders: [string, boolean][] = [];
     const result = () => {
       let data = tables[table].filter((r) => filters.every((f) => f(r)));
-      if (order) data = data.slice().sort((a, b) => a[order] < b[order] ? -1 : 1);
+      if (orders.length) data = data.slice().sort((a, b) => { for (const [k, asc] of orders) { if (a[k] === b[k]) continue; return (a[k] < b[k] ? -1 : 1) * (asc ? 1 : -1); } return 0; });
       data = data.slice(0, limit);
       if (insert) {
         if (failure === "insert" && table === "chapters" && insert.series_id === "series-1") return { data: null, error: { message: "insert refused" } };
@@ -36,7 +37,7 @@ function fixture(numbers = [1, 2], failure = "empty", tags?: unknown[]) {
       // Só o formato usado no importador: "coluna.is.null,coluna.eq.valor".
       or(expr: string) { const parts = expr.split(",").map((p) => p.split(".")); filters.push((r) => parts.some(([k, op, v]) => (op === "is" ? r[k!] == null : String(r[k!]) === v))); return query; },
       in(key: string, values: unknown[]) { filters.push((r) => values.includes(r[key])); return query; },
-      order(key: string) { order = key; return query; },
+      order(key: string, opts?: { ascending?: boolean }) { orders.push([key, opts?.ascending ?? true]); return query; },
       limit(n: number) { limit = n; return query; },
       update(value: Row) { change = value; return query; },
       insert(value: Row) { insert = value; return query; },
@@ -126,4 +127,11 @@ test("obra nova sem +18 deixa a idade para a classificação automática do banc
   tables.series = [];
   await importMediocreWork(admin, 1, { createdBy: null, chapterLimit: 0 });
   expect(tables.series[0]!.age_rating).toBeUndefined();
+});
+
+test("obra pedida por leitores passa na frente na fila do site", async () => {
+  const { admin, tables } = fixture([1], "empty");
+  tables.mediocre_queue[0]!.priority = 0;
+  tables.mediocre_queue[1]!.priority = 2;
+  expect(await processQueueTick(admin, now)).toMatchObject({ obraId: 2 });
 });

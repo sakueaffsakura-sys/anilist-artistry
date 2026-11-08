@@ -9,8 +9,9 @@
 //   • se a API travar por excesso de pedidos, pausa 1 minuto e continua do mesmo ponto;
 //   • se o tempo da execução acabar no meio de uma obra, ela fica "em andamento" e a próxima
 //     execução recomeça por ela.
-// Ordem: obras pedidas à mão → fila de publicação → obras novas ainda não enviadas → capítulos
-// novos das obras já publicadas.
+// Ordem: obras pedidas à mão → pedidos dos leitores (até 3 procurados por execução; uma obra com o
+// mesmo nome entra na fila com prioridade) → fila de publicação (em andamento, depois as mais pedidas
+// por leitores) → obras novas ainda não enviadas → capítulos novos das obras já publicadas.
 //
 // Variáveis (segredos do GitHub):
 //   MEDIOCRE_TOKEN  chave da MediocreScan (vai só para a MediocreScan, nunca para o site)
@@ -37,6 +38,7 @@ const DISCOVER_LISTS = ["/obras/adicionados-recentes", "/obras/atualizadas-recen
 const DISCOVER_PAGES = Math.min(Number(process.env.PAGINAS_DESCOBERTA) || 2, 10);
 const DISCOVER_PAGE_SIZE = { "/obras/adicionados-recentes": 20, "/obras/atualizadas-recentes": 30 };
 const SYNC_WORKS = 10; // obras publicadas verificadas por execução
+const REQUEST_SEARCHES = 3; // pedidos de leitores procurados na MediocreScan por execução (1 pedido à API cada)
 
 const started = Date.now();
 const timeLeft = () => BUDGET_MS - (Date.now() - started);
@@ -220,6 +222,37 @@ async function discover() {
   return items.map((i) => i.obraId);
 }
 
+/** Título comparável: sem acentos, minúsculo, só letras e números (igual ao site). */
+const titleKey = (v) => String(v || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
+/**
+ * Pedidos dos leitores sem obra escolhida: procura o título na MediocreScan e, quando há exatamente
+ * uma obra com o mesmo nome, liga o pedido a ela (entra na fila com prioridade). Os outros ficam para o admin no app.
+ */
+async function autoRequests() {
+  const r = await send({ action: "requests" });
+  const open = (r.groups || []).filter((g) => !g.mediocreId && !(g.kinds || []).includes("Novel")).slice(0, REQUEST_SEARCHES);
+  let linked = 0;
+  for (const g of open) {
+    if (timeLeft() < 5 * 60_000) break;
+    const want = titleKey(g.title);
+    const data = await mget("api", `/obras/buscar?${new URLSearchParams({ string: g.title.replace(/\s+/g, " ").trim().slice(0, 80) })}`);
+    const hits = new Map();
+    for (const o of listOf(data)) {
+      const id = Number(o?.obr_id ?? o?.id);
+      const names = [o?.obr_nome ?? o?.nome, ...(Array.isArray(o?.obr_titulos_alternativos) ? o.obr_titulos_alternativos : [])];
+      if (Number.isSafeInteger(id) && id > 0 && names.some((n) => titleKey(n) === want)) hits.set(id, String(o?.obr_nome ?? o?.nome ?? g.title));
+    }
+    if (hits.size !== 1) { console.log(`Pedido "${g.title}": ${hits.size ? `${hits.size} obras com esse nome` : "nada com esse nome"} na MediocreScan; fica para o admin escolher no app.`); continue; }
+    const [[obraId, title]] = [...hits];
+    const res = await send({ action: "request_link", ids: g.ids, obraId, title });
+    linked++;
+    console.log(`Pedido "${g.title}" (${g.count} leitor(es)) → obra ${obraId}: ${res.fulfilled ? "já estava no site, leitores avisados" : `na fila em ${res.position}º lugar`}.`);
+    rows.push(`| ${obraId} | pedido | ${res.slug ?? "-"} | ${g.count} leitor(es)${res.fulfilled ? ", atendido" : ", na fila"} |`);
+  }
+  return linked;
+}
+
 const rows = [];
 let totalAdded = 0;
 let unfinished = null;
@@ -249,6 +282,8 @@ async function runAll(ids, label, publish) {
 
 try {
   await runAll(MANUAL, "pedida", true);
+  // Pedidos de leitores primeiro: os encontrados entram na fila com prioridade e saem já nesta execução.
+  try { await autoRequests(); } catch (e) { if (e instanceof Fatal) throw e; console.error(`Pedidos: ${e.message}`); }
   const plan = await send({ action: "plan", syncLimit: SYNC_WORKS });
   const queue = (plan.queue || []).filter((id) => !MANUAL.includes(id));
   console.log(`Fila: ${queue.length} obra(s).`);

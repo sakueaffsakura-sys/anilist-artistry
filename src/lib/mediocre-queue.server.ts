@@ -24,7 +24,7 @@ export async function processQueueTick(admin: Admin, now = Date.now()): Promise<
 
   let { data: item } = await admin.from("mediocre_queue").select("*").eq("status", "running").order("created_at").limit(1).maybeSingle();
   if (!item) {
-    const { data: next } = await admin.from("mediocre_queue").select("*").eq("status", "waiting").order("created_at").limit(1).maybeSingle();
+    const { data: next } = await admin.from("mediocre_queue").select("*").eq("status", "waiting").order("priority", { ascending: false }).order("created_at").limit(1).maybeSingle();
     if (!next) return { state: "idle" };
     // Conditional update: two overlapping runs cannot both start a work.
     const { data: claimed } = await admin.from("mediocre_queue").update({ status: "running", updated_at: new Date(now).toISOString() })
@@ -56,7 +56,7 @@ export async function processQueueTick(admin: Admin, now = Date.now()): Promise<
     }).eq("id", item.id);
     if (done) {
       // The next work in line also waits the full interval.
-      const { data: following } = await admin.from("mediocre_queue").select("id").eq("status", "waiting").order("created_at").limit(1).maybeSingle();
+      const { data: following } = await admin.from("mediocre_queue").select("id").eq("status", "waiting").order("priority", { ascending: false }).order("created_at").limit(1).maybeSingle();
       if (following) await admin.from("mediocre_queue").update({ next_run_at: nextAt }).eq("id", following.id);
     }
     return { state: "chapter", obraId: item.obra_id, added: out.added, remaining: out.remaining, done };

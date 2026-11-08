@@ -252,10 +252,12 @@
     if (kind === "cap" && /^\d+$/.test(id)) return openChapter(Number(id), /^\d+$/.test(extra || "") ? Number(extra) : null);
     if (kind === "gerir" && /^[0-9a-f-]{36}$/i.test(id || "")) return openManage(id);
     if (kind === "site") return openSiteTab();
+    if (kind === "pedidos") return openRequests();
+    if (kind === "pedido" && id) return openPick(decodeURIComponent(id));
     openTab(TABS[kind] ? kind : "inicio");
   }
   function setView(v, title, back) {
-    ["list", "work", "reader", "site", "manage"].forEach((n) => { $(`view-${n}`).hidden = n !== v; });
+    ["list", "work", "reader", "site", "manage", "requests", "pick"].forEach((n) => { $(`view-${n}`).hidden = n !== v; });
     $("page-title").textContent = title; $("back").hidden = !back; $("brand").hidden = Boolean(back);
     window.scrollTo(0, 0);
     updateSendAll();
@@ -263,11 +265,12 @@
   $("back").onclick = () => { if (history.length > 1) history.back(); else go("#/inicio"); };
   document.querySelectorAll(".bottom-nav button").forEach((b) => { b.onclick = () => go(`#/${b.dataset.tab}`); });
   $("open-queue").onclick = () => go("#/fila");
+  $("open-requests").onclick = () => go("#/pedidos");
 
   /* ---------- listas ---------- */
   let page = 1, rows = [], loading = false, query = "", lastRaw = null;
   function openTab(tab) {
-    current = { tab }; page = 1; rows = []; lastRaw = null;
+    current = { tab }; page = 1; rows = []; lastRaw = null; pickGroup = null;
     setView("list", TABS[tab], false);
     document.querySelectorAll(".bottom-nav button").forEach((b) => { if (b.dataset.tab === tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
     const chips = CHIPS[tab];
@@ -344,7 +347,8 @@
     rows = items.map((i) => ({ id: i.id, title: i.title || `Obra ${i.id}`, cover: i.cover }));
     items.forEach((i) => marks.queued.add(i.id));
     if (!items.length) { $("list-meta").textContent = ""; empty("A fila do site está vazia."); updateSendAll(); return; }
-    $("list-meta").textContent = `${items.length} obra(s) na fila. Tire da fila as que você já finalizou.`;
+    const asked = items.filter((i) => i.priority > 0).length;
+    $("list-meta").textContent = `${items.length} obra(s) na fila${asked ? `, ${asked} pedida(s) por leitores (vão primeiro)` : ""}. Tire da fila as que você já finalizou.`;
     const clear = el("button", { type: "button", className: "btn ghost small", textContent: "Esvaziar a fila" });
     clear.onclick = async () => {
       if (busy()) { toast("Pare o envio antes de mexer na fila."); return; }
@@ -358,7 +362,8 @@
       const info = el("div", { className: "min0" },
         el("p", { className: "t", textContent: i.title || `Obra ${i.id}` }),
         el("p", { className: "s", textContent: `${i.chapters_on_site} capítulo(s) no site · ${status}` }),
-        el("div", {}, el("span", { className: `pill ${i.status === "running" ? "hot" : ""}`, textContent: "Fila" })));
+        el("div", {}, el("span", { className: `pill ${i.status === "running" ? "hot" : ""}`, textContent: "Fila" }),
+          i.priority > 0 ? el("span", { className: "pill hot", textContent: `Pedida por ${i.priority} leitor${i.priority === 1 ? "" : "es"}` }) : null));
       const open = el("button", { type: "button", className: "site-row queue-open" }, i.cover ? el("img", { src: i.cover, alt: "", loading: "lazy" }) : el("div", { className: "ph" }), info);
       open.onclick = () => go(`#/obra/${i.id}`);
       const remove = el("button", { type: "button", className: "chip-btn del", textContent: "Tirar da fila" });
@@ -417,6 +422,7 @@
       engine.thumbs(id).then((t) => { thumbsMap = t; if (work && work.id === id) renderChapters(); });
     }
     renderWork();
+    renderRequestCard();
     await refreshMarks([id]); renderSiteStatus();
     refreshChapterMarks(id);
   }
@@ -519,6 +525,129 @@
     catch (e) { toast(e.message); }
   };
 
+  /* ---------- pedidos dos leitores ---------- */
+  // Grupo = leitores que pediram a mesma obra. O admin escolhe a obra da MediocreScan; ela entra na fila
+  // com prioridade e os leitores são avisados quando for publicada (o site cuida disso).
+  let reqGroups = [], pickGroup = null, reqLoading = false;
+  const titleKey = (v) => String(v || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const readers = (n) => `${n} leitor${n === 1 ? "" : "es"}`;
+  async function loadRequests() {
+    const r = await engine.requests();
+    reqGroups = r.groups || [];
+    setRequestBadge(reqGroups.filter((g) => !g.mediocreId).reduce((n, g) => n + g.count, 0));
+    return reqGroups;
+  }
+  async function openRequests() {
+    pickGroup = null;
+    setView("requests", "Pedidos dos leitores", true);
+    $("req-list").innerHTML = ""; $("req-empty").hidden = true; $("req-meta").textContent = "Carregando…";
+    if (reqLoading) return;
+    reqLoading = true;
+    try {
+      const groups = await loadRequests();
+      const open = groups.filter((g) => !g.mediocreId).length;
+      $("req-meta").textContent = groups.length ? `${groups.length} obra(s) pedida(s) · ${open} esperando você escolher · mais pedidas primeiro` : "";
+      if (!groups.length) { const e = $("req-empty"); e.textContent = "Nenhum pedido esperando. Quando um leitor pedir uma obra, ela aparece aqui."; e.hidden = false; }
+      groups.forEach((g) => $("req-list").append(el("li", {}, requestCard(g, true))));
+    } catch (e) { $("req-meta").textContent = ""; const x = $("req-empty"); x.textContent = e.message; x.hidden = false; }
+    finally { reqLoading = false; }
+  }
+  function requestInfo(g) {
+    const when = fmtDate(g.first);
+    const state = g.queue === "running" ? "Enviando agora" : g.queue === "waiting" ? "Na fila com prioridade" : g.mediocreId ? "Obra escolhida (fora da fila)" : "Esperando você escolher a obra";
+    return [el("h2", {}, el("span", { className: "req-count", textContent: readers(g.count) }), document.createTextNode(g.title)),
+      el("p", { className: "s", textContent: [g.kinds.join(", "), `pedido em ${when}`, g.mediocreId ? `MediocreScan ${g.mediocreId}` : null].filter(Boolean).join(" · ") }),
+      el("span", { className: `pill ${g.mediocreId ? "hot" : "draft"}`, textContent: state }),
+      ...g.notes.map((n) => el("p", { className: "notes", textContent: n }))];
+  }
+  function requestCard(g, actions) {
+    const card = el("div", { className: "card req-card" }, ...requestInfo(g));
+    if (!actions) return card;
+    const pick = el("button", { type: "button", className: `btn small ${g.mediocreId ? "ghost" : "primary"}`, textContent: g.mediocreId ? "Trocar obra" : "Procurar na MediocreScan" });
+    pick.onclick = () => go(`#/pedido/${encodeURIComponent(g.key)}`);
+    const row = el("div", { className: "row" }, pick);
+    if (g.mediocreId) {
+      const open = el("button", { type: "button", className: "btn small ghost", textContent: "Ver obra" });
+      open.onclick = () => go(`#/obra/${g.mediocreId}`);
+      row.append(open);
+      if (!g.queue) {
+        const send = el("button", { type: "button", className: "btn small primary", textContent: "Pôr na fila de novo" });
+        send.onclick = () => linkRequest(g, { id: g.mediocreId, title: g.title });
+        row.append(send);
+      }
+    }
+    card.append(row);
+    return card;
+  }
+  async function openPick(key) {
+    setView("pick", "Atender pedido", true);
+    $("pick-list").innerHTML = ""; $("pick-empty").hidden = true; $("pick-meta").textContent = ""; $("pick-head").innerHTML = "";
+    let g = reqGroups.find((x) => x.key === key);
+    if (!g) { try { await loadRequests(); g = reqGroups.find((x) => x.key === key); } catch (e) { $("pick-meta").textContent = e.message; return; } }
+    if (!g) { $("pick-meta").textContent = "Este pedido já foi atendido."; return; }
+    pickGroup = g;
+    $("pick-head").append(...requestInfo(g));
+    $("pick-search").value = g.title.slice(0, 80);
+    searchPick(g.title);
+  }
+  $("form-pick").onsubmit = (e) => { e.preventDefault(); const q = $("pick-search").value.trim(); if (q) searchPick(q); };
+  $("pick-reject").onclick = async () => {
+    const g = pickGroup; if (!g) return;
+    const note = prompt(`Recusar ${g.count === 1 ? "o pedido" : `os ${g.count} pedidos`} de "${g.title}"? Escreva o motivo que os leitores vão ver:`, "Não encontramos esta obra para adicionar.");
+    if (note === null) return;
+    try { const r = await engine.requestReject(g.ids, note.trim()); toast(`${r.rejected} pedido(s) recusado(s).`); pickGroup = null; checkQueueDot(); go("#/pedidos"); }
+    catch (e) { toast(e.message); }
+  };
+  async function searchPick(text) {
+    if (!state.token) { $("pick-meta").textContent = "Cole a chave da MediocreScan para procurar a obra."; $("token-card").hidden = false; return; }
+    const g = pickGroup; if (!g) return;
+    $("pick-list").innerHTML = ""; $("pick-empty").hidden = true; $("pick-meta").textContent = "Procurando na MediocreScan…";
+    try {
+      const r = await engine.search(text, 1);
+      const want = titleKey(g.title);
+      const works = (r.works || []).slice().sort((a, b) => Number(titleKey(b.title) === want) - Number(titleKey(a.title) === want));
+      await refreshMarks(works.map((w) => w.id));
+      const same = works.filter((w) => titleKey(w.title) === want).length;
+      $("pick-meta").textContent = works.length ? `${works.length} resultado(s)${same ? ` · ${same} com o mesmo nome do pedido` : ""}. Toque na capa para conferir a obra.` : "";
+      if (!works.length) { const e = $("pick-empty"); e.textContent = "Nada encontrado. Tente outro nome (título original ou em inglês) ou o ID da obra."; e.hidden = false; }
+      works.forEach((w) => {
+        const st = statusOf(w.id);
+        const info = el("div", { className: "min0" }, el("p", { className: "t", textContent: w.title }),
+          el("p", { className: "s", textContent: `ID ${w.id}` }),
+          el("div", {}, titleKey(w.title) === want ? el("span", { className: "pill ok", textContent: "Mesmo nome" }) : null,
+            st === "ok" ? el("span", { className: "pill ok", textContent: "Já no site" }) : st === "queue" ? el("span", { className: "pill hot", textContent: "Na fila" }) : null));
+        const open = el("button", { type: "button", className: "site-row" }, w.cover ? el("img", { src: w.cover, alt: "", loading: "lazy" }) : el("div", { className: "ph" }), info);
+        open.onclick = () => go(`#/obra/${w.id}`);
+        const choose = el("button", { type: "button", className: "btn small primary", textContent: "Escolher" });
+        choose.onclick = () => linkRequest(g, w);
+        $("pick-list").append(el("li", { className: "pick-item" }, open, choose));
+      });
+    } catch (e) { $("pick-meta").textContent = ""; const x = $("pick-empty"); x.textContent = e.message; x.hidden = false; }
+  }
+  /** Obra aberta durante a escolha de um pedido: botão para usar esta obra. */
+  function renderRequestCard() {
+    const box = $("w-request"), g = pickGroup;
+    box.hidden = !g || !work; box.innerHTML = "";
+    if (!g || !work) return;
+    const use = el("button", { type: "button", className: "btn primary small", textContent: "Usar esta obra" });
+    use.onclick = () => linkRequest(g, work);
+    box.append(el("p", {}, el("strong", { textContent: `Pedido: ${g.title}` }), document.createTextNode(` · ${readers(g.count)}`)), el("div", { className: "row" }, use));
+  }
+  async function linkRequest(g, w) {
+    const title = w.title || w.name || `Obra ${w.id}`;
+    if (!confirm(`Atender ${g.count === 1 ? "o pedido" : `os ${g.count} pedidos`} de "${g.title}" com "${title}" (ID ${w.id})?`)) return;
+    try {
+      const r = await engine.requestLink(g.ids, w.id, title);
+      pickGroup = null;
+      if (r.fulfilled) { toast(`"${title}" já está no site: ${readers(r.fulfilled)} avisado(s).`); checkQueueDot(); go("#/pedidos"); return; }
+      marks.queued.add(w.id); checkQueueDot();
+      const where = r.position ? `${r.position}º lugar` : "na frente";
+      if (!busy() && confirm(`"${title}" entrou na fila do site em ${where}. Enviar agora? Os leitores são avisados assim que os primeiros capítulos chegarem.`)) { go("#/pedidos"); startRun([{ id: w.id, title }]); return; }
+      toast(busy() ? `Na fila em ${where}: vai primeiro no próximo envio da fila.` : `Na fila em ${where}.`);
+      go("#/pedidos");
+    } catch (e) { toast(e.message); }
+  }
+
   /* ---------- leitor ---------- */
   let chapterRaw = null, readerWork = null;
   async function openChapter(capId, workId) {
@@ -574,7 +703,7 @@
   let siteFilter = "todas", siteQuery = "", sitePage = 1, siteLoading = false;
   const fmtDate = (v) => { try { return new Date(v).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }); } catch (_) { return ""; } };
   function openSiteTab() {
-    current = { tab: "site" }; rows = [];
+    current = { tab: "site" }; rows = []; pickGroup = null;
     setView("site", "No site", false);
     document.querySelectorAll(".bottom-nav button").forEach((b) => { if (b.dataset.tab === "site") b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
     $("site-chips").innerHTML = "";
@@ -867,7 +996,17 @@
     state.session = null; save(); $("settings").close(); $("password").value = ""; $("code").value = ""; show("login");
   };
 
-  async function checkQueueDot() { try { const p = await engine.plan(); $("queue-dot").hidden = !(p.queue || []).length; } catch (_) { /* sem aviso */ } }
+  async function checkQueueDot() {
+    try {
+      const p = await engine.plan();
+      $("queue-dot").hidden = !(p.queue || []).length;
+      setRequestBadge(Number(p.requestsWaiting) || 0);
+    } catch (_) { /* sem aviso */ }
+  }
+  function setRequestBadge(n) {
+    const b = $("requests-count"); b.hidden = n <= 0; b.textContent = n > 99 ? "99+" : String(n);
+    $("open-requests").setAttribute("aria-label", n > 0 ? `Pedidos dos leitores: ${n} esperando` : "Pedidos dos leitores");
+  }
 
   /* ---------- início ---------- */
   /** Cartão "continuar envio": com auto=true continua sozinho em 8 s (o Android encerrou o app há pouco). */

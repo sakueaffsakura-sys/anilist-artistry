@@ -140,3 +140,15 @@ Só troca as funções de regra `auto_age_rating` e `auto_genres` (o gatilho e `
 Dados alterados: 23 das 32 obras ainda sem gênero ganharam gêneros, e 5 idades automáticas subiram de 14 para 16 (#TodaysUnderwearReport, Kouiu no Ga Ii, Succubus no Kuni no Hitoosu, Comprado pelo Lorde Demônio antes do Fim, The Story of Making My Bitchy Gal Sister Understand). Distribuição automática: 99 → 14, 7 → 16, 15 → 18. Idades escolhidas e `updated_at` não mudaram. Backup antes: `backup.series_0060` (121 linhas com idade, marca automática e gêneros anteriores).
 
 Reversão: recriar as duas funções como na 0059, restaurar `age_rating` e `genres` de `backup.series_0060` nas obras que ainda estiverem com `age_rating_auto` e remover o registro no histórico.
+
+## Pedidos dos leitores com prioridade — 2026-11-07
+
+Aplicada `0061_pedidos_prioridade.sql` e registrada no histórico Drizzle com o hash do arquivo. Antes, conferidos o histórico (61 registros, último 0060), os gatilhos de `work_requests`, `series` e `mediocre_queue`, e o fluxo inteiro numa transação desfeita (pedido ligado a uma obra da MediocreScan, segundo leitor pedindo a mesma obra, prioridade na fila, publicação atendendo os dois pedidos com aviso, título alternativo).
+
+- `work_requests.mediocre_id` e `queued_at`: obra da MediocreScan escolhida para o pedido (pelo app Estúdio ou pela automação).
+- `mediocre_queue.priority`: pedidos pendentes ligados à obra, mantido por gatilhos (`mediocre_queue_priority`, `work_requests_priority`).
+- Comparação de títulos (`request_title_key`, `series_title_keys`, `request_kind_fits`): sem acentos e pontuação, título principal e alternativos, e o formato só separa novel de quadrinho. `match_published_work_requests` também atende os pedidos ligados pelo `source_mediocre_id`; o gatilho da obra passa a olhar `alt_titles` e `source_mediocre_id`. `match_new_work_request` liga um pedido novo à obra já escolhida para o mesmo título.
+
+Dados alterados: o pedido pendente "Demon Lord’s Martial Arts Ascension" foi atendido (a obra já estava publicada com formato diferente do pedido) e o leitor recebeu o aviso. Backup antes: `backup.work_requests_0061` (3 pedidos pendentes com status, obra e resposta).
+
+Reversão: recriar `match_published_work_requests`, `match_new_work_request` e o gatilho `match_series_requests` como antes (título exato em minúsculas e mesmo formato), apagar os gatilhos e funções novos, remover as colunas novas e o registro no histórico.

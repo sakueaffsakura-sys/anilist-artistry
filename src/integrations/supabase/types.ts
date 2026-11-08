@@ -699,6 +699,7 @@ export type Database = {
           last_error: string | null
           next_run_at: string
           obra_id: number
+          priority: number
           slug: string | null
           status: string
           title: string | null
@@ -715,6 +716,7 @@ export type Database = {
           last_error?: string | null
           next_run_at?: string
           obra_id: number
+          priority?: number
           slug?: string | null
           status?: string
           title?: string | null
@@ -731,6 +733,7 @@ export type Database = {
           last_error?: string | null
           next_run_at?: string
           obra_id?: number
+          priority?: number
           slug?: string | null
           status?: string
           title?: string | null
@@ -1331,7 +1334,9 @@ export type Database = {
           created_at: string
           id: string
           kind: string
+          mediocre_id: number | null
           notes: string
+          queued_at: string | null
           series_id: string | null
           status: string
           title: string
@@ -1343,7 +1348,9 @@ export type Database = {
           created_at?: string
           id?: string
           kind?: string
+          mediocre_id?: number | null
           notes?: string
+          queued_at?: string | null
           series_id?: string | null
           status?: string
           title: string
@@ -1355,7 +1362,9 @@ export type Database = {
           created_at?: string
           id?: string
           kind?: string
+          mediocre_id?: number | null
           notes?: string
+          queued_at?: string | null
           series_id?: string | null
           status?: string
           title?: string

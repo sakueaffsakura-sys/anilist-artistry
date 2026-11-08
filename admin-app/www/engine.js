@@ -434,6 +434,10 @@
       chapterUpdate: (chapterId, published) => site({ action: "chapter_update", chapterId, published }),
       chapterDelete: (chapterId) => site({ action: "chapter_delete", chapterId }),
       siteDelete: (seriesId) => site({ action: "site_delete", seriesId, confirm: "EXCLUIR" }),
+      // Pedidos dos leitores: lista agrupada, ligar a uma obra da MediocreScan (entra na fila com prioridade) ou recusar.
+      requests: () => site({ action: "requests" }),
+      requestLink: (ids, obraId, title) => site({ action: "request_link", ids, obraId, title: title || null }),
+      requestReject: (ids, note) => site({ action: "request_reject", ids, note: note || "" }),
       stop() { if (running) stopFlag = true; },
       get running() { return running; },
     };
