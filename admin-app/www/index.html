@@ -52,6 +52,10 @@
         <div class="min0"><strong id="page-title">Estúdio</strong><span id="who"></span></div>
       </div>
       <div class="topbar-actions">
+        <button type="button" class="icon-btn" id="open-requests" aria-label="Pedidos dos leitores">
+          <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path fill="currentColor" d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm0 2v9h3.5a3.5 3.5 0 0 0 7 0H19V5zm3 3h8v2H8zm0-3h8v2H8z"/></svg>
+          <span class="count" id="requests-count" hidden></span>
+        </button>
         <button type="button" class="icon-btn" id="open-queue" aria-label="Fila do site">
           <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path fill="currentColor" d="M4 6h12v2H4zm0 5h12v2H4zm0 5h8v2H4zm14-2v-4h2v4h3l-4 4-4-4z"/></svg>
           <span class="dot" id="queue-dot" hidden></span>
@@ -92,8 +96,30 @@
       <button id="more" type="button" class="btn ghost wide" hidden>Carregar mais</button>
     </div>
 
+    <!-- Pedidos dos leitores -->
+    <div id="view-requests" class="view" hidden>
+      <p class="hint req-intro">Escolha a obra da MediocreScan que atende cada pedido: ela entra na fila do site na frente das outras (mais leitores pedindo, mais à frente) e os leitores são avisados quando ela for publicada.</p>
+      <p id="req-meta" class="list-meta"></p>
+      <ul id="req-list" class="req-list"></ul>
+      <p id="req-empty" class="empty" hidden></p>
+    </div>
+
+    <!-- Escolher a obra de um pedido -->
+    <div id="view-pick" class="view" hidden>
+      <div id="pick-head" class="card req-card"></div>
+      <form id="form-pick" class="row search">
+        <input id="pick-search" type="search" placeholder="Nome ou ID da obra na MediocreScan" enterkeyhint="search" />
+        <button class="btn" type="submit">Buscar</button>
+      </form>
+      <p id="pick-meta" class="list-meta"></p>
+      <ul id="pick-list" class="site-rows"></ul>
+      <p id="pick-empty" class="empty" hidden></p>
+      <button id="pick-reject" type="button" class="btn ghost wide">Não atender este pedido</button>
+    </div>
+
     <!-- Obra -->
     <article id="view-work" class="view" hidden>
+      <div id="w-request" class="card warn" hidden></div>
       <div class="work-hero">
         <div class="work-banner" id="w-banner"></div>
         <div class="work-head">

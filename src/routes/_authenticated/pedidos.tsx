@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/hooks/useAuth";
 import { KINDS } from "@/lib/queries";
-import { fetchWorkRequests, REQUEST_STATUS } from "@/lib/work-requests";
+import { fetchWorkRequests, requestStatusLabel } from "@/lib/work-requests";
 import { useServerFn } from "@tanstack/react-start";
 import { autoFulfillRequest } from "@/lib/mediocre-import.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,7 +49,7 @@ function RequestsPage() {
         <div><label htmlFor="request-notes" className="mb-2 block text-sm">Detalhes (opcional)</label><Textarea id="request-notes" maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} rows={4} /></div>
         <Button type="submit" disabled={save.isPending || title.trim().length < 2}><Send className="h-4 w-4" />{save.isPending ? "Procurando a obra…" : "Enviar pedido"}</Button>
       </form>
-      <section><h2 className="mb-4 font-display text-xl font-semibold">Meus pedidos</h2>{query.isPending ? <p className="text-muted-foreground">Carregando…</p> : query.isError ? <p role="alert" className="text-destructive">Não foi possível carregar seus pedidos.</p> : !query.data?.length ? <p className="text-sm text-muted-foreground">Você ainda não enviou pedidos.</p> : <div className="divide-y divide-border">{query.data.map((item) => <article key={item.id} className="py-5"><div className="flex flex-wrap justify-between gap-2"><h3 className="font-semibold">{item.title}</h3><span className="text-sm text-primary">{REQUEST_STATUS[item.status as keyof typeof REQUEST_STATUS]}</span></div><p className="mt-1 text-xs text-muted-foreground">{item.kind} · {new Date(item.created_at).toLocaleDateString("pt-BR")}</p>{item.admin_note ? <p className="mt-3 text-sm text-muted-foreground">{item.admin_note}</p> : null}{item.series ? <Button asChild variant="outline" size="sm" className="mt-3"><Link to="/obra/$slug" params={{ slug: item.series.slug }}>Ver obra</Link></Button> : null}</article>)}</div>}</section>
+      <section><h2 className="mb-4 font-display text-xl font-semibold">Meus pedidos</h2>{query.isPending ? <p className="text-muted-foreground">Carregando…</p> : query.isError ? <p role="alert" className="text-destructive">Não foi possível carregar seus pedidos.</p> : !query.data?.length ? <p className="text-sm text-muted-foreground">Você ainda não enviou pedidos.</p> : <div className="divide-y divide-border">{query.data.map((item) => <article key={item.id} className="py-5"><div className="flex flex-wrap justify-between gap-2"><h3 className="font-semibold">{item.title}</h3><span className="text-sm text-primary">{requestStatusLabel(item)}</span></div><p className="mt-1 text-xs text-muted-foreground">{item.kind} · {new Date(item.created_at).toLocaleDateString("pt-BR")}</p>{item.admin_note ? <p className="mt-3 text-sm text-muted-foreground">{item.admin_note}</p> : null}{item.series ? <Button asChild variant="outline" size="sm" className="mt-3"><Link to="/obra/$slug" params={{ slug: item.series.slug }}>Ver obra</Link></Button> : null}</article>)}</div>}</section>
     </div>
   </main><SiteFooter /></div>;
 }

@@ -2,6 +2,12 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const REQUEST_STATUS = { pending: "Aguardando", fulfilled: "Adicionada", rejected: "Não atendida" } as const;
 
+/** Status para mostrar: pedido pendente com obra já escolhida pelo admin está na fila de envio (com prioridade). */
+export function requestStatusLabel(item: { status: string; mediocre_id?: number | null }): string {
+  if (item.status === "pending" && item.mediocre_id) return "Na fila de envio";
+  return REQUEST_STATUS[item.status as keyof typeof REQUEST_STATUS] ?? item.status;
+}
+
 export async function fetchWorkRequests(userId?: string) {
   let query = supabase.from("work_requests").select("*, series(slug, title), profiles(username)").order("created_at", { ascending: false }).limit(100);
   if (userId) query = query.eq("user_id", userId);

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { importChapter, importMediocreWork, type MediocreGetter } from "./mediocre-import.server";
 import { enqueueWorks } from "./mediocre-queue.server";
+import { titleKey } from "./mediocre-api";
 
 type Admin = SupabaseClient<Database>;
 export const INGEST_MAX_BYTES = 6_000_000;
@@ -35,7 +36,13 @@ export type IngestBody =
   | { action: "site_update"; seriesId: string; patch: SitePatch }
   | { action: "chapter_update"; chapterId: string; published: boolean }
   | { action: "chapter_delete"; chapterId: string }
-  | { action: "site_delete"; seriesId: string; confirm: string };
+  | { action: "site_delete"; seriesId: string; confirm: string }
+  | { action: "requests" }
+  | { action: "request_link"; ids: string[]; obraId: number; title: string | null }
+  | { action: "request_reject"; ids: string[]; note: string };
+
+/** Pedidos por chamada de ligar/recusar (um grupo = os leitores que pediram a mesma obra). */
+export const INGEST_MAX_REQUESTS = 50;
 
 /** Gerenciamento das obras do site pelo app Estúdio (somente administradores, como todo o endpoint). */
 export type SiteFilter = "todas" | "publicadas" | "rascunhos" | "mediocre";
@@ -59,7 +66,7 @@ function workId(v: unknown): number {
 
 /** Validates the helper payload shape; throws a readable message on anything unexpected. */
 export function parseIngestBody(v: unknown): IngestBody {
-  const o = v as { obraId?: unknown; action?: unknown; work?: unknown; chapters?: unknown; publish?: unknown; syncLimit?: unknown; added?: unknown; remaining?: unknown; ids?: unknown; items?: unknown; filter?: unknown; q?: unknown; page?: unknown; seriesId?: unknown; chapterId?: unknown; patch?: unknown; published?: unknown; confirm?: unknown } | null;
+  const o = v as { obraId?: unknown; action?: unknown; work?: unknown; chapters?: unknown; publish?: unknown; syncLimit?: unknown; added?: unknown; remaining?: unknown; ids?: unknown; items?: unknown; filter?: unknown; q?: unknown; page?: unknown; seriesId?: unknown; chapterId?: unknown; patch?: unknown; published?: unknown; confirm?: unknown; note?: unknown; title?: unknown } | null;
   if (!o || typeof o !== "object") throw new Error("Corpo inválido.");
   if (o.action === "site_list") {
     const filter = (["todas", "publicadas", "rascunhos", "mediocre"] as const).find((f) => f === o.filter) ?? "todas";
@@ -92,6 +99,13 @@ export function parseIngestBody(v: unknown): IngestBody {
   if (o.action === "site_delete") {
     if (o.confirm !== "EXCLUIR") throw new Error('Para excluir, confirme digitando EXCLUIR.');
     return { action: "site_delete", seriesId: uuid(o.seriesId, "Obra"), confirm: "EXCLUIR" };
+  }
+  if (o.action === "requests") return { action: "requests" };
+  if (o.action === "request_link" || o.action === "request_reject") {
+    if (!Array.isArray(o.ids) || !o.ids.length || o.ids.length > INGEST_MAX_REQUESTS) throw new Error(`Envie de 1 a ${INGEST_MAX_REQUESTS} pedidos por vez.`);
+    const ids = [...new Set(o.ids.map((id) => uuid(id, "Pedido")))];
+    if (o.action === "request_reject") return { action: "request_reject", ids, note: typeof o.note === "string" ? o.note.trim().slice(0, 500) : "" };
+    return { action: "request_link", ids, obraId: workId(o.obraId), title: typeof o.title === "string" ? o.title.slice(0, 300) : null };
   }
   if (o.action === "plan") {
     const n = o.syncLimit === undefined ? 10 : count(o.syncLimit, "Limite");
@@ -145,10 +159,16 @@ export function suppliedGetter(api: Record<string, unknown>, cdn: unknown): Medi
  * first, then the rest in order) and the published works checked least recently. Queued works are
  * reserved so the site's own queue tick does not copy the same chapters at the same time.
  */
-type PlanItem = { id: number; title: string | null; status: string; cover: string | null; slug: string | null; chapters_on_site: number; chapters_added: number; updated_at: string };
-export async function ingestPlan(admin: Admin, syncLimit: number): Promise<{ queue: number[]; items: PlanItem[]; sync: number[] }> {
-  const { data: q } = await admin.from("mediocre_queue").select("obra_id, status, title, chapters_added, updated_at").in("status", ["running", "waiting"]).order("created_at").limit(50);
-  const rows = [...(q ?? [])].sort((a, b) => (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1));
+type PlanItem = { id: number; title: string | null; status: string; cover: string | null; slug: string | null; chapters_on_site: number; chapters_added: number; updated_at: string; priority: number };
+/** Ordem da fila: a obra em andamento, depois as pedidas por leitores (mais pedidos primeiro), depois a ordem de chegada. */
+export function queueOrder<T extends { status: string; priority?: number | null; created_at: string }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1) || (b.priority ?? 0) - (a.priority ?? 0) || a.created_at.localeCompare(b.created_at));
+}
+export async function ingestPlan(admin: Admin, syncLimit: number): Promise<{ queue: number[]; items: PlanItem[]; sync: number[]; requestsWaiting: number }> {
+  const { data: q } = await admin.from("mediocre_queue").select("obra_id, status, title, chapters_added, updated_at, created_at, priority").in("status", ["running", "waiting"]).order("priority", { ascending: false }).order("created_at").limit(50);
+  const rows = queueOrder(q ?? []);
+  // Pedidos de leitores ainda sem obra escolhida: o app mostra o número para o admin atender.
+  const { count: requestsWaiting } = await admin.from("work_requests").select("id", { count: "exact", head: true }).eq("status", "pending").is("mediocre_id", null);
   const queue = rows.map((r) => Number(r.obra_id)).filter((n) => Number.isSafeInteger(n) && n > 0);
   // Capa e capítulos que a obra já tem no site, para a fila do app mostrar e ajudar a limpar.
   const { data: ss } = queue.length
@@ -157,14 +177,14 @@ export async function ingestPlan(admin: Admin, syncLimit: number): Promise<{ que
   const bySource = new Map((ss ?? []).map((r) => [Number(r.source_mediocre_id), r as { cover_url: string | null; slug: string; title: string; chapters?: { count: number }[] | null }]));
   const items: PlanItem[] = rows.filter((r) => queue.includes(Number(r.obra_id))).map((r) => {
     const sr = bySource.get(Number(r.obra_id));
-    return { id: Number(r.obra_id), title: r.title ?? sr?.title ?? null, status: r.status, cover: sr?.cover_url ?? null, slug: sr?.slug ?? null, chapters_on_site: sr?.chapters?.[0]?.count ?? 0, chapters_added: r.chapters_added, updated_at: r.updated_at };
+    return { id: Number(r.obra_id), title: r.title ?? sr?.title ?? null, status: r.status, cover: sr?.cover_url ?? null, slug: sr?.slug ?? null, chapters_on_site: sr?.chapters?.[0]?.count ?? 0, chapters_added: r.chapters_added, updated_at: r.updated_at, priority: r.priority ?? 0 };
   });
   if (queue.length) await admin.from("mediocre_queue").update({ next_run_at: reserveUntil() }).in("obra_id", queue).in("status", ["running", "waiting"]);
-  if (!syncLimit) return { queue, items, sync: [] };
+  if (!syncLimit) return { queue, items, sync: [], requestsWaiting: requestsWaiting ?? 0 };
   const { data: s } = await admin.from("series").select("source_mediocre_id")
     .not("source_mediocre_id", "is", null).order("mediocre_synced_at", { ascending: true, nullsFirst: true }).limit(syncLimit);
   const sync = (s ?? []).map((r) => Number(r.source_mediocre_id)).filter((n) => Number.isSafeInteger(n) && n > 0 && !queue.includes(n));
-  return { queue, items, sync };
+  return { queue, items, sync, requestsWaiting: requestsWaiting ?? 0 };
 }
 
 /**
@@ -288,6 +308,14 @@ export async function runIngest(admin: Admin, body: IngestBody, createdBy: strin
     return { deleted: s.id, added: 0, skipped: 0 };
   }
   if (body.action === "plan") return { ...(await ingestPlan(admin, body.syncLimit)), added: 0, skipped: 0 };
+  if (body.action === "requests") return { groups: await requestGroups(admin), added: 0, skipped: 0 };
+  if (body.action === "request_link") return { ...(await linkRequests(admin, body, createdBy)), added: 0, skipped: 0 };
+  if (body.action === "request_reject") {
+    const { data, error } = await admin.from("work_requests").update({ status: "rejected", admin_note: body.note || "Não encontramos esta obra para adicionar.", mediocre_id: null })
+      .in("id", body.ids).eq("status", "pending").select("id");
+    if (error) throw new Error("Não foi possível recusar os pedidos.");
+    return { rejected: (data ?? []).length, added: 0, skipped: 0 };
+  }
   if (body.action === "check") return { ...(await ingestCheck(admin, body.ids)), added: 0, skipped: 0 };
   if (body.action === "enqueue") {
     const r = await enqueueWorks(admin, body.items, createdBy);
@@ -298,7 +326,9 @@ export async function runIngest(admin: Admin, body: IngestBody, createdBy: strin
   if (body.action === "finish") { await finishIngest(admin, body, createdBy); return { ok: true, added: 0, skipped: 0 }; }
   if (body.action === "work") {
     await keepReserved(admin, body.obraId);
-    const r = await importMediocreWork(admin, body.obraId, { createdBy, chapterLimit: 0, draft: !body.publish, get: suppliedGetter({ [`/obras/${body.obraId}`]: body.work }, null) });
+    // Obra pedida por leitores entra como rascunho e é publicada com os primeiros capítulos (o aviso não chega com a obra vazia).
+    const requested = await hasLinkedRequests(admin, body.obraId);
+    const r = await importMediocreWork(admin, body.obraId, { createdBy, chapterLimit: 0, draft: !body.publish || requested, get: suppliedGetter({ [`/obras/${body.obraId}`]: body.work }, null) });
     return { slug: r.slug, created: r.created, pendingCapIds: r.pendingCapIds, remaining: r.remaining, added: 0, skipped: 0 };
   }
   const { data: s } = await admin.from("series").select("id, slug, kind").eq("source_mediocre_id", body.obraId).maybeSingle();
@@ -309,5 +339,95 @@ export async function runIngest(admin: Admin, body: IngestBody, createdBy: strin
     const ok = await importChapter(admin, s.id, c.capId, s.kind === "Novel", suppliedGetter({ [`/capitulos/${c.capId}`]: c.meta }, c.content));
     ok ? added++ : skipped++;
   }
+  if (added) await publishRequested(admin, body.obraId);
   return { slug: s.slug, created: false, pendingCapIds: [] as number[], added, skipped };
+}
+
+/* ---------- pedidos dos leitores ---------- */
+
+export type RequestGroup = {
+  key: string; title: string; kinds: string[]; count: number; first: string; last: string;
+  notes: string[]; ids: string[]; mediocreId: number | null; queue: "waiting" | "running" | null;
+};
+
+/** Mesma obra pedida por vários leitores = um grupo (título sem acentos/pontuação; novel separada). */
+export function requestGroupKey(title: string, kind: string): string {
+  return `${titleKey(title)}${kind === "Novel" ? "|novel" : ""}`;
+}
+
+/** Agrupa pedidos pendentes: mais leitores primeiro, depois o pedido mais antigo. */
+export function groupRequests(rows: { id: string; title: string; kind: string; notes: string | null; created_at: string; mediocre_id: number | null }[]): RequestGroup[] {
+  const groups = new Map<string, RequestGroup>();
+  for (const r of rows) {
+    const key = requestGroupKey(r.title, r.kind);
+    if (!key.replace("|novel", "")) continue;
+    const g = groups.get(key) ?? { key, title: r.title.trim(), kinds: [], count: 0, first: r.created_at, last: r.created_at, notes: [], ids: [], mediocreId: null, queue: null };
+    g.count++; g.ids.push(r.id);
+    if (!g.kinds.includes(r.kind)) g.kinds.push(r.kind);
+    if (r.created_at < g.first) g.first = r.created_at;
+    if (r.created_at > g.last) g.last = r.created_at;
+    const note = (r.notes ?? "").trim();
+    if (note && g.notes.length < 3 && !g.notes.includes(note)) g.notes.push(note.slice(0, 300));
+    if (r.mediocre_id && !g.mediocreId) g.mediocreId = r.mediocre_id;
+    groups.set(key, g);
+  }
+  return [...groups.values()].sort((a, b) => b.count - a.count || a.first.localeCompare(b.first));
+}
+
+async function requestGroups(admin: Admin): Promise<RequestGroup[]> {
+  const { data, error } = await admin.from("work_requests").select("id, title, kind, notes, created_at, mediocre_id").eq("status", "pending").order("created_at").limit(500);
+  if (error) throw new Error("Não foi possível carregar os pedidos.");
+  const groups = groupRequests(data ?? []);
+  const linked = [...new Set(groups.map((g) => g.mediocreId).filter((n): n is number => n !== null))];
+  if (linked.length) {
+    const { data: q } = await admin.from("mediocre_queue").select("obra_id, status").in("obra_id", linked).in("status", ["waiting", "running"]);
+    const st = new Map((q ?? []).map((r) => [Number(r.obra_id), r.status as "waiting" | "running"]));
+    for (const g of groups) g.queue = g.mediocreId ? st.get(g.mediocreId) ?? null : null;
+  }
+  return groups;
+}
+
+async function hasLinkedRequests(admin: Admin, obraId: number): Promise<boolean> {
+  const { count } = await admin.from("work_requests").select("id", { count: "exact", head: true }).eq("status", "pending").eq("mediocre_id", obraId);
+  return (count ?? 0) > 0;
+}
+
+/** Obra pedida que já tem capítulo no site: publica (o banco atende os pedidos e avisa os leitores). */
+async function publishRequested(admin: Admin, obraId: number): Promise<boolean> {
+  if (!(await hasLinkedRequests(admin, obraId))) return false;
+  const { data: s } = await admin.from("series").select("id, published, chapters(count)").eq("source_mediocre_id", obraId).maybeSingle();
+  const chapters = (s as { chapters?: { count: number }[] } | null)?.chapters?.[0]?.count ?? 0;
+  if (!s || s.published || !chapters) return false;
+  const { error } = await admin.from("series").update({ published: true }).eq("id", s.id);
+  return !error;
+}
+
+/**
+ * O admin escolheu no app a obra da MediocreScan que atende estes pedidos. Se ela já está no site,
+ * os pedidos são atendidos agora; senão entra na fila na frente das outras (prioridade = leitores).
+ */
+async function linkRequests(admin: Admin, body: { ids: string[]; obraId: number; title: string | null }, createdBy: string) {
+  const now = new Date().toISOString();
+  const { data: reqs, error } = await admin.from("work_requests").update({ mediocre_id: body.obraId, queued_at: now })
+    .in("id", body.ids).eq("status", "pending").select("id");
+  if (error) throw new Error("Não foi possível ligar os pedidos.");
+  const ids = (reqs ?? []).map((r) => r.id);
+  if (!ids.length) throw new Error("Esses pedidos já foram atendidos.");
+  const { data: s } = await admin.from("series").select("id, slug, published, chapters(count)").eq("source_mediocre_id", body.obraId).maybeSingle();
+  if (s) {
+    if (!s.published) await publishRequested(admin, body.obraId);
+    const { data: fresh } = await admin.from("series").select("id, slug, published").eq("id", s.id).maybeSingle();
+    if (fresh?.published) {
+      // Pedidos ligados depois da publicação: o gatilho da obra não roda de novo, então atende aqui.
+      await admin.from("work_requests").update({ status: "fulfilled", series_id: fresh.id }).in("id", ids).eq("status", "pending");
+      return { linked: ids.length, fulfilled: ids.length, queued: false, slug: fresh.slug };
+    }
+  }
+  // Volta para a fila mesmo que já tenha passado por ela (terminada ou com erro).
+  await admin.from("mediocre_queue").delete().eq("obra_id", body.obraId).in("status", ["done", "error"]);
+  const { data: q } = await admin.from("mediocre_queue").select("id").eq("obra_id", body.obraId).in("status", ["waiting", "running"]).limit(1).maybeSingle();
+  if (!q) await admin.from("mediocre_queue").insert({ obra_id: body.obraId, title: body.title, created_by: createdBy });
+  const { data: pos } = await admin.from("mediocre_queue").select("obra_id, status, priority, created_at").in("status", ["waiting", "running"]).limit(200);
+  const position = queueOrder(pos ?? []).findIndex((r) => Number(r.obra_id) === body.obraId) + 1;
+  return { linked: ids.length, fulfilled: 0, queued: true, position, slug: s?.slug ?? null };
 }
