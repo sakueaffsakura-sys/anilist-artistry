@@ -26,7 +26,7 @@ concurrency:
 
 jobs:
   telas:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # o Playwright ainda não roda no Ubuntu 26.04 (padrão do GitHub desde nov. 2026)
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
