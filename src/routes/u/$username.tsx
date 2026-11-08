@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -53,6 +53,22 @@ import { useSession } from "@/hooks/useAuth";
 import { coverUrl, timeAgo } from "@/lib/media";
 import { FramedAvatar } from "@/components/FramedAvatar";
 import { UserBadges, type Badge } from "@/components/UserBadges";
+import { SeriesCard } from "@/components/SeriesCard";
+import { HScroll, SectionRow, shelfItem } from "@/components/SectionRow";
+import { compactNumber } from "@/lib/format";
+
+/** Avatar menor no celular (o cabeçalho do perfil cabe em 360 px sem quebrar). */
+function useAvatarSize() {
+  const [size, setSize] = useState(88);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const update = () => setSize(mq.matches ? 128 : 88);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return size;
+}
 
 export const Route = createFileRoute("/u/$username")({
   staticData: { sitemap: false },
@@ -86,8 +102,9 @@ function Perfil() {
   const { username } = Route.useParams();
   const { user } = useSession();
   const qc = useQueryClient();
-  const [tab, setTab] = useState<"colecao" | "listas" | "comentarios" | "tags">("colecao");
+  const [tab, setTab] = useState<"visao" | "colecao" | "listas" | "comentarios">("visao");
   const [collectionTab, setCollectionTab] = useState<"favoritos" | "continuando" | "interessado" | "lendo" | "lido" | "dropado" | "planejo">("favoritos");
+  const avatarSize = useAvatarSize();
   const [body, setBody] = useState("");
   const [editing, setEditing] = useState(false);
 
@@ -205,7 +222,7 @@ function Perfil() {
     return (
       <div className="min-h-screen">
         <SiteHeader />
-        <p className="mx-auto max-w-7xl px-4 py-16 text-muted-foreground">Carregando…</p>
+        <p role="status" className="mx-auto max-w-6xl px-4 py-16 text-muted-foreground">Carregando perfil…</p>
       </div>
     );
   }
@@ -213,7 +230,10 @@ function Perfil() {
     return (
       <div className="min-h-screen">
         <SiteHeader />
-        <p className="mx-auto max-w-7xl px-4 py-16 text-muted-foreground">Perfil não encontrado.</p>
+        <div className="mx-auto max-w-6xl px-4 py-16">
+          <h1 className="font-display text-xl font-bold">Perfil não encontrado</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Confira o nome de usuário ou procure em <Link to="/ranking-leitores" className="text-primary">Leitores</Link>.</p>
+        </div>
       </div>
     );
   }
@@ -221,281 +241,236 @@ function Perfil() {
   const levelFloor = Math.max(0, (p.level - 1) * 1000);
   const xpInLevel = Math.max(0, p.xp - levelFloor);
   const xpGoal = 1000;
-  const menu = isMe
-    ? [
-        { to: "/biblioteca", label: "Coleção", icon: Library },
-        { to: "/listas", label: "Minhas listas", icon: ListOrdered },
-        { to: "/historico", label: "Histórico", icon: History },
-      ]
-    : [];
-  const collectionTabs = [
-    { id: "favoritos", label: "Favoritos", shortLabel: "Favoritos", icon: Heart },
-    { id: "continuando", label: "Continue lendo", shortLabel: "Continue", icon: BookOpen },
-    { id: "interessado", label: "Interessado", shortLabel: "Interessado", icon: Sparkles },
-    { id: "lendo", label: "Lendo", shortLabel: "Lendo", icon: Play },
-    { id: "lido", label: "Lido", shortLabel: "Lido", icon: Check },
-    { id: "dropado", label: "Dropado", shortLabel: "Dropado", icon: Ban },
-    { id: "planejo", label: "Planejo Ler", shortLabel: "Planejo Ler", icon: BookmarkPlus },
-  ] as const;
-  const continuedSeries = (() => {
+  const continuedRows = (() => {
     const seen = new Set<string>();
     return (stats.data?.readingHistory ?? []).filter((row) => {
       if (seen.has(row.series_id)) return false;
       seen.add(row.series_id);
       return true;
-    }).map((row) => row.series);
+    });
   })();
-  const collectionItems = collectionTab === "favoritos"
-    ? (stats.data?.favorites ?? [])
-    : collectionTab === "continuando"
-      ? continuedSeries
-      : (stats.data?.readingStatuses ?? []).filter((row) => row.status === collectionTab).map((row) => row.series);
-  const readCount = (stats.data?.readingStatuses ?? []).filter((row) => row.status === "lido").length;
-  const joinedAt = new Date(p.created_at).toLocaleDateString("pt-BR", { month: "short", year: "numeric" });
+  const continuedSeries = continuedRows.map((row) => row.series);
+  const statusSeries = (status: string) => (stats.data?.readingStatuses ?? []).filter((row) => row.status === status).map((row) => row.series);
+  const collectionTabs = [
+    { id: "favoritos", label: "Favoritos", icon: Heart, items: stats.data?.favorites ?? [] },
+    { id: "continuando", label: "Lendo recentemente", icon: History, items: continuedSeries },
+    { id: "lendo", label: "Lendo", icon: Play, items: statusSeries("lendo") },
+    { id: "lido", label: "Lido", icon: Check, items: statusSeries("lido") },
+    { id: "planejo", label: "Planejo ler", icon: BookmarkPlus, items: statusSeries("planejo") },
+    { id: "interessado", label: "Interessado", icon: Sparkles, items: statusSeries("interessado") },
+    { id: "dropado", label: "Dropado", icon: Ban, items: statusSeries("dropado") },
+  ] as const;
+  const activeCollection = collectionTabs.find((item) => item.id === collectionTab) ?? collectionTabs[0];
+  const worksCount = new Set([...(stats.data?.favorites ?? []).map((x) => x.id), ...(stats.data?.readingStatuses ?? []).map((x) => x.series.id)]).size;
+  const lists = stats.data?.publicLists ?? [];
+  const joinedAt = new Date(p.created_at).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const name = p.display_name || p.username;
+  const openCollection = (id: typeof collectionTab) => { setCollectionTab(id); setTab("colecao"); };
+  const share = async () => {
+    try { await navigator.clipboard.writeText(window.location.href); toast.success("Link do perfil copiado"); }
+    catch { toast.error("Não foi possível copiar o link"); }
+  };
+  const tabs = [
+    { id: "visao", label: "Visão geral", icon: LayoutGrid, count: undefined },
+    { id: "colecao", label: "Coleção", icon: Library, count: worksCount },
+    { id: "listas", label: "Listas", icon: ListOrdered, count: lists.length },
+    { id: "comentarios", label: "Mural", icon: MessageSquare, count: undefined },
+  ] as const;
+  const level = <LevelCard level={p.level} xp={p.xp} xpInLevel={xpInLevel} xpGoal={xpGoal} totalRank={stats.data?.totalRank ?? 0} weeklyRank={stats.data?.weeklyRank ?? 0} />;
+  const badgesCard = <BadgesCard badges={stats.data?.badges ?? []} tier={p.subscription_tier} isAdmin={stats.data?.isAdmin ?? false} isMe={isMe} onEdit={() => setEditing(true)} />;
 
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <main className="pb-10">
-        <div className="relative h-48 overflow-hidden bg-surface sm:h-80">
-          {p.banner_url ? (
-            <img src={p.banner_url} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <div className="h-full w-full bg-[radial-gradient(ellipse_at_top,var(--primary),transparent_70%)] opacity-30" />
-          )}
-          <span className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-          <Button asChild variant="secondary" size="icon" className="absolute left-4 top-4 rounded-full bg-background/40 backdrop-blur-md sm:left-6 sm:top-6">
-            <Link to="/" aria-label="Voltar"><ArrowLeft className="h-5 w-5" /></Link>
-          </Button>
+      <main className="site-content pb-12">
+        <div className="profile-banner" style={!p.banner_url && p.accent_color ? { background: `color-mix(in oklab, ${p.accent_color} 28%, var(--surface))` } : undefined}>
+          {p.banner_url ? <img src={p.banner_url} alt="" /> : null}
         </div>
 
-        <OwnerProfileHeader
-          profile={p}
-          followers={stats.data?.followers ?? 0}
-          following={stats.data?.following ?? 0}
-          totalRank={stats.data?.totalRank ?? 0}
-          weeklyRank={stats.data?.weeklyRank ?? 0}
-          badges={stats.data?.badges ?? []}
-          isAdmin={stats.data?.isAdmin ?? false}
-          xpInLevel={xpInLevel}
-          xpGoal={xpGoal}
-          joinedAt={joinedAt}
-          onEdit={() => setEditing(true)}
-          action={isMe ? (
-            <Button variant="secondary" className="col-span-2 rounded-lg text-xs font-bold" onClick={() => setEditing(true)}><Pencil className="h-3.5 w-3.5" /> Editar perfil</Button>
-          ) : user ? (
-            <Button className="col-span-2 rounded-lg text-xs font-bold" variant={stats.data?.iFollow ? "outline" : "default"} onClick={() => follow.mutate()}><UserPlus className="h-3.5 w-3.5" /> {stats.data?.iFollow ? "Seguindo" : "Seguir"}</Button>
-          ) : null}
-        />
-
-        {isMe ? (
-          <OwnerOverview
-            collectionCount={(stats.data?.favorites.length ?? 0) + (stats.data?.readingStatuses.length ?? 0)}
-            readingCount={(stats.data?.readingStatuses ?? []).filter((row) => row.status === "lendo").length}
-            readCount={readCount}
-            favoritesCount={stats.data?.favorites.length ?? 0}
-            commentsCount={stats.data?.comments ?? 0}
-            followersCount={stats.data?.followers ?? 0}
-            badges={stats.data?.badges ?? []}
-            tier={p.subscription_tier}
-            isAdmin={stats.data?.isAdmin ?? false}
-            onEdit={() => setEditing(true)}
-          />
-        ) : <>
-          <OwnerOverview
-            isMe={false}
-            collectionCount={(stats.data?.favorites.length ?? 0) + (stats.data?.readingStatuses.length ?? 0)}
-            readingCount={(stats.data?.readingStatuses ?? []).filter((row) => row.status === "lendo").length}
-            readCount={readCount}
-            favoritesCount={stats.data?.favorites.length ?? 0}
-            commentsCount={stats.data?.comments ?? 0}
-            followersCount={stats.data?.followers ?? 0}
-            badges={stats.data?.badges ?? []}
-            tier={p.subscription_tier}
-            isAdmin={stats.data?.isAdmin ?? false}
-            onEdit={() => setEditing(true)}
-          />
-          <div className="mx-auto max-w-7xl px-4 sm:px-6">
-
-          <section className="min-w-0 pt-6">
-            <div className="sticky top-0 z-20 -mx-4 overflow-x-auto border-y border-border bg-background/80 px-4 py-2 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:rounded-lg sm:border">
-              <div className="flex min-w-max items-center gap-1">
-                {([
-                  { id: "colecao", label: "Coleção", icon: Library },
-                  { id: "listas", label: "Listas", icon: ListOrdered },
-                  { id: "comentarios", label: "Comentários", icon: MessageSquare },
-                  { id: "tags", label: "Tags", icon: Tag },
-                ] as const).map((item) => (
-                  <Button
-                    key={item.id}
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setTab(item.id)}
-                    className={tab === item.id ? "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary" : "text-muted-foreground"}
-                  >
-                    <item.icon className="mr-1.5 h-3.5 w-3.5" /> {item.label}
-                  </Button>
-                ))}
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <header className="profile-head">
+            <div className="profile-avatar">
+              <FramedAvatar src={p.avatar_url} frame={p.avatar_frame} size={avatarSize} />
+            </div>
+            <div className="profile-actions">
+              {isMe ? (
+                <Button variant="secondary" size="sm" onClick={() => setEditing(true)}><Pencil /> Editar perfil</Button>
+              ) : user ? (
+                <Button size="sm" variant={stats.data?.iFollow ? "secondary" : "default"} disabled={follow.isPending || !stats.data} onClick={() => follow.mutate()}>
+                  {stats.data?.iFollow ? <Check /> : <UserPlus />} {stats.data?.iFollow ? "Seguindo" : "Seguir"}
+                </Button>
+              ) : (
+                <Button asChild size="sm"><Link to="/auth"><UserPlus /> Seguir</Link></Button>
+              )}
+              <Button variant="secondary" size="icon" className="h-9 w-9" onClick={() => void share()} aria-label="Copiar link do perfil" title="Copiar link do perfil"><Send /></Button>
+            </div>
+            <div className="profile-id">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+                <h1 className="profile-name" style={p.accent_color ? { color: p.accent_color } : undefined}>{name}</h1>
+                <UserBadges variant="inline" size={22} tier={p.subscription_tier} badges={stats.data?.badges ?? []} isAdmin={stats.data?.isAdmin ?? false} />
               </div>
+              <p className="profile-handle">@{p.username} <span aria-hidden="true">·</span> <b>Nível {p.level}</b></p>
+              {p.bio ? <p className="profile-bio">{p.bio}</p> : isMe ? <button type="button" className="profile-bio text-left text-muted-foreground hover:text-primary" onClick={() => setEditing(true)}>Escreva uma biografia curta…</button> : null}
+              <p className="profile-meta">
+                <span><CalendarDays /> Desde {joinedAt}</span>
+                {stats.data?.totalRank ? <Link to="/ranking-leitores"><Trophy /> #{stats.data.totalRank} no ranking</Link> : null}
+                {stats.data?.weeklyRank ? <Link to="/ranking-leitores"><Crown /> #{stats.data.weeklyRank} na semana</Link> : null}
+              </p>
+            </div>
+          </header>
+
+          <dl className="profile-stats" aria-busy={stats.isPending}>
+            {[
+              ["Seguidores", stats.data?.followers],
+              ["Seguindo", stats.data?.following],
+              ["Obras", stats.data ? worksCount : undefined],
+              ["Comentários", stats.data?.comments],
+            ].map(([label, value]) => (
+              <div key={label as string}>
+                <dt>{label}</dt>
+                <dd title={typeof value === "number" ? value.toLocaleString("pt-BR") : undefined}>{typeof value === "number" ? compactNumber(value) : "–"}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <div className="profile-layout">
+            <div className="min-w-0">
+              <nav className="chip-row profile-tabs" aria-label="Seções do perfil">
+                {tabs.map((item) => (
+                  <button key={item.id} type="button" className="chip" aria-pressed={tab === item.id} onClick={() => setTab(item.id)}>
+                    <item.icon aria-hidden="true" /> {item.label}
+                    {typeof item.count === "number" && item.count > 0 ? <span className="chip-count">{item.count}</span> : null}
+                  </button>
+                ))}
+              </nav>
+
+              {tab === "visao" ? (
+                <div className="space-y-8">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:hidden">{level}{badgesCard}</div>
+                  {stats.isPending ? <p role="status" className="text-sm text-muted-foreground">Carregando atividade…</p> : null}
+                  {continuedRows.length ? (
+                    <SectionRow icon={<History />} title={isMe ? "Continue lendo" : "Lendo recentemente"} count={continuedRows.length}
+                      action={continuedRows.length > 6 ? <button type="button" className="see-all" onClick={() => openCollection("continuando")}>Ver tudo</button> : undefined}>
+                      <HScroll>
+                        {continuedRows.slice(0, 12).map((row) => (
+                          <div key={row.series_id} className={shelfItem}>
+                            <SeriesCard slug={row.series.slug} title={row.series.title} cover={row.series.cover_url} rating={row.series.rating} kind={row.series.kind} seriesId={row.series.id}
+                              chapters={row.series.chapter_total?.[0]?.count ?? null} badge={row.chapters?.number ? `Cap. ${row.chapters.number}` : null} />
+                          </div>
+                        ))}
+                      </HScroll>
+                    </SectionRow>
+                  ) : null}
+                  {(stats.data?.favorites.length ?? 0) > 0 ? (
+                    <SectionRow icon={<Heart />} title="Favoritos" count={stats.data!.favorites.length}
+                      action={stats.data!.favorites.length > 6 ? <button type="button" className="see-all" onClick={() => openCollection("favoritos")}>Ver tudo</button> : undefined}>
+                      <HScroll>
+                        {stats.data!.favorites.slice(0, 12).map((series) => (
+                          <div key={series.id} className={shelfItem}><WorkCard series={series} /></div>
+                        ))}
+                      </HScroll>
+                    </SectionRow>
+                  ) : null}
+                  {lists.length ? (
+                    <SectionRow icon={<ListOrdered />} title="Listas" count={lists.length}
+                      action={lists.length > 3 ? <button type="button" className="see-all" onClick={() => setTab("listas")}>Ver todas</button> : undefined}>
+                      <ListRows lists={lists.slice(0, 3)} />
+                    </SectionRow>
+                  ) : null}
+                  {stats.data && !continuedRows.length && !stats.data.favorites.length && !lists.length ? (
+                    <div className="profile-empty">
+                      <BookOpen aria-hidden="true" />
+                      <p>{isMe ? "Seu perfil ainda está vazio. Favorite obras e crie listas para elas aparecerem aqui." : `@${p.username} ainda não tem obras favoritas nem listas públicas.`}</p>
+                      {isMe ? <Button asChild size="sm"><Link to="/catalogo">Explorar o catálogo</Link></Button> : null}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {tab === "colecao" ? (
+                <div>
+                  <div className="chip-row mb-4" role="tablist" aria-label="Parte da coleção">
+                    {collectionTabs.map((item) => (
+                      <button key={item.id} type="button" role="tab" className="chip chip-sm" aria-selected={collectionTab === item.id} aria-pressed={collectionTab === item.id} onClick={() => setCollectionTab(item.id)}>
+                        <item.icon aria-hidden="true" /> {item.label}
+                        {item.items.length ? <span className="chip-count">{item.items.length}</span> : null}
+                      </button>
+                    ))}
+                  </div>
+                  {activeCollection.items.length ? (
+                    <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 lg:grid-cols-5">
+                      {activeCollection.items.map((series) => <WorkCard key={series.id} series={series} />)}
+                    </div>
+                  ) : (
+                    <p className="profile-empty-line">{stats.isPending ? "Carregando…" : `Nenhuma obra em "${activeCollection.label}".`}</p>
+                  )}
+                </div>
+              ) : null}
+
+              {tab === "listas" ? (
+                lists.length ? <ListRows lists={lists} /> : <p className="profile-empty-line">{isMe ? <>Você ainda não tem listas públicas. <Link to="/listas" className="text-primary">Criar uma lista</Link></> : "Nenhuma lista pública."}</p>
+              ) : null}
+
+              {tab === "comentarios" ? (
+                <div>
+                  {user ? (
+                    <div className="profile-compose">
+                      <Textarea value={body} maxLength={2000} onChange={(e) => setBody(e.target.value)}
+                        placeholder={isMe ? "Escreva algo no seu mural…" : `Deixe um recado para @${p.username}…`}
+                        aria-label="Comentário no mural" className="min-h-20 resize-none border-none bg-transparent p-0 shadow-none focus-visible:ring-0" />
+                      <div className="mt-2 flex items-center justify-end gap-3">
+                        <span className="text-xs text-muted-foreground tabular-nums">{body.length}/2000</span>
+                        <Button size="sm" disabled={!body.trim() || post.isPending} onClick={() => post.mutate()}><Send /> Publicar</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground"><Link to="/auth" className="text-primary">Entre</Link> para deixar um recado.</p>
+                  )}
+                  <ul className="mt-4 divide-y divide-border">
+                    {comments.isPending ? <li role="status" className="py-5 text-sm text-muted-foreground">Carregando mural…</li> : null}
+                    {comments.isError ? <li role="alert" className="py-4"><Button variant="secondary" size="sm" onClick={() => void comments.refetch()}>Tentar novamente</Button></li> : null}
+                    {comments.isSuccess && !comments.data.length ? <li className="profile-empty-line">Ninguém escreveu no mural ainda.</li> : null}
+                    {(comments.data ?? []).map((c) => (
+                      <li key={c.id} className="flex gap-3 py-4">
+                        <Link to="/u/$username" params={{ username: c.author?.username ?? "" }} className="shrink-0" aria-hidden="true" tabIndex={-1}>
+                          <FramedAvatar src={c.author?.avatar_url} size={40} />
+                        </Link>
+                        <div className="min-w-0 flex-1 rounded-md px-3 py-2" style={p.comment_bg ? { background: p.comment_bg } : { background: "var(--surface)" }}>
+                          <div className="flex flex-wrap items-baseline gap-x-2">
+                            <Link to="/u/$username" params={{ username: c.author?.username ?? "" }} className="text-sm font-bold hover:text-primary">{c.author?.username ?? "leitor"}</Link>
+                            <span className="text-[11px] font-semibold text-muted-foreground">Nv. {c.author?.level ?? 1}</span>
+                            <span className="ml-auto text-xs text-muted-foreground">{timeAgo(c.created_at)}</span>
+                          </div>
+                          <p className="mt-1 whitespace-pre-line break-words text-sm text-foreground/85">{c.body}</p>
+                          {user && (user.id === c.author_id || isMe) ? (
+                            <button type="button" onClick={() => del.mutate(c.id)} className="mt-1.5 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive">
+                              <Trash2 className="h-3 w-3" /> Excluir
+                            </button>
+                          ) : null}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </div>
 
-            {tab === "colecao" ? (
-              <div className="mt-5">
-                <div className="mb-5 overflow-x-auto rounded-lg border border-border bg-background/70 p-1.5 backdrop-blur-xl no-scrollbar md:hidden">
-                  <div className="flex min-w-max items-center gap-1">
-                    {collectionTabs.map((item, index) => (
-                      <div key={item.id} className="flex items-center gap-1">
-                        {index === 2 ? <span className="mx-0.5 h-6 w-px bg-border" /> : null}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setCollectionTab(item.id)}
-                          className={collectionTab === item.id ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground" : "text-muted-foreground"}
-                        >
-                          <item.icon className={`mr-1.5 h-3.5 w-3.5 ${item.id === "favoritos" && collectionTab === item.id ? "fill-current" : ""}`} />
-                          {item.shortLabel}
-                        </Button>
-                      </div>
-                    ))}
+            <aside className="hidden space-y-3 lg:block">
+              {level}
+              {badgesCard}
+              {isMe ? (
+                <div className="side-card">
+                  <h2 className="text-sm font-bold">Atalhos</h2>
+                  <div className="mt-2 grid gap-1">
+                    <Link to="/biblioteca" className="profile-link"><Library /> Minha biblioteca</Link>
+                    <Link to="/historico" className="profile-link"><History /> Histórico</Link>
+                    <Link to="/listas" className="profile-link"><ListOrdered /> Minhas listas</Link>
                   </div>
                 </div>
-
-                <div className="grid items-start gap-6 md:grid-cols-[190px_minmax(0,1fr)]">
-                  <aside className="sticky top-24 hidden overflow-hidden rounded-lg border border-border bg-surface/70 p-2 backdrop-blur-xl md:block">
-                    <p className="px-3 pb-1.5 pt-2 text-xs font-bold text-muted-foreground">Principal</p>
-                    {collectionTabs.slice(0, 2).map((item) => (
-                      <Button key={item.id} type="button" variant="ghost" onClick={() => setCollectionTab(item.id)} className={`mb-0.5 w-full justify-start ${collectionTab === item.id ? "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary" : "text-muted-foreground"}`}>
-                        <item.icon className={`mr-2 h-4 w-4 ${item.id === "favoritos" && collectionTab === item.id ? "fill-current" : ""}`} /> {item.label}
-                      </Button>
-                    ))}
-                    <div className="mx-3 my-2 h-px bg-border" />
-                    <p className="px-3 pb-1.5 pt-1 text-xs font-bold text-muted-foreground">Status</p>
-                    {collectionTabs.slice(2).map((item) => (
-                      <Button key={item.id} type="button" variant="ghost" onClick={() => setCollectionTab(item.id)} className={`mb-0.5 w-full justify-start ${collectionTab === item.id ? "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary" : "text-muted-foreground"}`}>
-                        <item.icon className="mr-2 h-4 w-4" /> {item.label}
-                      </Button>
-                    ))}
-                  </aside>
-
-                  <div className="min-w-0">
-                    <div className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-                      <h2 className="truncate font-display text-xl font-bold">{collectionTabs.find((item) => item.id === collectionTab)?.label}</h2>
-                      <span className="text-xs text-muted-foreground">{collectionItems.length} obras</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 xl:grid-cols-4">
-                      {collectionItems.map((series) => {
-                        const chapters = series.latest_chapters ?? [];
-                        const total = series.chapter_total?.[0]?.count ?? chapters.length;
-                        const latest = chapters.reduce((max, chapter) => Math.max(max, Number(chapter.number)), 0);
-                        return (
-                          <article key={series.id} className="group min-w-0">
-                            <Link to="/obra/$slug" params={{ slug: series.slug }} className="block">
-                              <div className="relative aspect-[2/3] overflow-hidden rounded-lg border border-border bg-surface shadow-[var(--shadow-card)] transition group-hover:border-primary/60">
-                                <img src={coverUrl(series.cover_url)} alt={series.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" loading="lazy" />
-                                <span className="cover-fade" />
-                                <div className="absolute left-2 top-2 flex items-center gap-1.5 rounded-md bg-background/85 px-2 py-1 text-[11px] font-bold">
-                                  <span className="flex items-center gap-1"><BookOpen className="h-3 w-3 text-primary" />{total}</span>
-                                  <span className="h-3 w-px bg-border" />
-                                  <span className="flex items-center gap-1 text-gold"><Star className="h-3 w-3 fill-current" />{Number(series.rating || 0).toFixed(1).replace(".", ",")}</span>
-                                </div>
-                                <span className="absolute bottom-2 left-2 rounded-md border border-primary/50 bg-background/85 px-2 py-1 text-xs font-bold text-primary">{series.kind || "Mangá"}</span>
-                              </div>
-                              <h3 className="mt-2 line-clamp-2 text-sm font-bold leading-tight transition group-hover:text-primary">{series.title}</h3>
-                              <p className="mt-1 text-xs text-muted-foreground">{latest > 0 ? `Cap. ${latest}` : `${total} capítulos`}</p>
-                            </Link>
-                          </article>
-                        );
-                      })}
-                      {collectionItems.length === 0 ? <p className="col-span-full py-10 text-center text-sm text-muted-foreground">Nenhuma obra nesta seção.</p> : null}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            {tab === "listas" ? (
-              <div className="mt-5 space-y-3">
-                <h2 className="font-display text-lg font-bold">Listas públicas</h2>
-                {(stats.data?.publicLists ?? []).map((list) => (
-                  <Link key={list.id} to="/listas/$id" params={{ id: list.id }} className="flex items-center gap-3 rounded-lg border border-border bg-surface p-4 transition hover:border-primary/50">
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><ListOrdered className="h-5 w-5" /></span>
-                    <span className="min-w-0"><b className="block truncate text-sm">{list.title}</b><span className="line-clamp-1 text-xs text-muted-foreground">{list.description || "Lista de leitura"}</span></span>
-                    <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
-                  </Link>
-                ))}
-                {stats.data?.publicLists.length === 0 ? <p className="py-8 text-sm text-muted-foreground">Nenhuma lista pública.</p> : null}
-              </div>
-            ) : null}
-
-            {tab === "tags" ? (
-              <div className="mt-5">
-                <h2 className="font-display text-lg font-bold">Tags e selos</h2>
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <UserBadges tier={p.subscription_tier} badges={stats.data?.badges} isAdmin={stats.data?.isAdmin} size={52} />
-                  {!p.subscription_tier || p.subscription_tier === "none" ? null : <span className="self-center text-sm text-muted-foreground">Selo de assinatura</span>}
-                  {(stats.data?.badges.length ?? 0) === 0 && !stats.data?.isAdmin && p.subscription_tier === "none" ? <p className="py-8 text-sm text-muted-foreground">Nenhuma tag conquistada.</p> : null}
-                </div>
-              </div>
-            ) : null}
-
-            {tab === "comentarios" ? <div className="mt-5">
-              <h2 className="flex items-center gap-2 font-display text-lg font-bold">
-                <MessageSquare className="h-5 w-5 text-primary" /> Comentários do perfil
-              </h2>
-              {user ? (
-                <div className="mt-4 rounded-lg border border-border bg-surface p-4">
-                <Textarea
-                  value={body}
-                  maxLength={2000}
-                  onChange={(e) => setBody(e.target.value)}
-                  placeholder={isMe ? "Comentar no seu perfil..." : `Comentar no perfil de @${p.username}...`}
-                  className="min-h-20 border-none bg-transparent p-0 focus-visible:ring-0"
-                />
-                <div className="mt-2 flex items-center justify-end gap-3">
-                  <span className="text-xs text-muted-foreground">{body.length}/2000</span>
-                  <Button size="sm" disabled={!body.trim() || post.isPending} onClick={() => post.mutate()}>
-                    <Send className="mr-2 h-4 w-4" /> Comentar
-                  </Button>
-                </div>
-              </div>
-              ) : (
-              <p className="mt-4 text-sm text-muted-foreground"><Link to="/auth" className="text-primary">Entre</Link> para comentar.</p>
-              )}
-              <ul className="mt-6 space-y-5">
-              {comments.isPending ? <li role="status" className="py-5 text-sm text-muted-foreground">Carregando comentários...</li> : null}
-              {comments.isError ? <li role="alert"><Button variant="outline" onClick={() => void comments.refetch()}>Tentar novamente</Button></li> : null}
-              {(comments.data ?? []).map((c) => (
-                <li
-                  key={c.id}
-                  className="flex gap-3 rounded-lg p-3"
-                  style={p.comment_bg ? { background: p.comment_bg } : undefined}
-                >
-                  <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 text-sm font-bold">
-                    {c.author?.avatar_url ? <img loading="lazy" decoding="async" src={c.author.avatar_url} alt="" className="h-full w-full object-cover" /> : (c.author?.username ?? "?")[0]?.toUpperCase()}
-                  </span>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <Link to="/u/$username" params={{ username: c.author?.username ?? "" }} className="text-sm font-bold hover:text-primary">
-                        {c.author?.username ?? "leitor"}
-                        <span className="ml-2 rounded border border-border px-1 text-[10px] text-muted-foreground">Nv. {c.author?.level ?? 1}</span>
-                      </Link>
-                      <span className="text-xs text-muted-foreground">{timeAgo(c.created_at)}</span>
-                    </div>
-                    <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground">{c.body}</p>
-                    {user && (user.id === c.author_id || isMe) ? (
-                      <button onClick={() => del.mutate(c.id)} className="mt-1 flex items-center gap-1 text-xs text-destructive">
-                        <Trash2 className="h-3 w-3" /> Excluir
-                      </button>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-              </ul>
-            </div> : null}
-          </section>
-        </div></>}
+              ) : null}
+            </aside>
+          </div>
+        </div>
       </main>
       {isMe ? <EditProfile open={editing} onOpenChange={setEditing} profile={p} /> : null}
       <SiteFooter />
@@ -503,134 +478,63 @@ function Perfil() {
   );
 }
 
-type OwnerProfile = {
-  username: string;
-  display_name: string | null;
-  avatar_url: string | null;
-  avatar_frame: string | null;
-  level: number;
-  xp: number;
-  subscription_tier: string | null;
-};
+/** Capa de obra do perfil (mesmo cartão do resto do site). */
+function WorkCard({ series }: { series: ProfileSeries }) {
+  return (
+    <SeriesCard slug={series.slug} title={series.title} cover={series.cover_url} rating={series.rating} kind={series.kind} seriesId={series.id}
+      chapters={series.chapter_total?.[0]?.count ?? null} />
+  );
+}
 
-function OwnerProfileHeader({
-  profile,
-  followers,
-  following,
-  totalRank,
-  weeklyRank,
-  badges,
-  isAdmin,
-  xpInLevel,
-  xpGoal,
-  joinedAt,
-  onEdit,
-  action,
-}: {
-  action?: React.ReactNode;
-  profile: OwnerProfile & { bio?: string | null; accent_color?: string | null };
-  followers: number;
-  following: number;
-  totalRank: number;
-  weeklyRank: number;
-  badges: Badge[];
-  isAdmin: boolean;
-  xpInLevel: number;
-  xpGoal: number;
-  joinedAt: string;
-  onEdit: () => void;
-}) {
+function ListRows({ lists }: { lists: { id: string; title: string; description: string | null }[] }) {
+  return (
+    <ul className="grid gap-2 sm:grid-cols-2">
+      {lists.map((list) => (
+        <li key={list.id}>
+          <Link to="/listas/$id" params={{ id: list.id }} className="profile-list-row">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-2 text-primary"><ListOrdered className="h-4 w-4" /></span>
+            <span className="min-w-0 flex-1"><b className="block truncate text-sm">{list.title}</b><span className="line-clamp-1 text-xs text-muted-foreground">{list.description || "Lista de leitura"}</span></span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function LevelCard({ level, xp, xpInLevel, xpGoal, totalRank, weeklyRank }: { level: number; xp: number; xpInLevel: number; xpGoal: number; totalRank: number; weeklyRank: number }) {
   const percentage = Math.min(100, Math.round((xpInLevel / xpGoal) * 100));
   return (
-    <section className="relative z-10 mx-auto -mt-16 max-w-7xl px-4 sm:-mt-24 sm:px-6">
-      <div className="grid gap-4 rounded-lg border border-border bg-background/85 p-4 shadow-[var(--shadow-hero)] backdrop-blur-2xl sm:p-6 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center">
-        <div className="flex justify-center lg:justify-start">
-          <div className="relative rounded-full bg-background p-1.5">
-            <FramedAvatar src={profile.avatar_url} frame={profile.avatar_frame} size={128} />
-            <span className="absolute -bottom-1 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full border border-primary/40 bg-background px-2.5 py-1 text-[10px] font-bold text-primary">Nível {profile.level}</span>
-          </div>
-        </div>
-        <div className="min-w-0 text-center lg:text-left">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="truncate font-display text-2xl font-bold sm:text-3xl" style={profile.accent_color ? { color: profile.accent_color } : undefined}>{profile.display_name || profile.username}</h1>
-            <UserBadges variant="inline" size={26} tier={profile.subscription_tier} badges={badges} isAdmin={isAdmin} />
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">@{profile.username}</p>
-          {profile.bio ? <p className="mx-auto mt-2 max-w-2xl text-sm text-foreground/80 lg:mx-0">{profile.bio}</p> : null}
-          <div className="mt-3 flex flex-wrap justify-center gap-2 lg:justify-start">
-            <Link to="/ranking-leitores" className="rounded-md border border-border bg-surface/70 px-2.5 py-1 text-[11px] font-semibold text-foreground/75 hover:border-primary/40 hover:text-primary">Global #{totalRank || "—"}</Link>
-            <Link to="/ranking-leitores" className="rounded-md border border-border bg-surface/70 px-2.5 py-1 text-[11px] font-semibold text-foreground/75 hover:border-primary/40 hover:text-primary">Semanal #{weeklyRank || "—"}</Link>
-            <span className="inline-flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground"><CalendarDays className="h-3.5 w-3.5" /> Desde {joinedAt}</span>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 lg:w-52">
-          <div className="rounded-lg border border-border bg-surface/60 p-3 text-center"><b className="block text-lg">{followers}</b><span className="text-[11px] font-bold text-muted-foreground">Seguidores</span></div>
-          <div className="rounded-lg border border-border bg-surface/60 p-3 text-center"><b className="block text-lg">{following}</b><span className="text-[11px] font-bold text-muted-foreground">Seguindo</span></div>
-          {action}
-        </div>
-        <div className="lg:col-start-2 lg:col-span-2">
-          <div className="mb-2 flex justify-between text-xs font-bold text-muted-foreground"><span>{profile.xp.toLocaleString("pt-BR")} XP total</span><span>{percentage}% do nível</span></div>
-          <div className="h-2 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${percentage}%` }} /></div>
-          <p className="mt-1.5 text-[11px] text-muted-foreground">{xpInLevel.toLocaleString("pt-BR")} / {xpGoal.toLocaleString("pt-BR")} XP para o próximo nível</p>
-        </div>
+    <section className="side-card" aria-label="Nível e experiência">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="font-display text-lg font-bold">Nível {level}</h2>
+        <span className="text-xs font-semibold text-muted-foreground tabular-nums">{xp.toLocaleString("pt-BR")} XP</span>
       </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuemin={0} aria-valuemax={xpGoal} aria-valuenow={xpInLevel} aria-label={`Progresso para o nível ${level + 1}`}>
+        <div className="h-full rounded-full bg-primary" style={{ width: `${percentage}%` }} />
+      </div>
+      <p className="mt-1.5 text-xs text-muted-foreground tabular-nums">{xpInLevel.toLocaleString("pt-BR")} / {xpGoal.toLocaleString("pt-BR")} XP para o nível {level + 1}</p>
+      {totalRank || weeklyRank ? (
+        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3 text-center">
+          <Link to="/ranking-leitores" className="rounded-md bg-surface-2 py-2 hover:bg-accent"><b className="block font-display text-base tabular-nums">{totalRank ? `#${totalRank}` : "–"}</b><span className="text-[11px] font-semibold text-muted-foreground">Ranking geral</span></Link>
+          <Link to="/ranking-leitores" className="rounded-md bg-surface-2 py-2 hover:bg-accent"><b className="block font-display text-base tabular-nums">{weeklyRank ? `#${weeklyRank}` : "–"}</b><span className="text-[11px] font-semibold text-muted-foreground">Na semana</span></Link>
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function OwnerOverview({ isMe = true, collectionCount, readingCount, readCount, favoritesCount, commentsCount, followersCount, badges, tier, isAdmin, onEdit }: {
-  isMe?: boolean;
-  collectionCount: number;
-  readingCount: number;
-  readCount: number;
-  favoritesCount: number;
-  commentsCount: number;
-  followersCount: number;
-  badges: Badge[];
-  tier: string | null;
-  isAdmin: boolean;
-  onEdit: () => void;
-}) {
-  const cards = [
-    { label: "Na coleção", value: collectionCount, icon: BookOpen },
-    { label: "Lendo", value: readingCount, icon: Play },
-    { label: "Completadas", value: readCount, icon: Check },
-    { label: "Favoritos", value: favoritesCount, icon: Heart },
-    { label: "Comentários", value: commentsCount, icon: MessageSquare },
-    { label: "Seguidores", value: followersCount, icon: Users },
-  ];
+function BadgesCard({ badges, tier, isAdmin, isMe, onEdit }: { badges: Badge[]; tier: string | null; isAdmin: boolean; isMe: boolean; onEdit: () => void }) {
+  const empty = badges.length === 0 && !isAdmin && (!tier || tier === "none");
   return (
-    <section className="relative z-10 mx-auto max-w-7xl px-4 pb-12 pt-6 sm:px-6">
-      <div className="min-w-0">
-        {isMe ? <nav className="flex items-center gap-1 overflow-x-auto border-b border-border py-2 no-scrollbar">
-          <Button variant="ghost" className="relative rounded-none text-primary after:absolute after:inset-x-4 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary"><LayoutGrid className="h-4 w-4" /> Visão geral</Button>
-          <Button asChild variant="ghost" className="rounded-none text-muted-foreground"><Link to="/biblioteca"><Library className="h-4 w-4" /> Coleção</Link></Button>
-          <Button variant="ghost" className="rounded-none text-muted-foreground" onClick={onEdit}><Settings className="h-4 w-4" /> Configurações</Button>
-        </nav> : null}
-        <div className="mt-6 grid gap-4 lg:grid-cols-12">
-          <div className="lg:col-span-7">
-            <h2 className="mb-4 text-xs font-bold text-muted-foreground">{isMe ? "Sua atividade" : "Atividade"}</h2>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {cards.map((card) => (
-              <div key={card.label} className="group flex min-h-32 flex-col justify-between rounded-lg border border-border bg-surface/45 p-4 transition-colors hover:border-primary/40">
-                <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary"><card.icon className="h-4 w-4" /></span>
-                <div><b className="block text-2xl font-bold tabular-nums">{card.value}</b><span className="text-[11px] font-semibold text-muted-foreground">{card.label}</span></div>
-              </div>
-            ))}
-            </div>
-          </div>
-          <div className="min-w-0 rounded-lg border border-border bg-surface/30 p-5 lg:col-span-5">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-              <div className="min-w-0"><h2 className="font-display text-base font-bold">{isMe ? "Meus selos" : "Selos"}</h2><p className="mt-1 text-xs text-muted-foreground">Conquistas deste leitor</p></div>
-              {isMe ? <Button variant="outline" size="sm" onClick={onEdit}><Settings className="h-3.5 w-3.5" /> Personalizar</Button> : null}
-            </div>
-            <div className="mt-5 min-h-24 max-w-full overflow-hidden rounded-lg border border-border bg-background/35 p-3">
-              <UserBadges tier={tier} badges={badges} isAdmin={isAdmin} size={40} />
-              {badges.length === 0 && !isAdmin && (!tier || tier === "none") ? <span className="text-sm text-muted-foreground">Nenhum selo conquistado.</span> : null}
-            </div>
-            <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">Passe sobre um selo para ver o nome da conquista.</p>
-          </div>
-        </div>
+    <section className="side-card" aria-label="Selos">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-bold">Selos</h2>
+        {isMe ? <button type="button" className="see-all" onClick={onEdit}>Personalizar</button> : null}
+      </div>
+      <div className="mt-3 flex min-h-10 flex-wrap items-center gap-2">
+        <UserBadges tier={tier} badges={badges} isAdmin={isAdmin} size={36} />
+        {empty ? <span className="text-sm text-muted-foreground">Nenhum selo ainda.</span> : null}
       </div>
     </section>
   );
@@ -774,7 +678,7 @@ function EditProfile({
           </Button>
           <div className="min-w-0">
             <h1 className="text-base font-bold">Editar perfil</h1>
-            <p className="hidden text-xs font-bold tracking-[0.2em] text-muted-foreground sm:block">Avatar · Banner · Moldura · Dados pessoais</p>
+            <p className="hidden text-xs text-muted-foreground sm:block">Foto, banner, moldura e dados pessoais</p>
           </div>
         </header>
 
@@ -782,7 +686,7 @@ function EditProfile({
           <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_1.4fr] lg:gap-6">
             <div className="space-y-4">
               <section className="space-y-4 rounded-lg border border-border bg-card p-5">
-                <h2 className="flex items-center gap-2 text-xs font-bold tracking-[0.25em] text-muted-foreground"><User2 className="h-3 w-3" /> Foto de perfil</h2>
+                <h2 className="flex items-center gap-2 text-xs font-bold text-muted-foreground"><User2 className="h-3 w-3" /> Foto de perfil</h2>
                 <div className="flex items-center gap-4">
                   <Button variant="ghost" className="relative h-20 w-20 shrink-0 rounded-full p-0" onClick={() => avatarInput.current?.click()} aria-label="Escolher foto de perfil">
                     <FramedAvatar src={form.avatar_url} frame={form.avatar_frame || null} size={80} />
@@ -797,7 +701,7 @@ function EditProfile({
               </section>
 
               <section className="space-y-4 rounded-lg border border-border bg-card p-5">
-                <h2 className="flex items-center gap-2 text-xs font-bold tracking-[0.25em] text-muted-foreground"><ImageIcon className="h-3 w-3" /> Banner</h2>
+                <h2 className="flex items-center gap-2 text-xs font-bold text-muted-foreground"><ImageIcon className="h-3 w-3" /> Banner</h2>
                 <Button variant="ghost" className="group relative h-32 w-full overflow-hidden rounded-lg bg-surface-2 p-0" onClick={() => bannerInput.current?.click()}>
                   {form.banner_url ? <img src={form.banner_url} alt="Banner atual" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" /> : <ImageIcon className="h-7 w-7 text-muted-foreground" />}
                   <span className="absolute inset-0 grid place-items-center bg-background/60 opacity-0 transition-opacity group-hover:opacity-100"><span className="flex items-center gap-2 text-xs font-bold"><Upload className="h-4 w-4" /> Alterar banner</span></span>
@@ -807,7 +711,7 @@ function EditProfile({
               </section>
 
               <section className="space-y-4 rounded-lg border border-border bg-card p-5">
-                <h2 className="flex items-center gap-2 text-xs font-bold tracking-[0.25em] text-muted-foreground"><Shapes className="h-3 w-3" /> Moldura</h2>
+                <h2 className="flex items-center gap-2 text-xs font-bold text-muted-foreground"><Shapes className="h-3 w-3" /> Moldura</h2>
                 <div className="flex items-center gap-3">
                   <div className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-surface-2">{form.avatar_frame ? <img src={form.avatar_frame} alt="Moldura atual" className="h-14 w-14 object-contain" /> : <span className="text-[11px] font-bold text-muted-foreground">Nenhuma</span>}</div>
                   <p className="min-w-0 flex-1 text-xs text-muted-foreground">Abra a galeria, escolha e salve.</p>
@@ -827,16 +731,16 @@ function EditProfile({
             </div>
 
             <section className="space-y-5 rounded-lg border border-border bg-card p-5">
-              <h2 className="flex items-center gap-2 text-xs font-bold tracking-[0.25em] text-muted-foreground"><Pencil className="h-3 w-3" /> Dados pessoais</h2>
-              <label className="block text-xs font-bold tracking-[0.2em] text-muted-foreground">Nome
-                <Input className="mt-2 h-11 text-sm font-medium normal-case tracking-normal" maxLength={50} placeholder="O seu nome" value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} />
+              <h2 className="flex items-center gap-2 text-xs font-bold text-muted-foreground"><Pencil className="h-3 w-3" /> Dados pessoais</h2>
+              <label className="block text-xs font-bold text-muted-foreground">Nome
+                <Input className="mt-2 h-11 text-sm font-medium" maxLength={50} placeholder="O seu nome" value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} />
               </label>
-              <label className="block text-xs font-bold tracking-[0.2em] text-muted-foreground">Nickname
-                <Input className="mt-2 h-11 text-sm font-medium normal-case tracking-normal" maxLength={30} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value.replace(/[^a-zA-Z0-9_.-]/g, "") })} />
+              <label className="block text-xs font-bold text-muted-foreground">Nickname
+                <Input className="mt-2 h-11 text-sm font-medium" maxLength={30} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value.replace(/[^a-zA-Z0-9_.-]/g, "") })} />
               </label>
-              <label className="block text-xs font-bold tracking-[0.2em] text-muted-foreground">Biografia
-                <Textarea className="mt-2 min-h-28 resize-none text-sm font-medium normal-case tracking-normal" maxLength={500} placeholder="Conte um pouco sobre você" value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} />
-                <span className="mt-1 block text-right text-[10px] font-medium normal-case tracking-normal">{form.bio.length}/500</span>
+              <label className="block text-xs font-bold text-muted-foreground">Biografia
+                <Textarea className="mt-2 min-h-28 resize-none text-sm font-medium" maxLength={500} placeholder="Conte um pouco sobre você" value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} />
+                <span className="mt-1 block text-right text-[10px] font-medium">{form.bio.length}/500</span>
               </label>
 
               <div className="flex items-center gap-3 rounded-lg border border-border bg-surface p-4">
@@ -845,7 +749,7 @@ function EditProfile({
               </div>
 
               <div className="space-y-3 border-t border-border pt-5">
-                <p className="text-xs font-bold tracking-[0.2em] text-muted-foreground">Cor do perfil</p>
+                <p className="text-xs font-bold text-muted-foreground">Cor do perfil</p>
                 <div className="flex flex-wrap gap-2">
                   {ACCENT_COLORS.map((color) => (
                     <Button key={color} variant="ghost" size="icon" className={`h-8 w-8 rounded-full border-2 p-1 ${form.accent_color === color ? "border-foreground" : "border-transparent"}`} onClick={() => setForm({ ...form, accent_color: color })} aria-label={`Escolher cor ${color}`}><span className="h-full w-full rounded-full" style={{ backgroundColor: color }} /></Button>
@@ -854,7 +758,7 @@ function EditProfile({
               </div>
 
               <div className="space-y-3 border-t border-border pt-5">
-                <p className="text-xs font-bold tracking-[0.2em] text-muted-foreground">Fundo nos comentários</p>
+                <p className="text-xs font-bold text-muted-foreground">Fundo nos comentários</p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {COMMENT_BGS.map((background) => (
                     <Button key={background.id} variant="outline" className={`h-14 justify-start ${form.comment_bg === background.value ? "border-primary" : ""}`} onClick={() => setForm({ ...form, comment_bg: background.value })}><span className="h-7 w-9 rounded bg-surface-2" style={background.value ? { background: background.value } : undefined} /><span className="truncate text-xs">{background.label}</span></Button>

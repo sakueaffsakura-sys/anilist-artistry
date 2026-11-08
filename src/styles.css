@@ -329,6 +329,50 @@
 .rating-bars span[data-bar] > span { display: block; height: 100%; border-radius: inherit; background: var(--gold); }
 .side-card { padding: 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); }
 
+/* ---------- perfil do leitor ---------- */
+.profile-banner { position: relative; height: 140px; overflow: hidden; background: var(--surface); border-bottom: 1px solid var(--border); }
+.profile-banner img { width: 100%; height: 100%; object-fit: cover; }
+.profile-banner::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 45%, color-mix(in oklab, var(--background) 85%, transparent)); }
+@media (min-width: 768px) { .profile-banner { height: 240px; } }
+.profile-head { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar actions" "id id"; column-gap: 16px; row-gap: 10px; }
+.profile-avatar { grid-area: avatar; position: relative; z-index: 1; margin-top: -44px; }
+.profile-actions { grid-area: actions; display: flex; align-items: flex-start; justify-content: flex-end; gap: 8px; padding-top: 12px; }
+.profile-id { grid-area: id; min-width: 0; }
+.profile-name { min-width: 0; font-family: var(--font-display); font-size: 1.375rem; line-height: 1.2; font-weight: 700; overflow-wrap: anywhere; }
+.profile-handle { margin-top: 2px; font-size: 14px; color: var(--muted-foreground); }
+.profile-handle b { color: var(--primary); font-weight: 700; }
+.profile-bio { display: block; margin-top: 10px; max-width: 64ch; font-size: 14px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
+.profile-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 13px; color: var(--muted-foreground); }
+.profile-meta > * { display: inline-flex; align-items: center; gap: 6px; }
+.profile-meta a:hover { color: var(--primary); }
+.profile-meta svg { width: 15px; height: 15px; flex-shrink: 0; }
+@media (min-width: 768px) {
+  .profile-head { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "avatar id actions"; column-gap: 24px; align-items: end; }
+  .profile-avatar { margin-top: -64px; }
+  .profile-actions { padding-top: 0; padding-bottom: 6px; align-self: end; }
+  .profile-id { padding-bottom: 4px; }
+  .profile-name { font-size: 1.75rem; }
+}
+.profile-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 16px 0 20px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.profile-stats > div { display: flex; flex-direction: column-reverse; align-items: center; gap: 2px; padding: 10px 4px; min-width: 0; }
+.profile-stats > div + div { border-left: 1px solid var(--border); }
+.profile-stats dd { font-family: var(--font-display); font-size: 1.125rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.profile-stats dt { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; color: var(--muted-foreground); }
+@media (min-width: 768px) { .profile-stats { max-width: 560px; margin-top: 20px; } }
+.profile-layout { display: grid; gap: 24px; }
+@media (min-width: 1024px) { .profile-layout { grid-template-columns: minmax(0, 1fr) 300px; align-items: start; } }
+.profile-tabs { margin-bottom: 20px; }
+.chip-count { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 4px; background: color-mix(in oklab, currentColor 14%, transparent); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.profile-empty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 32px 16px; border: 1px dashed var(--border); border-radius: 8px; text-align: center; font-size: 14px; color: var(--muted-foreground); }
+.profile-empty svg { width: 28px; height: 28px; color: var(--muted-foreground); }
+.profile-empty-line { padding: 28px 0; text-align: center; font-size: 14px; color: var(--muted-foreground); }
+.profile-list-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); }
+.profile-list-row:hover { border-color: color-mix(in oklab, var(--primary) 50%, var(--border)); }
+.profile-compose { padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); }
+.profile-link { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; font-size: 14px; font-weight: 600; color: var(--muted-foreground); }
+.profile-link:hover { background: var(--surface-2); color: var(--foreground); }
+.profile-link svg { width: 16px; height: 16px; }
+
 /* ---------- leitor ---------- */
 .reader-toolbar { position: sticky; }
 .reader-progress { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--primary); transform-origin: 0 50%; transform: scaleX(0); pointer-events: none; }
