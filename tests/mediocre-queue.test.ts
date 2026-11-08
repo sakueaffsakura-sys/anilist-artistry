@@ -8,7 +8,7 @@ import * as api from "../src/lib/mediocre-api.server";
 type Row = Record<string, any>;
 const now = Date.parse("2026-11-07T01:51:00Z");
 
-function fixture(numbers = [1, 2], failure = "empty") {
+function fixture(numbers = [1, 2], failure = "empty", tags?: unknown[]) {
   const tables: Record<string, Row[]> = {
     mediocre_settings: [{ id: 1, blocked_until: null }],
     mediocre_queue: [1, 2].map((id) => ({ id, obra_id: id, status: "waiting", created_at: id, next_run_at: new Date(now).toISOString(), created_by: null, chapters_added: 0, attempts: 0 })),
@@ -33,12 +33,15 @@ function fixture(numbers = [1, 2], failure = "empty") {
     const query = {
       select(_columns?: string, opts?: { head?: boolean }) { head = opts?.head ?? false; return query; },
       eq(key: string, value: unknown) { filters.push((r) => r[key] === value); return query; },
+      // Só o formato usado no importador: "coluna.is.null,coluna.eq.valor".
+      or(expr: string) { const parts = expr.split(",").map((p) => p.split(".")); filters.push((r) => parts.some(([k, op, v]) => (op === "is" ? r[k!] == null : String(r[k!]) === v))); return query; },
       in(key: string, values: unknown[]) { filters.push((r) => values.includes(r[key])); return query; },
       order(key: string) { order = key; return query; },
       limit(n: number) { limit = n; return query; },
       update(value: Row) { change = value; return query; },
       insert(value: Row) { insert = value; return query; },
       async maybeSingle() { const r = result(); return { ...r, data: r.data?.[0] ?? null }; },
+      async single() { const r = result(); return { ...r, data: r.data?.[0] ?? null }; },
       then(resolve: (r: ReturnType<typeof result>) => unknown) { return Promise.resolve(result()).then(resolve); },
     };
     return query;
@@ -47,7 +50,7 @@ function fixture(numbers = [1, 2], failure = "empty") {
     let data: unknown;
     if (path.startsWith("/obras/")) {
       const id = Number(path.split("/").pop());
-      data = { obr_nome: `Obra ${id}`, capitulos: (id === 1 ? numbers : [1]).map((n, i) => ({ cap_id: id * 100 + i, cap_num: n })) };
+      data = { obr_nome: `Obra ${id}`, ...(tags ? { tags } : {}), capitulos: (id === 1 ? numbers : [1]).map((n, i) => ({ cap_id: id * 100 + i, cap_num: n })) };
     } else {
       const id = Number(path.split("/").pop());
       const bad = id === 100;
@@ -99,4 +102,28 @@ test("sincronização fica pausada enquanto a fila ainda tem obras", async () =>
   const { admin, get } = fixture();
   expect(await syncMediocreChapters(admin)).toEqual({ checked: 0, added: 0 });
   expect(get).not.toHaveBeenCalled();
+});
+
+test("+18 da fonte fixa idade 18 em obra já importada, menos quando o admin escolheu", async () => {
+  const { admin, tables } = fixture([1], "empty", [{ tag_nome: "+18" }, { tag_nome: "Romance" }]);
+  Object.assign(tables.series[0]!, { age_rating: "14", age_rating_auto: true });
+  Object.assign(tables.series[1]!, { age_rating: "16", age_rating_auto: false });
+  await importMediocreWork(admin, 1, { createdBy: null, chapterLimit: 0 });
+  await importMediocreWork(admin, 2, { createdBy: null, chapterLimit: 0 });
+  expect(tables.series[0]).toMatchObject({ age_rating: "18", age_rating_auto: false });
+  expect(tables.series[1]).toMatchObject({ age_rating: "16", age_rating_auto: false });
+});
+
+test("obra nova +18 entra com idade 18 e sem a etiqueta nos gêneros", async () => {
+  const { admin, tables } = fixture([1], "empty", [{ tag_nome: "+18" }, { tag_nome: "Romance" }]);
+  tables.series = [];
+  expect(await importMediocreWork(admin, 1, { createdBy: null, chapterLimit: 0 })).toMatchObject({ created: true });
+  expect(tables.series[0]).toMatchObject({ age_rating: "18", genres: ["Romance"], source_mediocre_id: 1 });
+});
+
+test("obra nova sem +18 deixa a idade para a classificação automática do banco", async () => {
+  const { admin, tables } = fixture([1], "empty", [{ tag_nome: "Ação" }]);
+  tables.series = [];
+  await importMediocreWork(admin, 1, { createdBy: null, chapterLimit: 0 });
+  expect(tables.series[0]!.age_rating).toBeUndefined();
 });

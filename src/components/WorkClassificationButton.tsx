@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type ReviewRow } from "@/components/ClassificationReviewItem";
 import { ClassificationReviewList } from "@/components/ClassificationReviewList";
+import { AutoClassificationPanel } from "@/components/AutoClassificationPanel";
 import { ManualClassificationPanel } from "@/components/ManualClassificationPanel";
 import { useSession } from "@/hooks/useAuth";
 import { approveWorkClassification } from "@/lib/work-classification.functions";
@@ -18,7 +19,7 @@ export function WorkClassificationButton() {
  const approve = useServerFn(approveWorkClassification);
  const [open, setOpen] = useState(false), [running, setRunning] = useState(false), [paused, setPaused] = useState(false), [message, setMessage] = useState("");
  const [mode, setMode] = useState<ClassificationMode>("missing");
- const [source, setSource] = useState("ai");
+ const [source, setSource] = useState("auto");
  const [progress, setProgress] = useState({ total: 0, processed: 0, suggested: 0 });
  const [rows, setRows] = useState<ReviewRow[]>([]);
  const [savingId, setSavingId] = useState<string | null>(null);
@@ -82,11 +83,12 @@ export function WorkClassificationButton() {
   finally { saving.current = false; setSavingId(null); }
  };
  return <>
-  <Button variant="outline" onClick={() => setOpen(true)}><Sparkles className="h-4 w-4 text-primary" /> Classificar com IA</Button>
+  <Button variant="outline" onClick={() => setOpen(true)}><Sparkles className="h-4 w-4 text-primary" /> Classificar obras</Button>
   <Dialog open={open} onOpenChange={(value) => { if (!busy) setOpen(value); }}>
    <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-3xl" onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }} onInteractOutside={(event) => { if (busy) event.preventDefault(); }}>
-    <DialogHeader><DialogTitle>Classificar obras</DialogTitle><DialogDescription>{source === "ai" ? "Claude · Lovable AI" : "AniList · pesquisa manual · sem créditos de IA"}</DialogDescription></DialogHeader>
-    <Tabs value={source} onValueChange={setSource}><TabsList className="grid h-auto w-full grid-cols-2"><TabsTrigger value="ai" disabled={busy}>Claude IA</TabsTrigger><TabsTrigger value="manual" disabled={busy}>Pesquisa manual</TabsTrigger></TabsList></Tabs>
+    <DialogHeader><DialogTitle>Classificar obras</DialogTitle><DialogDescription>{source === "auto" ? "Regras do site · automática · sem créditos de IA" : source === "ai" ? "Claude · Lovable AI · usa créditos" : "AniList · pesquisa manual · sem créditos de IA"}</DialogDescription></DialogHeader>
+    <Tabs value={source} onValueChange={setSource}><TabsList className="grid h-auto w-full grid-cols-3"><TabsTrigger className="whitespace-normal" value="auto" disabled={busy}>Automática</TabsTrigger><TabsTrigger className="whitespace-normal" value="ai" disabled={busy}>Claude IA</TabsTrigger><TabsTrigger className="whitespace-normal" value="manual" disabled={busy}>Pesquisa manual</TabsTrigger></TabsList></Tabs>
+    {source === "auto" ? <AutoClassificationPanel /> : null}
     {source === "manual" ? <ManualClassificationPanel /> : null}
     <div hidden={source !== "ai"} className="space-y-4">
     <Tabs value={mode} onValueChange={(value) => { if (!busy && !rows.length && (value === "missing" || value === "review")) setMode(value); }}>

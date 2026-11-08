@@ -19,7 +19,7 @@ import { coverUrl, formatChapter, slugify, timeAgo } from "@/lib/media";
 import { KINDS } from "@/lib/queries";
 import { GenreSelect } from "@/components/GenreSelect";
 import { normalizeGenres } from "@/lib/work-genres";
-import { AGE_RATINGS, ageRatingLabel } from "@/lib/age-ratings";
+import { AGE_RATINGS, ageRatingChoice, ageRatingLabel, ageRatingShort, ageRatingUpdate } from "@/lib/age-ratings";
 import { AgeRatingBadge } from "@/components/AgeRatingBadge";
 import { useRoles, useSession } from "@/hooks/useAuth";
 import { signCloudinaryUpload } from "@/lib/media.functions";
@@ -240,12 +240,17 @@ function SeriesEditor() {
 type Obra = {
   id: string; title: string; slug: string; alt_titles: string | null; synopsis: string | null; cover_url: string | null;
   banner_url: string | null; kind: string; status: string; author: string | null; artist: string | null; genres: string[]; age_rating: string | null;
-  published: boolean; pinned: boolean;
+  age_rating_auto?: boolean; published: boolean; pinned: boolean;
 };
 
+/** Estado do formulário: a idade é a escolha do admin ("" = automática, calculada pelas regras do site). */
+function formFor(obra: Obra) {
+  return { ...obra, genres: normalizeGenres(obra.genres), age_rating: ageRatingChoice(obra) || null };
+}
+
 function InfoForm({ obra, onSaved }: { obra: Obra; onSaved: () => void }) {
-  const [f, setF] = useState({ ...obra, genres: normalizeGenres(obra.genres) });
-  useEffect(() => setF({ ...obra, genres: normalizeGenres(obra.genres) }), [obra]);
+  const [f, setF] = useState(() => formFor(obra));
+  useEffect(() => setF(formFor(obra)), [obra]);
   const set = (k: keyof typeof f, v: unknown) => setF((p) => ({ ...p, [k]: v }));
 
   const save = useMutation({
@@ -265,7 +270,7 @@ function InfoForm({ obra, onSaved }: { obra: Obra; onSaved: () => void }) {
           author: f.author || null,
           artist: f.artist || null,
           genres: normalizeGenres(f.genres),
-          age_rating: f.age_rating || null,
+          ...ageRatingUpdate(f.age_rating),
           published: f.published,
           pinned: f.pinned,
         })
@@ -319,13 +324,20 @@ function InfoForm({ obra, onSaved }: { obra: Obra; onSaved: () => void }) {
           </div>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
-              <Label>Classificação de idade</Label>
-              <AgeRatingBadge value={f.age_rating} size="sm" />
+              <Label htmlFor="obra-idade">Classificação de idade</Label>
+              <AgeRatingBadge value={f.age_rating ?? obra.age_rating} size="sm" />
             </div>
-            <select value={f.age_rating ?? ""} onChange={(e) => set("age_rating", e.target.value || null)} className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm">
-              <option value="">Não informada</option>
+            <select id="obra-idade" aria-describedby="obra-idade-dica" value={f.age_rating ?? ""} onChange={(e) => set("age_rating", e.target.value || null)} className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm">
+              <option value="">{obra.age_rating_auto && obra.age_rating ? `Automática (${ageRatingShort(obra.age_rating)})` : "Automática"}</option>
               {AGE_RATINGS.map((r) => <option key={r} value={r}>{ageRatingLabel(r)}</option>)}
             </select>
+            <p id="obra-idade-dica" className="text-xs text-muted-foreground">
+              {f.age_rating
+                ? "Fixa: não muda sozinha."
+                : obra.age_rating
+                  ? "Pelas regras do site; acompanha a sinopse e os gêneros."
+                  : "Sem dados para calcular: adicione sinopse ou gêneros, ou escolha uma idade."}
+            </p>
           </div>
           {field("Autor", "author")}
           {field("Artista", "artist")}
