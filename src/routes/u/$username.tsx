@@ -433,7 +433,7 @@ function Perfil() {
                     {(comments.data ?? []).map((c) => (
                       <li key={c.id} className="flex gap-3 py-4">
                         <Link to="/u/$username" params={{ username: c.author?.username ?? "" }} className="shrink-0" aria-hidden="true" tabIndex={-1}>
-                          <FramedAvatar src={c.author?.avatar_url} size={40} />
+                          <FramedAvatar src={c.author?.avatar_url ?? null} size={40} />
                         </Link>
                         <div className="min-w-0 flex-1 rounded-md px-3 py-2" style={p.comment_bg ? { background: p.comment_bg } : { background: "var(--surface)" }}>
                           <div className="flex flex-wrap items-baseline gap-x-2">
