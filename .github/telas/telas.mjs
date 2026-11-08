@@ -168,7 +168,9 @@ const PAGES = [
   // painel
   { group: "admin", name: "admin", path: "/admin", signedIn: true, admin: true, steps: s(3, 2) },
   { group: "admin", name: "admin-obras", path: "/admin/obras", signedIn: true, admin: true, steps: s(2) },
+  { group: "admin", name: "admin-classificar", path: "/admin/obras", signedIn: true, admin: true, click: "Classificar obras", steps: s(1) },
   { group: "admin", name: "admin-editar", path: `/admin/${WORK_ID}`, signedIn: true, admin: true, steps: s(3, 2) },
+  { group: "admin", name: "admin-editar-info", path: `/admin/${WORK_ID}`, signedIn: true, admin: true, click: "Editar obra", role: "tab", steps: s(3, 2) },
   { group: "admin", name: "admin-nova", path: "/admin/nova", signedIn: true, admin: true, steps: s(2) },
   { group: "admin", name: "admin-novels", path: "/admin/novels", signedIn: true, admin: true, steps: s(2) },
   { group: "admin", name: "admin-mediocre", path: "/admin/mediocre", signedIn: true, admin: true, steps: s(2) },
@@ -196,6 +198,11 @@ for (const [viewName, view] of Object.entries(VIEWS)) {
     try {
       await page.goto(BASE + p.path, { waitUntil: "domcontentloaded", timeout: 45000 });
       await settle(page);
+      // Abre um diálogo ou aba antes da foto (ex.: classificação de obras, formulário da obra).
+      if (p.click) {
+        await page.getByRole(p.role ?? "button", { name: p.click }).first().click({ timeout: 15000 });
+        await settle(page);
+      }
       log.push(`[${viewName} ${p.name}] ${page.url()} título: ${await page.title()}`);
       // Página mais larga que a tela = rolagem para o lado no celular.
       const wide = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { chapterContentPath, mediocreErrorFor, mediocrePath, normalizeChapterContent, parseMediocreRequest, titleKey } from "../src/lib/mediocre-api";
+import { chapterContentPath, isAdultTag, mediocreErrorFor, mediocrePath, normalizeChapterContent, parseMediocreRequest, titleKey } from "../src/lib/mediocre-api";
 
 describe("MediocreScan proxy rules", () => {
   it("maps obra to its fixed path", () => {
@@ -70,4 +70,11 @@ it("busca por nome usa o parâmetro string e limita o texto", () => {
 it("adicionadas recentes paginam de 20 em 20", () => {
   expect(pathOf(parseReq({ operation: "adicionados", pagina: 3 }))).toBe("/obras/adicionados-recentes?offset=40");
   expect(pathOf(parseReq({ operation: "ranking" }))).toBe("/obras/ranking");
+});
+
+describe("MediocreScan adult tag", () => {
+  it("reconhece só a etiqueta de idade", () => {
+    for (const tag of ["+18", "18+", " +18 ", "+ 18"]) expect(isAdultTag(tag)).toBe(true);
+    for (const tag of ["18", "+1", "+8", "Adulto", "Romance", "+180"]) expect(isAdultTag(tag)).toBe(false);
+  });
 });

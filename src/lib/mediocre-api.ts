@@ -234,6 +234,11 @@ export function tagNames(v: unknown): string[] {
   return v.map((t) => (typeof t === "string" ? t : isRow(t) ? text(t["nome"] ?? t["tag_nome"] ?? t["name"]) : null)).filter((x): x is string => Boolean(x));
 }
 
+/** Etiqueta da fonte que marca a obra como adulta ("+18" ou "18+"): vira idade 18, não gênero. */
+export function isAdultTag(tag: string): boolean {
+  return /^(\+\s*18|18\s*\+)$/.test(tag.trim());
+}
+
 const MEDIA = "https://cdn.mediocrescan.com/obras";
 /** List endpoints use short keys (id, nome, imagem as bare file name); detail uses obr_*. */
 export function pick(row: Row, ...keys: string[]): unknown {

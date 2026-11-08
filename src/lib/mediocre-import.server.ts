@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
-import { chapterContentPath, extractWork, normalizeChapterContent, titleKey, workImage, extractList } from "./mediocre-api";
+import { chapterContentPath, extractWork, isAdultTag, normalizeChapterContent, titleKey, workImage, extractList } from "./mediocre-api";
 import { mediocreGet } from "./mediocre-api.server";
 import { KINDS } from "./work-categories";
 import { normalizeGenres } from "./work-genres";
@@ -85,11 +85,14 @@ export async function importMediocreWork(admin: Admin, obraId: number, opts: { k
   if (!work || !name) throw new Error("O formato retornado não foi reconhecido.");
 
   let created = false;
+  const sourceTags = Array.isArray(work["tags"]) ? (work["tags"] as unknown[]).map((t) => (t && typeof t === "object" ? (t as Row)["tag_nome"] : t)).filter((t): t is string => typeof t === "string") : [];
+  // "+18" na fonte é a classificação da própria obra: idade 18 fixa. Sem ela, o banco classifica sozinho.
+  const adult = sourceTags.some(isAdultTag);
   const found = await admin.from("series").select("id, slug, kind, cover_url, banner_url").eq("source_mediocre_id", obraId).maybeSingle();
   let series: { id: string; slug: string; kind: string; cover_url?: string | null; banner_url?: string | null } | null = found.data;
   if (!series) {
     const alts = Array.isArray(work["obr_titulos_alternativos"]) ? (work["obr_titulos_alternativos"] as unknown[]).filter((t): t is string => typeof t === "string" && Boolean(t.trim())) : [];
-    const tags = Array.isArray(work["tags"]) ? (work["tags"] as unknown[]).map((t) => (t && typeof t === "object" ? (t as Row)["tag_nome"] : t)).filter((t): t is string => typeof t === "string" && t !== "+18") : [];
+    const tags = sourceTags.filter((t) => !isAdultTag(t));
     const base = slugify(name) || `obra-${obraId}`;
     const { data: taken } = await admin.from("series").select("id").eq("slug", base).maybeSingle();
     const insert = await admin.from("series").insert({
@@ -102,6 +105,7 @@ export async function importMediocreWork(admin: Admin, obraId: number, opts: { k
       kind: kindFor(work, opts.kind),
       status: statusFor(work["obr_status"]),
       genres: normalizeGenres(tags),
+      ...(adult ? { age_rating: "18" } : {}),
       published: !opts.draft,
       created_by: opts.createdBy,
       source_mediocre_id: obraId,
@@ -122,6 +126,8 @@ export async function importMediocreWork(admin: Admin, obraId: number, opts: { k
   // Repair broken/missing images with data already fetched (no extra API call, no AI credits).
   const broken = (u: string | null | undefined) => !u || u.includes("back2.mediocrescan.com");
   if (!series) throw new Error("Obra não encontrada.");
+  // Obra já no site marcada +18 na fonte: fixa 18 se a idade estava vazia ou automática (escolha do admin fica).
+  if (adult && !created) await admin.from("series").update({ age_rating: "18", age_rating_auto: false }).eq("id", series.id).or("age_rating.is.null,age_rating_auto.eq.true");
   const s0 = series;
   const fix: { cover_url?: string; banner_url?: string } = {};
   const cover = workImage(work), banner = workImage(work, "banner") ?? cover;

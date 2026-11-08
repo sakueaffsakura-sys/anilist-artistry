@@ -110,3 +110,33 @@ Aplicada `0058_series_touch_ignore_views.sql` e registrada no histórico Drizzle
 O gatilho `series_touch` passou a ter `WHEN`: só roda quando muda alguma coluna além de `views` e `updated_at`. Abrir um capítulo soma 1 em `views` e não faz mais a obra subir em "Capítulos novos" e "Atualizadas". Quem grava `updated_at` de propósito (importações, painel) continua igual, e mudar qualquer outro campo continua atualizando a data. Os dois casos foram testados numa transação desfeita antes de aplicar.
 
 Nenhum dado foi alterado. Reversão: recriar `series_touch BEFORE UPDATE ... EXECUTE FUNCTION touch_updated_at()` sem o `WHEN` e remover o registro no histórico.
+
+## Classificação automática das obras — 2026-11-07
+
+Aplicada `0059_auto_classificacao.sql` e registrada no histórico Drizzle com o hash do arquivo. Antes, foram conferidos o histórico (59 registros, último 0058), os gatilhos de `series` e o `ctype` do banco (`en_US.UTF-8`, que faz `\m`/`\M` tratarem letras acentuadas como parte da palavra: "transação" não conta como "transa"). Tudo foi testado numa transação desfeita antes de aplicar: obra nova, troca de sinopse, idade escolhida, volta ao automático, recálculo pelo painel e usuário comum e visitante barrados na função.
+
+Sem IA e sem créditos: regras fixas no próprio banco, então toda forma de criar obra (painel, AniList, novels, app, automação do GitHub, fila e sincronização da MediocreScan) passa por elas.
+
+- `series.age_rating_auto`: `true` quando a idade foi calculada pelas regras, `false` quando alguém escolheu.
+- `auto_age_rating(kind, genres, title, alt_titles, synopsis)`: 18 para tipo Hentai, etiquetas adultas (Adulto, Smut, +18, Oral, Creampie, Incesto, MILF…) ou termos explícitos; 16 para Ecchi, Gore, Sangue, Maduro, nudez, drogas ou insinuação sexual ("sexo oposto/masculino/feminino" não conta); 14 para as demais com sinopse ou gênero; vazia sem dados. Nunca L, 10 ou 12: perfis infantis não são liberados sozinhos.
+- `auto_genres(title, alt_titles, synopsis)`: até 5 gêneros da lista oficial tirados do título e da sinopse, só para obras sem gênero.
+- Gatilho `series_auto_classify` (antes de inserir ou de mudar `kind`, `genres`, `title`, `alt_titles`, `synopsis`, `age_rating` ou `age_rating_auto`): preenche gêneros vazios e calcula a idade. Idade automática acompanha os dados da obra; mudar a idade para um valor fixa a escolha; idade vazia ou `age_rating_auto = true` devolve às regras.
+- `series_touch` passa a ignorar também `age_rating`, `age_rating_auto` e `genres`: classificar não faz a obra subir em "Capítulos novos".
+- `auto_classify_series(_all)`: só administradores (RPC do painel). Preenche o que falta e, com `_all`, recalcula as idades automáticas. Devolve `{generos, idades}`.
+
+Dados alterados: as 121 obras sem idade receberam idade automática (104 → 14, 2 → 16, 15 → 18) e 37 das 69 obras sem gênero ganharam gêneros (32 não tinham palavra reconhecida). Nenhuma idade escolhida foi tocada e nenhum `updated_at` mudou. Backup antes do preenchimento: `backup.series_0059` (121 linhas com `id`, `age_rating` e `genres` anteriores), num schema fora da API (sem acesso para `anon` e `authenticated`).
+
+Reversão: `DROP TRIGGER series_auto_classify ON series`; restaurar `age_rating` e `genres` de `backup.series_0059` nas obras que ainda estiverem com `age_rating_auto`; recriar `series_touch` como na 0058; apagar as quatro funções; remover a coluna e o registro no histórico.
+
+## Classificação automática: regras ampliadas — 2026-11-07
+
+Aplicada `0060_auto_classificacao_regras.sql` e registrada no histórico Drizzle com o hash do arquivo. Antes, conferido o histórico (60 registros, último 0059) e visto o resultado numa transação desfeita (obra por obra).
+
+Só troca as funções de regra `auto_age_rating` e `auto_genres` (o gatilho e `auto_classify_series` são os da 0059):
+
+- Idade: termos em inglês (porn, rape, sex, nude, drugs…) e sinais de conteúdo maduro que passavam como 14 (roupa íntima, súcubo, motel, desejo carnal, garota de programa…). "opposite sex", "same-sex" e "lustre" não contam.
+- Gêneros: palavras em inglês e mais gêneros oficiais (Aventura, Fantasia pela própria palavra, Viagem no Tempo, Super-heróis, Ficção Científica, Crime, Histórico, Gastronomia, Música, Sobrenatural, Mecha). Continuam no máximo 5.
+
+Dados alterados: 23 das 32 obras ainda sem gênero ganharam gêneros, e 5 idades automáticas subiram de 14 para 16 (#TodaysUnderwearReport, Kouiu no Ga Ii, Succubus no Kuni no Hitoosu, Comprado pelo Lorde Demônio antes do Fim, The Story of Making My Bitchy Gal Sister Understand). Distribuição automática: 99 → 14, 7 → 16, 15 → 18. Idades escolhidas e `updated_at` não mudaram. Backup antes: `backup.series_0060` (121 linhas com idade, marca automática e gêneros anteriores).
+
+Reversão: recriar as duas funções como na 0059, restaurar `age_rating` e `genres` de `backup.series_0060` nas obras que ainda estiverem com `age_rating_auto` e remover o registro no histórico.

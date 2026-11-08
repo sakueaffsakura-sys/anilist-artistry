@@ -1115,6 +1115,7 @@ export type Database = {
       series: {
         Row: {
           age_rating: string | null
+          age_rating_auto: boolean
           alt_titles: string | null
           anilist_id: number | null
           anilist_popularity: number
@@ -1143,6 +1144,7 @@ export type Database = {
         }
         Insert: {
           age_rating?: string | null
+          age_rating_auto?: boolean
           alt_titles?: string | null
           anilist_id?: number | null
           anilist_popularity?: number
@@ -1171,6 +1173,7 @@ export type Database = {
         }
         Update: {
           age_rating?: string | null
+          age_rating_auto?: boolean
           alt_titles?: string | null
           anilist_id?: number | null
           anilist_popularity?: number
@@ -1430,6 +1433,21 @@ export type Database = {
       ad_ack_ad: { Args: never; Returns: Json }
       ad_record_read: { Args: { _chapter: string }; Returns: Json }
       ad_state: { Args: never; Returns: Json }
+      auto_age_rating: {
+        Args: {
+          _alt_titles: string
+          _genres: string[]
+          _kind: string
+          _synopsis: string
+          _title: string
+        }
+        Returns: string
+      }
+      auto_classify_series: { Args: { _all?: boolean }; Returns: Json }
+      auto_genres: {
+        Args: { _alt_titles: string; _synopsis: string; _title: string }
+        Returns: string[]
+      }
       award_xp: {
         Args: { _amount: number; _reason: string; _ref: string; _user: string }
         Returns: undefined
