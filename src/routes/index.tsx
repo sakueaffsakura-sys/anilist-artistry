@@ -110,7 +110,7 @@ function Home() {
     <div className="min-h-screen">
       <SiteHeader />
       {heroLoading ? (
-        <section aria-label="Carregando destaques" aria-busy="true" className="home-banner">
+        <section aria-label="Carregando destaques" aria-busy="true" className="home-banner min-h-[295px] md:min-h-[414px]">
           <div className="mx-auto grid max-w-7xl grid-cols-[96px_minmax(0,1fr)] gap-4 px-4 py-5 sm:grid-cols-[150px_minmax(0,1fr)] sm:px-6 md:grid-cols-[190px_minmax(0,1fr)] md:gap-7 md:py-9 lg:px-8">
             <div className="aspect-[2/3] rounded-md bg-surface-2 motion-safe:animate-pulse" />
             <div className="space-y-3" aria-hidden="true">
