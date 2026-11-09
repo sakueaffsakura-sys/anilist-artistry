@@ -1487,6 +1487,7 @@ export type Database = {
         Args: { object_metadata: Json; object_name: string }
         Returns: boolean
       }
+      mediocre_request_priority: { Args: { _obra: number }; Returns: number }
       obra_ranking: {
         Args: { _metric: string }
         Returns: {
@@ -1498,9 +1499,18 @@ export type Database = {
           total: number
         }[]
       }
+      request_kind_fits: {
+        Args: { _request_kind: string; _series_kind: string }
+        Returns: boolean
+      }
+      request_title_key: { Args: { value: string }; Returns: string }
       resolve_work_request: {
         Args: { _note?: string; _request: string; _series?: string }
         Returns: undefined
+      }
+      series_title_keys: {
+        Args: { _alt_titles: string; _title: string }
+        Returns: string[]
       }
       set_profile_pin: {
         Args: { _pin: string; _profile: string }
