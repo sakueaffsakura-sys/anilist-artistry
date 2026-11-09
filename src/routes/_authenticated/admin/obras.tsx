@@ -171,7 +171,7 @@ function ObrasAdmin() {
       title="Obras"
       subtitle={`${series.data?.total ?? 0} obras no catálogo`}
       actions={
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="no-scrollbar flex max-w-full items-center gap-2 overflow-x-auto">
         <Button asChild className="font-semibold">
           <Link to="/admin/nova">
             <Plus className="mr-2 h-4 w-4" /> Nova obra
@@ -210,9 +210,9 @@ function ObrasAdmin() {
         </div>
       </div>
 
-      {series.isFetching ? <p role="status" className="mt-4 text-sm text-muted-foreground">Carregando obras…</p> : null}
+      <p role="status" className="mt-4 h-5 text-sm text-muted-foreground">{series.isFetching ? "Carregando obras…" : ""}</p>
       {series.isError ? <div role="alert" className="mt-4 text-sm text-destructive">Não foi possível carregar as obras. <Button variant="outline" onClick={() => void series.refetch()}>Tentar novamente</Button></div> : null}
-      <div aria-busy={series.isFetching} className="admin-work-list mt-5 overflow-hidden rounded-lg border border-border bg-surface">
+      <div aria-busy={series.isFetching} className={`admin-work-list mt-5 overflow-hidden rounded-lg border border-border bg-surface${series.isPending ? " min-h-[70vh]" : ""}`}>
         {rows.map((r) => (
           <div key={r.id} className="admin-work-row flex flex-wrap items-center gap-3 border-b border-border p-4 last:border-0 hover:bg-surface-2/50">
             <img src={coverUrl(r.cover_url)} alt={r.title} loading="lazy" decoding="async" className="h-20 w-14 shrink-0 rounded-lg object-cover" />

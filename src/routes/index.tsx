@@ -91,6 +91,8 @@ function Home() {
     (recent.data?.length ?? 0) === 0 &&
     (updated.data?.length ?? 0) === 0;
 
+  // Render the shelves together once the first batch settles, so content never jumps while loading.
+  const shelvesPending = updated.isPending || releases.isPending || discovery.isPending || novels.isPending || ranking.isPending;
   const heroItems = slider.data ?? [];
   const heroLoading = slider.isPending;
   const catalogFailed = recent.isError || updated.isError || ranking.isError || slider.isError || novels.isError || discovery.isError;
@@ -108,7 +110,7 @@ function Home() {
     <div className="min-h-screen">
       <SiteHeader />
       {heroLoading ? (
-        <section aria-label="Carregando destaques" aria-busy="true" className="home-banner">
+        <section aria-label="Carregando destaques" aria-busy="true" className="home-banner min-h-[295px] md:min-h-[414px]">
           <div className="mx-auto grid max-w-7xl grid-cols-[96px_minmax(0,1fr)] gap-4 px-4 py-5 sm:grid-cols-[150px_minmax(0,1fr)] sm:px-6 md:grid-cols-[190px_minmax(0,1fr)] md:gap-7 md:py-9 lg:px-8">
             <div className="aspect-[2/3] rounded-md bg-surface-2 motion-safe:animate-pulse" />
             <div className="space-y-3" aria-hidden="true">
@@ -149,10 +151,9 @@ function Home() {
           <FavoritesUpdated rows={favorites.data ?? []} />
         ) : null}
 
-        {updated.isPending ? <LoadingShelf label="Carregando atualizações" /> : null}
+        {shelvesPending ? <HomeLoading /> : <>
         {(updated.data?.length ?? 0) > 0 ? <RecentlyUpdated rows={updated.data ?? []} /> : null}
 
-        {releases.isPending ? <LoadingShelf label="Carregando lançamentos" /> : null}
         {(releases.data?.length ?? 0) > 0 ? <Releases rows={releases.data ?? []} favoriteIds={favoriteIds} /> : null}
 
         <section aria-labelledby="genre-shortcuts" className="mb-8">
@@ -167,10 +168,8 @@ function Home() {
           </div>
         </section>
 
-        {discovery.isPending ? <LoadingShelf label="Carregando obras populares" /> : null}
         {discovery.data ? <HomeDiscovery sections={discovery.data} favoriteIds={favoriteIds} /> : null}
 
-        {novels.isPending ? <LoadingShelf label="Carregando novels" /> : null}
         {novels.isSuccess ? (
           <SectionRow icon={<BookOpenText />} title="Novels" count={novels.data.length}
             subtitle="Capítulos em texto, atualizados por último"
@@ -184,7 +183,6 @@ function Home() {
           </SectionRow>
         ) : null}
 
-        {ranking.isPending ? <LoadingShelf label="Carregando as mais lidas" /> : null}
         {(ranking.data?.[0]?.views ?? 0) > 0 ? (
           <SectionRow
             icon={<Trophy />}
@@ -215,6 +213,7 @@ function Home() {
             </ol>
           </SectionRow>
         ) : null}
+        </>}
         <EventBadges />
 
       </main>
@@ -223,9 +222,19 @@ function Home() {
   );
 }
 
-function LoadingShelf({ label }: { label: string }) {
+function HomeLoading() {
   return (
-    <section aria-label={label} aria-busy="true" className="mb-9 overflow-hidden">
+    <div aria-busy="true" aria-label="Carregando obras" className="min-h-[160vh]">
+      <LoadingShelf />
+      <LoadingShelf />
+      <LoadingShelf />
+    </div>
+  );
+}
+
+function LoadingShelf() {
+  return (
+    <section aria-hidden="true" className="mb-9 overflow-hidden">
       <div aria-hidden="true" className="mb-3 h-5 w-40 rounded bg-surface-2 motion-safe:animate-pulse" />
       <div aria-hidden="true" className="flex gap-3 sm:gap-4">
         {Array.from({ length: 7 }, (_, index) => (
