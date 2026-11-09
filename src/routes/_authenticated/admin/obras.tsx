@@ -171,7 +171,7 @@ function ObrasAdmin() {
       title="Obras"
       subtitle={`${series.data?.total ?? 0} obras no catálogo`}
       actions={
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="no-scrollbar flex max-w-full items-center gap-2 overflow-x-auto">
         <Button asChild className="font-semibold">
           <Link to="/admin/nova">
             <Plus className="mr-2 h-4 w-4" /> Nova obra

@@ -58,7 +58,7 @@ export function ProfilePicker({ onDone }: { onDone?: () => void }) {
   return (
     <div className="mx-auto flex max-w-3xl flex-col items-center gap-10 px-4 py-12 text-center">
       <h1 className="font-display text-3xl font-bold sm:text-4xl">{manage ? "Gerenciar perfis" : "Quem está lendo?"}</h1>
-      <div className="flex flex-wrap justify-center gap-6 sm:gap-8">
+      <div className="flex min-h-[200px] flex-wrap justify-center gap-6 sm:gap-8">
         {profiles.map((profile) => (
           <div key={profile.id} className="flex w-28 flex-col items-center gap-3">
             <button type="button" onClick={() => manage ? void changePin(profile) : void choose(profile)}
