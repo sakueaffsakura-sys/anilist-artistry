@@ -135,7 +135,7 @@ export function AdminShell({
         <main className="admin-content admin-workspace-content min-w-0 px-4 py-5 sm:px-8 sm:py-7 xl:px-10">
           <div className="admin-page-heading admin-hero mb-6 flex flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3"><span className="admin-hero-icon"><CurrentIcon className="h-5 w-5" /></span><div className="min-w-0"><h1 className="font-display text-xl font-bold sm:text-2xl">{title}</h1>{subtitle ? <p className="mt-0.5 max-w-2xl text-[13px] text-muted-foreground">{subtitle}</p> : null}</div></div>
-            {actions ? <div className="flex max-w-full flex-wrap gap-2">{actions}</div> : null}
+            {actions ? <div className="flex max-w-full basis-full flex-wrap gap-2 sm:basis-auto">{actions}</div> : null}
           </div>
           <div className="admin-body">{body}</div>
         </main>
