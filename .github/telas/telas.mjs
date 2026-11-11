@@ -214,9 +214,10 @@ for (const [viewName, view] of Object.entries(VIEWS)) {
         const js = res.filter((r) => r.initiatorType === "script" || /\.m?js(\?|$)/.test(r.name));
         const css = res.filter((r) => /\.css(\?|$)/.test(r.name));
         const db = res.filter((r) => r.name.includes("/rest/v1/") || r.name.includes("/_serverFn/"));
-        const slow = db.reduce((m, r) => Math.max(m, r.duration), 0);
+        const slowest = db.reduce((m, r) => (r.duration > (m?.duration ?? -1) ? r : m), null);
+        const slow = slowest?.duration ?? 0;
         const ms = (v) => `${Math.round(v)} ms`;
-        return `${label} · servidor ${ms(nav?.responseStart ?? 0)} · pronta ${ms(nav?.domContentLoadedEventEnd ?? 0)} · maior conteúdo ${ms(window.__perf?.lcp ?? 0)} · pulos ${(window.__perf?.cls ?? 0).toFixed(3)} · JS ${kb(js)} kB (${js.length}) · CSS ${kb(css)} kB · banco ${db.length} pedidos, mais lento ${ms(slow)}`;
+        return `${label} · servidor ${ms(nav?.responseStart ?? 0)} · pronta ${ms(nav?.domContentLoadedEventEnd ?? 0)} · maior conteúdo ${ms(window.__perf?.lcp ?? 0)} · pulos ${(window.__perf?.cls ?? 0).toFixed(3)} · JS ${kb(js)} kB (${js.length}) · CSS ${kb(css)} kB · banco ${db.length} pedidos, mais lento ${ms(slow)}${slowest ? ` (${decodeURIComponent(slowest.name.replace(/^https?:\/\/[^/]+/, "")).slice(0, 160)})` : ""}`;
       }, `[${viewName} ${p.name}]`).catch((e) => `[${viewName} ${p.name}] medida falhou: ${e.message}`));
       // Abre um diálogo ou aba antes da foto (ex.: classificação de obras, formulário da obra).
       if (p.click) {
