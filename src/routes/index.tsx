@@ -93,6 +93,8 @@ function Home() {
 
   // Render the shelves together once the first batch settles, so content never jumps while loading.
   const shelvesPending = updated.isPending || releases.isPending || discovery.isPending || novels.isPending || ranking.isPending;
+  // Na conta logada, "Continue lendo" e favoritos entram junto com as prateleiras (antes surgiam depois e empurravam a página).
+  const personalPending = Boolean(user) && (history.isPending || favorites.isPending);
   const heroItems = slider.data ?? [];
   const heroLoading = slider.isPending;
   const catalogFailed = recent.isError || updated.isError || ranking.isError || slider.isError || novels.isError || discovery.isError;
@@ -143,6 +145,7 @@ function Home() {
           </div>
         ) : null}
 
+        {shelvesPending || personalPending ? <HomeLoading /> : <>
         {user && (history.data?.length ?? 0) > 0 ? (
           <ContinueReading rows={history.data ?? []} userId={user.id} />
         ) : null}
@@ -151,7 +154,6 @@ function Home() {
           <FavoritesUpdated rows={favorites.data ?? []} />
         ) : null}
 
-        {shelvesPending ? <HomeLoading /> : <>
         {(updated.data?.length ?? 0) > 0 ? <RecentlyUpdated rows={updated.data ?? []} /> : null}
 
         {(releases.data?.length ?? 0) > 0 ? <Releases rows={releases.data ?? []} favoriteIds={favoriteIds} /> : null}
