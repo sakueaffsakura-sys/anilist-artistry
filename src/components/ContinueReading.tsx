@@ -13,7 +13,7 @@ export type ContinueRow = {
   updated_at: string;
   chapter_id: string | null;
   chapters: { id: string; number: number } | null;
-  series: { id: string; slug: string; title: string; cover_url: string | null; chapters: Array<{ count: number }> };
+  series: { id: string; slug: string; title: string; cover_url: string | null; chapter_count: number };
 };
 
 /** Continuar lendo: capa com a barra de andamento, o capítulo onde parou e o atalho para voltar a ele. */
