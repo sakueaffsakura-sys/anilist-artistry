@@ -32,7 +32,7 @@ import { Input } from "@/components/ui/input";
 
 type Tab = "favoritos" | "continuando" | (typeof STATUSES)[number]["key"];
 
-const SERIES_FIELDS = "id, slug, title, cover_url, kind, rating, chapters(number)";
+const SERIES_FIELDS = "id, slug, title, cover_url, kind, rating, chapter_count, latest_chapter_number";
 type S = {
   id: string;
   slug: string;
@@ -40,7 +40,8 @@ type S = {
   cover_url: string | null;
   kind: string;
   rating: number;
-  chapters: { number: number }[];
+  chapter_count: number;
+  latest_chapter_number: number | null;
 };
 
 function Colecao() {
@@ -106,10 +107,10 @@ function Colecao() {
   const progressBySeries = useMemo(() => {
     const map = new Map<string, number>();
     for (const row of history.data ?? []) {
-      const total = row.series.chapters.length || 1;
-      const read = row.chapters?.number ?? 0;
-      const idx = [...row.series.chapters].sort((a, b) => a.number - b.number).findIndex((c) => c.number === read);
-      const pct = Math.round(((idx + 1) / total) * 100);
+      // Progresso pelo número do capítulo lido sobre o último publicado (sem baixar a lista de capítulos).
+      const latest = Number(row.series.latest_chapter_number ?? 0);
+      const read = Number(row.chapters?.number ?? 0);
+      const pct = latest > 0 ? Math.min(100, Math.round((read / latest) * 100)) : 0;
       map.set(row.series_id, Math.max(map.get(row.series_id) ?? 0, pct));
     }
     return map;
@@ -216,7 +217,7 @@ function Colecao() {
               title={i.series.title}
               cover={i.series.cover_url}
               rating={i.series.rating}
-              chapters={i.series.chapters.length}
+              chapters={i.series.chapter_count}
               kind={i.series.kind}
               progress={progressBySeries.get(i.series.id) ?? 0}
               resumeChapter={tab === "continuando" ? history.data?.find((r) => r.series_id === i.series.id)?.chapters?.number : undefined}

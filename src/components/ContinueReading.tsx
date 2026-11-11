@@ -13,7 +13,7 @@ export type ContinueRow = {
   updated_at: string;
   chapter_id: string | null;
   chapters: { id: string; number: number } | null;
-  series: { id: string; slug: string; title: string; cover_url: string | null; chapters: Array<{ count: number }> };
+  series: { id: string; slug: string; title: string; cover_url: string | null; chapter_count: number };
 };
 
 /** Continuar lendo: capa com a barra de andamento, o capítulo onde parou e o atalho para voltar a ele. */
@@ -46,7 +46,7 @@ export function ContinueReading({ rows, userId }: { rows: ContinueRow[]; userId:
     >
       <HScroll>
         {rows.map((row) => {
-          const total = row.series.chapters[0]?.count ?? 0;
+          const total = row.series.chapter_count ?? 0;
           const current = row.chapters?.number ?? 0;
           const pct = total > 0 ? Math.min(100, (current / total) * 100) : 0;
           return (

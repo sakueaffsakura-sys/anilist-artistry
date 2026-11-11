@@ -94,8 +94,7 @@ type ProfileSeries = {
   cover_url: string | null;
   kind: string;
   rating: number;
-  latest_chapters: { number: number }[];
-  chapter_total: { count: number }[];
+  chapter_count: number;
 };
 
 function Perfil() {
@@ -131,9 +130,9 @@ function Perfil() {
       const [followers, following, favs, readingStatuses, readingHistory, mine, lists, profileComments, workComments, badges, roles, totalRank, weeklyRank] = await Promise.all([
         supabase.from("user_follows").select("*", { count: "exact", head: true }).eq("following_id", p.id),
         supabase.from("user_follows").select("*", { count: "exact", head: true }).eq("follower_id", p.id),
-        supabase.from("favorites").select("created_at, series(id, slug, title, cover_url, kind, rating, chapter_total:chapters(count), latest_chapters:chapters(number))").eq("user_id", p.id).eq("profile_id", "00000000-0000-0000-0000-000000000000").order("created_at", { ascending: false }).order("number", { referencedTable: "series.latest_chapters", ascending: false }).limit(1, { referencedTable: "series.latest_chapters" }).limit(48),
-        supabase.from("reading_status").select("status, updated_at, series(id, slug, title, cover_url, kind, rating, chapter_total:chapters(count), latest_chapters:chapters(number))").eq("user_id", p.id).order("updated_at", { ascending: false }).order("number", { referencedTable: "series.latest_chapters", ascending: false }).limit(1, { referencedTable: "series.latest_chapters" }).limit(48),
-        supabase.from("reading_history").select("updated_at, series_id, chapters(number), series(id, slug, title, cover_url, kind, rating, chapter_total:chapters(count), latest_chapters:chapters(number))").eq("user_id", p.id).eq("profile_id", "00000000-0000-0000-0000-000000000000").order("updated_at", { ascending: false }).order("number", { referencedTable: "series.latest_chapters", ascending: false }).limit(1, { referencedTable: "series.latest_chapters" }).limit(48),
+        supabase.from("favorites").select("created_at, series(id, slug, title, cover_url, kind, rating, chapter_count)").eq("user_id", p.id).eq("profile_id", "00000000-0000-0000-0000-000000000000").order("created_at", { ascending: false }).limit(48),
+        supabase.from("reading_status").select("status, updated_at, series(id, slug, title, cover_url, kind, rating, chapter_count)").eq("user_id", p.id).order("updated_at", { ascending: false }).limit(48),
+        supabase.from("reading_history").select("updated_at, series_id, chapters(number), series(id, slug, title, cover_url, kind, rating, chapter_count)").eq("user_id", p.id).eq("profile_id", "00000000-0000-0000-0000-000000000000").order("updated_at", { ascending: false }).limit(48),
         user
           ? supabase.from("user_follows").select("follower_id").eq("follower_id", user.id).eq("following_id", p.id).maybeSingle()
           : Promise.resolve({ data: null }),
@@ -355,7 +354,7 @@ function Perfil() {
                         {continuedRows.slice(0, 12).map((row) => (
                           <div key={row.series_id} className={shelfItem}>
                             <SeriesCard slug={row.series.slug} title={row.series.title} cover={row.series.cover_url} rating={row.series.rating} kind={row.series.kind} seriesId={row.series.id}
-                              chapters={row.series.chapter_total?.[0]?.count ?? null} badge={row.chapters?.number ? `Cap. ${row.chapters.number}` : null} />
+                              chapters={row.series.chapter_count ?? null} badge={row.chapters?.number ? `Cap. ${row.chapters.number}` : null} />
                           </div>
                         ))}
                       </HScroll>
@@ -482,7 +481,7 @@ function Perfil() {
 function WorkCard({ series }: { series: ProfileSeries }) {
   return (
     <SeriesCard slug={series.slug} title={series.title} cover={series.cover_url} rating={series.rating} kind={series.kind} seriesId={series.id}
-      chapters={series.chapter_total?.[0]?.count ?? null} />
+      chapters={series.chapter_count ?? null} />
   );
 }
 

@@ -31,7 +31,8 @@
 - Genre selectors, import writes and public genre labels use the browser-safe work-genres module; alias-aware catalog filtering preserves old records without bulk rewrites.
 - Homepage discovery shelves use admin-only persisted selection settings and lightweight published-work queries; automatic ordering uses saved AniList metrics so home visits never call AniList, while manual selection preserves its order without fallback.
 - Recent updates uses the shared horizontal shelf and browser-safe selection helper for both query and display limits, keeping layout and result counts consistent.
-- List queries use aggregate chapter totals and aliased bounded previews; details cache full indexes separately from reader content to avoid oversized downloads.
+- Chapter counts live on the work (migration 0062): `series.chapter_count` (published), `chapter_count_total` (all, for the panel/app), `latest_chapter_number`, `latest_chapter_at`, kept by statement triggers on chapters. Never embed `chapters(count)` or full chapter lists just to count or find the latest chapter; lists use these columns plus at most two `recent_chapters` previews. Details cache full indexes separately from reader content to avoid oversized downloads.
+- Reader pages (`ReaderPage`) reserve 70vh until loaded so native lazy loading only fetches pages near the reader, show a retry on error, and the next chapter's data and first pages are prefetched once the reader passes half of the chapter.
 
 - Use RLS reads and server APK signing; minimum-only edits preserve files and publication.
 - Follow docs/MIGRATIONS.md; never auto-run unjournaled SQL containing pending changes.

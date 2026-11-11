@@ -152,3 +152,15 @@ Aplicada `0061_pedidos_prioridade.sql` e registrada no histórico Drizzle com o 
 Dados alterados: o pedido pendente "Demon Lord’s Martial Arts Ascension" foi atendido (a obra já estava publicada com formato diferente do pedido) e o leitor recebeu o aviso. Backup antes: `backup.work_requests_0061` (3 pedidos pendentes com status, obra e resposta).
 
 Reversão: recriar `match_published_work_requests`, `match_new_work_request` e o gatilho `match_series_requests` como antes (título exato em minúsculas e mesmo formato), apagar os gatilhos e funções novos, remover as colunas novas e o registro no histórico.
+
+## Contagem de capítulos guardada na obra — 2026-11-11
+
+Aplicada `0062_series_chapter_counts.sql` e registrada no histórico Drizzle com o hash do arquivo. Antes, conferidos o histórico (62 registros, último 0061) e as consultas mais lentas do banco (`pg_stat_statements`): as prateleiras da home contavam os capítulos de cada obra a cada visita (`chapters(count)`), de 1 a 4 s por prateleira com ~49 mil capítulos. Testada numa transação desfeita: contagens iguais às reais em todas as obras, inserir, publicar e apagar capítulos atualizando os números, nenhum `updated_at` mexido, prateleira em ~65 ms.
+
+- `series.chapter_count` (publicados), `chapter_count_total` (todos), `latest_chapter_number` e `latest_chapter_at`, mantidos pelos gatilhos de comando `chapters_series_counts_ins/upd/del` (um recálculo por obra por comando, via `refresh_series_chapter_counts`).
+- `series_touch` também ignora essas quatro colunas.
+- `site_chapter_total()` (contas logadas): total de capítulos do painel sem varrer a tabela.
+
+Dados alterados: só as colunas novas foram preenchidas (497 obras, 49.031 capítulos); nenhum dado existente mudou, então não houve backup.
+
+Reversão: apagar os três gatilhos, as funções `chapters_series_counts`, `refresh_series_chapter_counts` e `site_chapter_total`, recriar `series_touch` como na 0059, remover as quatro colunas e o registro no histórico (o código volta a usar `chapters(count)`).

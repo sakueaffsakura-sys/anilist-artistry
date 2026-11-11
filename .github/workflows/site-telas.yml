@@ -60,7 +60,10 @@ jobs:
       - name: Preparar o navegador
         run: |
           npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" playwright@1.50.1
-          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+          # O navegador vem do CDN do Playwright; as bibliotecas do sistema já vêm na imagem do GitHub.
+          # O apt só complementa fontes e, se o espelho do Ubuntu estiver fora do ar, não derruba a foto.
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install chromium
+          sudo "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install-deps chromium || echo "Aviso: dependências do sistema não instaladas (espelho do Ubuntu fora do ar); seguindo com as da imagem."
       - name: Fotografar
         env:
           PW_PATH: ${{ runner.temp }}/pw/node_modules/playwright

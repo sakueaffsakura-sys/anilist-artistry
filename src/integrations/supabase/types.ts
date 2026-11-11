@@ -1126,6 +1126,8 @@ export type Database = {
           artist: string | null
           author: string | null
           banner_url: string | null
+          chapter_count: number
+          chapter_count_total: number
           cover_url: string | null
           created_at: string
           created_by: string | null
@@ -1133,6 +1135,8 @@ export type Database = {
           id: string
           in_slider: boolean
           kind: string
+          latest_chapter_at: string | null
+          latest_chapter_number: number | null
           mediocre_synced_at: string | null
           pinned: boolean
           published: boolean
@@ -1155,6 +1159,8 @@ export type Database = {
           artist?: string | null
           author?: string | null
           banner_url?: string | null
+          chapter_count?: number
+          chapter_count_total?: number
           cover_url?: string | null
           created_at?: string
           created_by?: string | null
@@ -1162,6 +1168,8 @@ export type Database = {
           id?: string
           in_slider?: boolean
           kind?: string
+          latest_chapter_at?: string | null
+          latest_chapter_number?: number | null
           mediocre_synced_at?: string | null
           pinned?: boolean
           published?: boolean
@@ -1184,6 +1192,8 @@ export type Database = {
           artist?: string | null
           author?: string | null
           banner_url?: string | null
+          chapter_count?: number
+          chapter_count_total?: number
           cover_url?: string | null
           created_at?: string
           created_by?: string | null
@@ -1191,6 +1201,8 @@ export type Database = {
           id?: string
           in_slider?: boolean
           kind?: string
+          latest_chapter_at?: string | null
+          latest_chapter_number?: number | null
           mediocre_synced_at?: string | null
           pinned?: boolean
           published?: boolean
@@ -1512,6 +1524,7 @@ export type Database = {
         Args: { _alt_titles: string; _title: string }
         Returns: string[]
       }
+      site_chapter_total: { Args: never; Returns: number }
       set_profile_pin: {
         Args: { _pin: string; _profile: string }
         Returns: undefined

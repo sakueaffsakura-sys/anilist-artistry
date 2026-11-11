@@ -35,9 +35,9 @@ export type SeriesRow = {
 const SERIES_SELECT = SERIES_SUMMARY_SELECT;
 
 function normalize(rows: unknown): SeriesRow[] {
-  return ((rows ?? []) as Array<SeriesRow & { chapter_total?: Array<{ count: number }>; recent_chapters?: ChapterLite[] }>).map((row) => ({
+  return ((rows ?? []) as Array<SeriesRow & { recent_chapters?: ChapterLite[] }>).map((row) => ({
     ...row,
-    chapter_count: row.chapter_total?.[0]?.count ?? row.chapters?.length ?? 0,
+    chapter_count: row.chapter_count ?? row.chapters?.length ?? 0,
     chapters: [...(row.recent_chapters ?? row.chapters ?? [])].sort((a, b) => Number(b.number) - Number(a.number)),
   }));
 }
@@ -61,7 +61,7 @@ export async function fetchSeries(options: {
 
   query = query.order(options.order ?? "updated_at", { ascending: false }).limit(options.limit ?? 24);
   query = query.eq("recent_chapters.published", true);
-  query = query.eq("chapter_total.published", true)
+  query = query
     .order("number", { referencedTable: "recent_chapters", ascending: false })
     .limit(2, { referencedTable: "recent_chapters" });
 
@@ -94,7 +94,6 @@ export async function fetchFavorites(userId: string) {
     .eq("profile_id", activeProfileId())
     .order("created_at", { ascending: false })
     .eq("series.recent_chapters.published", true)
-    .eq("series.chapter_total.published", true)
     .order("number", { referencedTable: "series.recent_chapters", ascending: false })
     .limit(2, { referencedTable: "series.recent_chapters" });
   if (error) throw error;
@@ -108,7 +107,7 @@ export async function fetchHistory(userId: string) {
   const { data, error } = await supabase
     .from("reading_history")
     .select(
-      `progress, updated_at, chapter_id, chapters(id, number), series!inner(id, slug, title, cover_url, chapters(count))`,
+      `progress, updated_at, chapter_id, chapters(id, number), series!inner(id, slug, title, cover_url, chapter_count)`,
     )
     .eq("user_id", userId)
     .eq("profile_id", activeProfileId())
@@ -120,7 +119,7 @@ export async function fetchHistory(userId: string) {
     updated_at: string;
     chapter_id: string | null;
     chapters: { id: string; number: number } | null;
-    series: { id: string; slug: string; title: string; cover_url: string | null; chapters: Array<{ count: number }> };
+    series: { id: string; slug: string; title: string; cover_url: string | null; chapter_count: number };
   }>;
 }
 

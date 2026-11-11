@@ -106,7 +106,7 @@ function Pesquisar() {
     queryFn: async () => {
       let q = supabase
         .from("series")
-        .select("id, slug, title, cover_url, kind, status, rating, views, updated_at, synopsis, genres, age_rating, chapters(count)", { count: "exact" })
+        .select("id, slug, title, cover_url, kind, status, rating, views, updated_at, synopsis, genres, age_rating, chapter_count", { count: "exact" })
         .eq("published", true);
       const kidsAges = allowedAgeRatings();
       if (kidsAges) q = q.in("age_rating", kidsAges);
@@ -261,7 +261,7 @@ function Pesquisar() {
               {listView ? (
                 <div className="mt-2 grid grid-cols-1 gap-x-6 xl:grid-cols-2">
                   {rows.map((r) => {
-                    const chapters = r.chapters[0]?.count ?? 0;
+                    const chapters = r.chapter_count ?? 0;
                     return (
                       <div key={r.id} className="catalog-list-item">
                         <Link to="/obra/$slug" params={{ slug: r.slug }} className="series-cover relative block aspect-[2/3] overflow-hidden rounded-md">
@@ -297,7 +297,7 @@ function Pesquisar() {
                       titleNode={<Highlight text={r.title} term={s.q} />}
                       cover={r.cover_url}
                       rating={r.rating}
-                      chapters={r.chapters[0]?.count ?? 0}
+                      chapters={r.chapter_count ?? 0}
                       kind={r.kind}
                       ageRating={r.age_rating}
                       seriesId={r.id}

@@ -232,7 +232,7 @@ function ObrasAdmin() {
                 <AgeRatingBadge value={r.age_rating} size="sm" />
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {kindLabel(r.kind)} · {r.status} · {(r.chapters?.[0]?.count ?? 0).toLocaleString("pt-BR")} capítulos · {compactNumber(r.views ?? 0)} leituras · {timeAgo(r.updated_at)}
+                {kindLabel(r.kind)} · {r.status} · {(r.chapter_count_total ?? 0).toLocaleString("pt-BR")} capítulos · {compactNumber(r.views ?? 0)} leituras · {timeAgo(r.updated_at)}
               </p>
             </div>
             <Button

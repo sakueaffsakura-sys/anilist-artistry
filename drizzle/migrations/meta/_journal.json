@@ -435,6 +435,13 @@
       "when": 1794100733051,
       "tag": "0061_pedidos_prioridade",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1794406421226,
+      "tag": "0062_series_chapter_counts",
+      "breakpoints": true
     }
   ]
 }
