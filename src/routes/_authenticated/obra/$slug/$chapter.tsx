@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { AlignJustify, BookOpen, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronsDown, Home, List, Maximize2, MessageCircle, Minus, Moon, Palette, Plus, Settings2, SunMedium } from "lucide-react";
+import { AlignJustify, BookOpen, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronsDown, Home, List, Maximize2, MessageCircle, Minus, Moon, Palette, Plus, RotateCw, Settings2, SunMedium } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -96,6 +96,25 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
     const raw = (chapterContent?.pages ?? []) as unknown;
     return Array.isArray(raw) ? (raw.filter((item) => typeof item === "string") as string[]) : [];
   }, [chapterContent]);
+
+  // Próximo capítulo pronto antes do toque: dados e as primeiras páginas começam a baixar na metade da leitura.
+  const prefetchClient = useQueryClient();
+  useEffect(() => {
+    if (!next) return;
+    let done = false;
+    const warm = async () => {
+      if (done) return;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      if (max > 0 && window.scrollY / max < 0.5) return;
+      done = true;
+      window.removeEventListener("scroll", warm);
+      const data = await prefetchClient.fetchQuery(chapterQueryOptions(next.id)).catch(() => null);
+      const firstPages = Array.isArray(data?.pages) ? (data.pages as unknown[]).filter((u): u is string => typeof u === "string").slice(0, 3) : [];
+      for (const url of firstPages) { const img = new Image(); img.decoding = "async"; img.src = url; }
+    };
+    window.addEventListener("scroll", warm, { passive: true });
+    return () => { done = true; window.removeEventListener("scroll", warm); };
+  }, [next, prefetchClient]);
 
   const isNovel = obra?.kind === "Novel";
   const novelBlocks = useMemo(
@@ -591,18 +610,7 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
             Este capítulo ainda não tem páginas.
           </p>
         ) : (
-          pages.map((page, pageIndex) => (
-            <img
-              key={`${page}-${pageIndex}`}
-              src={page}
-              alt={`Página ${pageIndex + 1}`}
-              data-reader-page=""
-              loading={pageIndex < 2 ? "eager" : "lazy"}
-              decoding="async"
-              fetchPriority={pageIndex === 0 ? "high" : "auto"}
-              className="w-full"
-            />
-          ))
+          pages.map((page, pageIndex) => <ReaderPage key={`${page}-${pageIndex}`} src={page} index={pageIndex} />)
         )}
       </main>
 
@@ -697,6 +705,40 @@ function ChapterReader({ chapterId }: { chapterId: string }) {
           <ChevronRight className="h-5 w-5" />
         </Button>
       </nav>
+    </div>
+  );
+}
+
+/**
+ * Página do capítulo. Até carregar, guarda espaço na tela: assim o carregamento sob demanda baixa só as
+ * páginas perto de quem lê (antes todas começavam juntas e as primeiras demoravam) e a leitura não pula.
+ * Se a página falhar, um toque tenta de novo sem recarregar o capítulo.
+ */
+function ReaderPage({ src, index }: { src: string; index: number }) {
+  const [state, setState] = useState<"loading" | "ok" | "error">("loading");
+  const [attempt, setAttempt] = useState(0);
+  const url = attempt ? `${src}${src.includes("?") ? "&" : "?"}tentativa=${attempt}` : src;
+  return (
+    <div className="reader-page" data-state={state}>
+      {state === "error" ? (
+        <div className="reader-page-error" role="alert">
+          <p>A página {index + 1} não carregou.</p>
+          <Button size="sm" variant="secondary" onClick={() => { setState("loading"); setAttempt((n) => n + 1); }}><RotateCw /> Tentar de novo</Button>
+        </div>
+      ) : (
+        <img
+          key={url}
+          src={url}
+          alt={`Página ${index + 1}`}
+          data-reader-page=""
+          loading={index < 3 ? "eager" : "lazy"}
+          decoding="async"
+          fetchPriority={index === 0 ? "high" : "auto"}
+          className="w-full"
+          onLoad={() => setState("ok")}
+          onError={() => setState("error")}
+        />
+      )}
     </div>
   );
 }

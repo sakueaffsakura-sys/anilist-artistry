@@ -14,7 +14,7 @@ export function literalSearch(term: string): string {
 
 export async function fetchAdminWorks(page: number, term: string, filter: AdminWorkFilter, signal?: AbortSignal) {
   let query = supabase.from("series")
-    .select("id, slug, title, cover_url, kind, status, published, in_slider, views, updated_at, age_rating, chapters(count)", { count: "exact" })
+    .select("id, slug, title, cover_url, kind, status, published, in_slider, views, updated_at, age_rating, chapter_count_total", { count: "exact" })
     .neq("kind", "Novel");
   if (term.trim()) query = query.ilike("title", literalSearch(term));
   if (filter === "slide") query = query.eq("in_slider", true);

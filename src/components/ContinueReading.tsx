@@ -46,7 +46,7 @@ export function ContinueReading({ rows, userId }: { rows: ContinueRow[]; userId:
     >
       <HScroll>
         {rows.map((row) => {
-          const total = row.series.chapters[0]?.count ?? 0;
+          const total = row.series.chapter_count ?? 0;
           const current = row.chapters?.number ?? 0;
           const pct = total > 0 ? Math.min(100, (current / total) * 100) : 0;
           return (

@@ -172,12 +172,12 @@ export async function ingestPlan(admin: Admin, syncLimit: number): Promise<{ que
   const queue = rows.map((r) => Number(r.obra_id)).filter((n) => Number.isSafeInteger(n) && n > 0);
   // Capa e capítulos que a obra já tem no site, para a fila do app mostrar e ajudar a limpar.
   const { data: ss } = queue.length
-    ? await admin.from("series").select("source_mediocre_id, cover_url, slug, title, chapters(count)").in("source_mediocre_id", queue)
+    ? await admin.from("series").select("source_mediocre_id, cover_url, slug, title, chapter_count_total").in("source_mediocre_id", queue)
     : { data: [] as never[] };
-  const bySource = new Map((ss ?? []).map((r) => [Number(r.source_mediocre_id), r as { cover_url: string | null; slug: string; title: string; chapters?: { count: number }[] | null }]));
+  const bySource = new Map((ss ?? []).map((r) => [Number(r.source_mediocre_id), r as { cover_url: string | null; slug: string; title: string; chapter_count_total: number }]));
   const items: PlanItem[] = rows.filter((r) => queue.includes(Number(r.obra_id))).map((r) => {
     const sr = bySource.get(Number(r.obra_id));
-    return { id: Number(r.obra_id), title: r.title ?? sr?.title ?? null, status: r.status, cover: sr?.cover_url ?? null, slug: sr?.slug ?? null, chapters_on_site: sr?.chapters?.[0]?.count ?? 0, chapters_added: r.chapters_added, updated_at: r.updated_at, priority: r.priority ?? 0 };
+    return { id: Number(r.obra_id), title: r.title ?? sr?.title ?? null, status: r.status, cover: sr?.cover_url ?? null, slug: sr?.slug ?? null, chapters_on_site: sr?.chapter_count_total ?? 0, chapters_added: r.chapters_added, updated_at: r.updated_at, priority: r.priority ?? 0 };
   });
   if (queue.length) await admin.from("mediocre_queue").update({ next_run_at: reserveUntil() }).in("obra_id", queue).in("status", ["running", "waiting"]);
   if (!syncLimit) return { queue, items, sync: [], requestsWaiting: requestsWaiting ?? 0 };
@@ -232,9 +232,9 @@ async function finishIngest(admin: Admin, body: { obraId: number; added: number;
   }).eq("id", item.id);
 }
 
-const SITE_COLUMNS = "id, slug, title, cover_url, banner_url, published, pinned, in_slider, kind, status, updated_at, created_at, source_mediocre_id, views, rating, chapters(count)";
-type SiteRow = { chapters?: { count: number }[] | null } & Record<string, unknown>;
-const withCount = (r: SiteRow) => { const { chapters, ...rest } = r; return { ...rest, chapter_count: chapters?.[0]?.count ?? 0 }; };
+const SITE_COLUMNS = "id, slug, title, cover_url, banner_url, published, pinned, in_slider, kind, status, updated_at, created_at, source_mediocre_id, views, rating, chapter_count_total";
+type SiteRow = { chapter_count_total?: number | null } & Record<string, unknown>;
+const withCount = (r: SiteRow) => { const { chapter_count_total, ...rest } = r; return { ...rest, chapter_count: chapter_count_total ?? 0 }; };
 
 async function siteList(admin: Admin, b: { filter: SiteFilter; q: string; page: number; obraId: number | null }) {
   let q = admin.from("series").select(SITE_COLUMNS, { count: "exact" });
@@ -395,8 +395,8 @@ async function hasLinkedRequests(admin: Admin, obraId: number): Promise<boolean>
 /** Obra pedida que já tem capítulo no site: publica (o banco atende os pedidos e avisa os leitores). */
 async function publishRequested(admin: Admin, obraId: number): Promise<boolean> {
   if (!(await hasLinkedRequests(admin, obraId))) return false;
-  const { data: s } = await admin.from("series").select("id, published, chapters(count)").eq("source_mediocre_id", obraId).maybeSingle();
-  const chapters = (s as { chapters?: { count: number }[] } | null)?.chapters?.[0]?.count ?? 0;
+  const { data: s } = await admin.from("series").select("id, published, chapter_count_total").eq("source_mediocre_id", obraId).maybeSingle();
+  const chapters = s?.chapter_count_total ?? 0;
   if (!s || s.published || !chapters) return false;
   const { error } = await admin.from("series").update({ published: true }).eq("id", s.id);
   return !error;
@@ -413,7 +413,7 @@ async function linkRequests(admin: Admin, body: { ids: string[]; obraId: number;
   if (error) throw new Error("Não foi possível ligar os pedidos.");
   const ids = (reqs ?? []).map((r) => r.id);
   if (!ids.length) throw new Error("Esses pedidos já foram atendidos.");
-  const { data: s } = await admin.from("series").select("id, slug, published, chapters(count)").eq("source_mediocre_id", body.obraId).maybeSingle();
+  const { data: s } = await admin.from("series").select("id, slug, published").eq("source_mediocre_id", body.obraId).maybeSingle();
   if (s) {
     if (!s.published) await publishRequested(admin, body.obraId);
     const { data: fresh } = await admin.from("series").select("id, slug, published").eq("id", s.id).maybeSingle();

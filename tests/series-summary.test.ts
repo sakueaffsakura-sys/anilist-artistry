@@ -11,7 +11,7 @@ mock.module("../src/integrations/supabase/client", () => ({
       order: (key: string, options: unknown) => { calls.push(["order", key, options]); return query; },
       limit: (value: number, options?: unknown) => { calls.push(["limit", value, options]); return query; },
       then: (resolve: (value: unknown) => unknown) => {
-        const work = { id: "work", recent_chapters: [{ number: 41, created_at: "2026-01-01" }, { number: 42, created_at: "2026-01-02" }], chapter_total: [{ count: 500 }] };
+        const work = { id: "work", recent_chapters: [{ number: 41, created_at: "2026-01-01" }, { number: 42, created_at: "2026-01-02" }], chapter_count: 500 };
         return resolve({ data: table === "favorites" ? [{ series: work }] : [work], error: null });
       },
     };
@@ -26,12 +26,13 @@ describe("Lightweight work lists", () => {
     expect(chapterCount({ chapters: [{}, {}] })).toBe(2);
     expect(chapterCount({ chapter_count: 0, chapters: [] })).toBe(0);
   });
-  it("downloads only two published chapter previews plus an aggregate", async () => {
+  it("downloads only two published chapter previews plus the stored total", async () => {
     calls.length = 0;
     const rows = await fetchSeries({ limit: 14 });
     expect(calls).toContainEqual(["limit", 2, { referencedTable: "recent_chapters" }]);
     expect(calls).toContainEqual(["order", "number", { referencedTable: "recent_chapters", ascending: false }]);
-    expect(calls).toContainEqual(["eq", "chapter_total.published", true]);
+    expect(String(calls.find((call) => call[0] === "select")?.[1])).toContain("chapter_count");
+    expect(String(calls.find((call) => call[0] === "select")?.[1])).not.toContain("chapters(count)");
     expect(rows[0]?.chapter_count).toBe(500);
     expect(rows[0]?.chapters.map((c) => c.number)).toEqual([42, 41]);
   });
@@ -40,12 +41,11 @@ describe("Lightweight work lists", () => {
     await fetchFavorites("reader-id");
     expect(calls).toContainEqual(["eq", "user_id", "reader-id"]);
     expect(calls).toContainEqual(["limit", 2, { referencedTable: "series.recent_chapters" }]);
-    expect(calls).toContainEqual(["eq", "series.chapter_total.published", true]);
   });
-  it("loads the history denominator as a count without downloading every chapter ID", async () => {
+  it("loads the history denominator from the stored count without counting chapters", async () => {
     calls.length = 0;
     await fetchHistory("reader-id");
-    expect(calls).toContainEqual(["select", "progress, updated_at, chapter_id, chapters(id, number), series!inner(id, slug, title, cover_url, chapters(count))"]);
+    expect(calls).toContainEqual(["select", "progress, updated_at, chapter_id, chapters(id, number), series!inner(id, slug, title, cover_url, chapter_count)"]);
     expect(calls).toContainEqual(["eq", "user_id", "reader-id"]);
     expect(calls).toContainEqual(["limit", 24, undefined]);
   });

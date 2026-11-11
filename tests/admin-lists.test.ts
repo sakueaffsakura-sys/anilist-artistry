@@ -9,7 +9,7 @@ mock.module("../src/integrations/supabase/client", () => ({
       query[method] = (...args: unknown[]) => { calls.push([method, ...args]); return query; };
     }
     query.then = (resolve: (value: unknown) => unknown) => resolve({ error: null, count: 91,
-      data: table === "profiles" ? [{ id: "account-a", username: "reader" }] : table === "user_roles" ? [{ user_id: "account-a", role: "uploader" }] : [{ id: "work", chapters: [{ count: 557 }] }],
+      data: table === "profiles" ? [{ id: "account-a", username: "reader" }] : table === "user_roles" ? [{ user_id: "account-a", role: "uploader" }] : [{ id: "work", chapter_count_total: 557 }],
     });
     return query;
   } },
@@ -23,8 +23,8 @@ describe("Bounded admin lists", () => {
     expect(calls).toContainEqual(["range", 30, 59]);
     expect(calls).toContainEqual(["eq", "published", false]);
     expect(calls).toContainEqual(["ilike", "title", "%One Piece%"]);
-    expect(String(calls.find(call => call[0] === "select")?.[1])).toContain("chapters(count)");
-    expect(result.rows[0]?.chapters[0]?.count).toBe(557);
+    expect(String(calls.find(call => call[0] === "select")?.[1])).toContain("chapter_count_total");
+    expect(result.rows[0]?.chapter_count_total).toBe(557);
     expect(result.total).toBe(91);
   });
   it("only reads roles for accounts on the requested page", async () => {

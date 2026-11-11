@@ -49,7 +49,7 @@ function AdminPage() {
     queryFn: async () => {
       const [s, c, p, recent] = await Promise.all([
         supabase.from("series").select("views"),
-        supabase.from("chapters").select("id", { count: "exact", head: true }),
+        supabase.rpc("site_chapter_total"),
         supabase.from("profiles").select("id", { count: "exact", head: true }),
         supabase.from("series").select("id, title, cover_url, kind, updated_at, published").order("updated_at", { ascending: false }).limit(6),
       ]);
@@ -58,7 +58,7 @@ function AdminPage() {
       return {
         series: s.data?.length ?? 0,
         views: (s.data ?? []).reduce((a, r) => a + (r.views ?? 0), 0),
-        chapters: c.count ?? 0,
+        chapters: Number(c.data ?? 0),
         users: p.count ?? 0,
         recent: recent.data ?? [],
       };

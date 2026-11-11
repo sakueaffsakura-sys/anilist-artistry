@@ -192,9 +192,9 @@ export async function syncMediocreChapters(admin: Admin, maxWorks = 2): Promise<
     return { checked: 0, added: 0, blocked: true };
   }
   // Obras sem capítulos (importação interrompida) vêm primeiro.
-  const { data: empty } = await admin.from("series").select("id, source_mediocre_id, chapters(count)")
-    .not("source_mediocre_id", "is", null).limit(200);
-  const missing = (empty ?? []).filter((r) => ((r as { chapters?: { count: number }[] }).chapters?.[0]?.count ?? 0) === 0).slice(0, maxWorks);
+  const { data: empty } = await admin.from("series").select("id, source_mediocre_id")
+    .not("source_mediocre_id", "is", null).eq("chapter_count_total", 0).limit(maxWorks);
+  const missing = empty ?? [];
   const { data: rotated } = await admin.from("series").select("id, source_mediocre_id")
     .not("source_mediocre_id", "is", null).order("mediocre_synced_at", { ascending: true, nullsFirst: true }).limit(maxWorks);
   const data = missing.length ? missing : rotated;

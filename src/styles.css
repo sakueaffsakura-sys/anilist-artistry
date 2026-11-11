@@ -385,6 +385,11 @@
 .reader-dim main img { filter: brightness(.78) contrast(1.02); }
 .reader-chapter-select { height: 36px; max-width: 132px; padding: 0 28px 0 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a3a7ae' stroke-width='3'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center; appearance: none; color: var(--foreground); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer; }
 .reader-chapter-select:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.reader-page { position: relative; }
+.reader-page[data-state="loading"] { min-height: 70vh; background: var(--surface); }
+.reader-page[data-state="loading"]::before { content: "Carregando página…"; position: absolute; top: 24px; left: 0; right: 0; text-align: center; font-size: 13px; color: var(--muted-foreground); }
+.reader-page img { position: relative; z-index: 1; display: block; }
+.reader-page-error { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 48px 16px; background: var(--surface); text-align: center; font-size: 14px; color: var(--muted-foreground); }
 .reader-page-pill { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 45; transform: translateX(-50%); align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: color-mix(in oklab, var(--background) 90%, transparent); backdrop-filter: blur(10px); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; transition: opacity .25s; pointer-events: none; }
 .reader-page-pill[data-hidden="true"] { opacity: 0; }
 .reader-page-pill b { color: var(--primary); }

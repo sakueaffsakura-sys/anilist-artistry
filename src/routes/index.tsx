@@ -62,7 +62,7 @@ function Home() {
   const releases = recent;
   const slider = useQuery({
     queryKey: ["series", "slider"],
-    queryFn: () => fetchSeries({ order: "updated_at", limit: 100, inSlider: true }),
+    queryFn: () => fetchSeries({ order: "updated_at", limit: 12, inSlider: true }),
     staleTime: 30_000,
   });
   const novels = useQuery({

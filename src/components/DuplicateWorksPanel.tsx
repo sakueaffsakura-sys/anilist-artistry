@@ -18,7 +18,7 @@ export function DuplicateWorksPanel() {
     queryFn: async () => {
       const fetchPage = async (offset: number) => {
         const { data, error } = await supabase.from('series')
-          .select('id, title, alt_titles, kind, cover_url, published, created_at, chapters(count)')
+          .select('id, title, alt_titles, kind, cover_url, published, created_at, chapter_count_total')
           .eq('published', true).order('id').range(offset, offset + 499);
         if (error) throw error;
         return data;
@@ -72,12 +72,12 @@ export function DuplicateWorksPanel() {
                 <div className="min-w-0 flex-1">
                   <p className="break-words font-bold">{work.title}</p>
                   {work.alt_titles ? <p className="mt-1 break-words text-xs text-muted-foreground">Alternativos: {work.alt_titles}</p> : null}
-                  <p className="mt-1 text-xs text-muted-foreground">{work.kind} · {work.chapters[0]?.count ?? 0} capítulos · Publicada em {new Date(work.created_at).toLocaleDateString('pt-BR')}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{work.kind} · {work.chapter_count_total ?? 0} capítulos · Publicada em {new Date(work.created_at).toLocaleDateString('pt-BR')}</p>
                   <p className="mt-1 break-all text-xs text-muted-foreground">ID: {work.id}</p>
                 </div>
                 <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
                   <Button asChild variant="ghost" size="icon" title="Editar obra"><Link to="/admin/$id" params={{ id: work.id }} aria-label={`Editar ${work.title}`}><Pencil className="h-4 w-4" /></Link></Button>
-                  <ConfirmDelete title={`Apagar "${work.title}"?`} description={`Esta cópia (ID: ${work.id}) e seus ${work.chapters[0]?.count ?? 0} capítulos serão apagados permanentemente. Favoritos, comentários e históricos vinculados também podem ser removidos. As outras obras do grupo serão mantidas.`} onConfirm={() => remove.mutate(work.id)}>
+                  <ConfirmDelete title={`Apagar "${work.title}"?`} description={`Esta cópia (ID: ${work.id}) e seus ${work.chapter_count_total ?? 0} capítulos serão apagados permanentemente. Favoritos, comentários e históricos vinculados também podem ser removidos. As outras obras do grupo serão mantidas.`} onConfirm={() => remove.mutate(work.id)}>
                     <Button variant="ghost" size="icon" title="Apagar esta cópia" aria-label={`Apagar cópia ${work.id}`} disabled={remove.isPending || scan.isFetching}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </ConfirmDelete>
                 </div>
