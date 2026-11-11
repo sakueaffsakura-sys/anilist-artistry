@@ -6,6 +6,10 @@
 // Ritmo (a API bloqueia envios múltiplos):
 //   • uma obra por vez, até o fim: só passa para outra depois de enviar todos os capítulos;
 //   • 5 capítulos por envio e espera de 1 min 12 s antes dos próximos 5;
+//   • páginas direto do CDN quando a lista da obra já traz o UUID do capítulo (sem gastar o pedido
+//     por minuto da API); só os capítulos sem UUID pedem os dados à API;
+//   • se sobrar fila quando o tempo acabar, o workflow emenda outra execução na hora (sem esperar o
+//     horário do GitHub, que atrasa horas);
 //   • se a API travar por excesso de pedidos, pausa 1 minuto e continua do mesmo ponto;
 //   • se o tempo da execução acabar no meio de uma obra, ela fica "em andamento" e a próxima
 //     execução recomeça por ela.
@@ -26,7 +30,7 @@ const CDN = "https://cdn.mediocrescan.com";
 const TOKEN = (process.env.MEDIOCRE_TOKEN || "").trim().replace(/^Bearer\s+/i, "");
 const CODE = (process.env.CODIGO_ENVIO || "").trim();
 const MANUAL = [...new Set((process.env.OBRAS || "").split(/[\s,;]+/).filter((s) => /^\d{1,9}$/.test(s)).map(Number))];
-const BUDGET_MS = Math.min(Number(process.env.TEMPO_MAXIMO_MIN) || 20, 50) * 60_000;
+const BUDGET_MS = Math.min(Number(process.env.TEMPO_MAXIMO_MIN) || 45, 50) * 60_000;
 
 const CHAPTERS_PER_SEND = 5; // capítulos por envio
 const WAIT_BETWEEN_SENDS_MS = 72_000; // 1 min 12 s antes dos próximos 5 capítulos
@@ -125,6 +129,49 @@ function contentPath(m) {
     ? `/obras/${obra}/capitulos/${num}/${uuid}.json` : null;
 }
 
+/** UUID do capítulo na lista da obra (cap_uuid ou outro campo com "uuid" no nome). */
+function entryUuid(c) {
+  if (typeof c?.cap_uuid === "string" && UUID.test(c.cap_uuid)) return c.cap_uuid;
+  for (const [k, v] of Object.entries(c || {})) if (/uuid/i.test(k) && typeof v === "string" && UUID.test(v)) return v;
+  return null;
+}
+
+/** Capítulos da lista da obra por ID: quando já trazem o UUID, as páginas vêm direto do CDN (sem pedido à API). */
+function listEntries(work) {
+  const w = unwrap(work);
+  const obrId = Number(w?.obr_id ?? w?.id) || null;
+  const map = new Map();
+  for (const c of Array.isArray(w?.capitulos) ? w.capitulos : []) {
+    const id = Number(c?.cap_id ?? c?.id);
+    if (!Number.isSafeInteger(id)) continue;
+    const uuid = entryUuid(c);
+    map.set(id, uuid ? { ...c, obr_id: c.obr_id ?? obrId, cap_uuid: uuid } : c);
+  }
+  return map;
+}
+
+let cdnDirect = 0, apiLookups = 0;
+/** Dados + conteúdo de um capítulo: direto do CDN se a lista da obra já tem o UUID; senão pede à API (1 por minuto). */
+async function chapterData(capId, entries) {
+  const e = entries.get(capId);
+  const direct = e && contentPath(e);
+  if (direct) {
+    let content = null;
+    try { content = await mget("cdn", direct); } catch (err) { if (err instanceof Fatal || err instanceof OutOfTime) throw err; }
+    if (content) { cdnDirect++; return { meta: e, content }; }
+  }
+  apiLookups++;
+  const meta = unwrap(await mget("api", `/capitulos/${capId}`));
+  if (!meta || typeof meta !== "object") return null;
+  const path = contentPath(meta);
+  let content = null;
+  if (path) {
+    try { content = await mget("cdn", path); }
+    catch (err) { if (err instanceof Fatal || err instanceof OutOfTime) throw err; content = null; }
+  }
+  return { meta, content };
+}
+
 /** Lista de obras de uma resposta da API (array direto ou dentro de data/obras/items/…). */
 function listOf(data) {
   const d = unwrap(data);
@@ -141,6 +188,7 @@ async function pull(id, { publish }) {
     return { note: "não encontrada na MediocreScan", added: 0, skipped: 0, remaining: 0 };
   }
   const w = await send({ action: "work", obraId: id, work, publish });
+  const entries = listEntries(work);
   const pending = Array.isArray(w.pendingCapIds) ? w.pendingCapIds : [];
   const total = Number.isSafeInteger(w.remaining) ? w.remaining : pending.length;
   if (pending.length) console.log(`Obra ${id} (${w.slug}${w.created ? ", nova" : ""}): ${total} capítulo(s) para enviar.`);
@@ -158,15 +206,9 @@ async function pull(id, { publish }) {
       const group = pending.slice(i, i + CHAPTERS_PER_SEND);
       for (const capId of group) {
         try {
-          const meta = unwrap(await mget("api", `/capitulos/${capId}`));
-          if (!meta || typeof meta !== "object") continue;
-          const path = contentPath(meta);
-          let content = null;
-          if (path) {
-            try { content = await mget("cdn", path); }
-            catch (e) { if (e instanceof Fatal || e instanceof OutOfTime) throw e; content = null; }
-          }
-          chapters.push({ capId, meta, content });
+          const data = await chapterData(capId, entries);
+          if (!data) continue;
+          chapters.push({ capId, meta: data.meta, content: data.content });
         } catch (e) {
           if (e instanceof Fatal || e instanceof OutOfTime) throw e;
           console.warn(`  cap ${capId}: ${e.message}`);
@@ -256,6 +298,7 @@ async function autoRequests() {
 const rows = [];
 let totalAdded = 0;
 let unfinished = null;
+let moreWork = false; // sobra trabalho: o workflow emenda outra execução em seguida
 
 /** Roda as obras em ordem, uma de cada vez; para tudo se o tempo acabar no meio de uma. */
 async function runAll(ids, label, publish) {
@@ -287,6 +330,7 @@ try {
   const plan = await send({ action: "plan", syncLimit: SYNC_WORKS });
   const queue = (plan.queue || []).filter((id) => !MANUAL.includes(id));
   console.log(`Fila: ${queue.length} obra(s).`);
+  moreWork = queue.length > 0;
   await runAll(queue, "fila", true);
   const fresh = await discover();
   await runAll(fresh, "nova", true);
@@ -295,12 +339,19 @@ try {
   console.log(`Concluído: ${totalAdded} capítulos enviados.`);
 } catch (e) {
   if (e instanceof OutOfTime) {
+    moreWork = true;
     console.log(`Tempo desta execução acabou (${totalAdded} capítulos enviados). ${unfinished ? `A obra ${unfinished} ficou em andamento e é a primeira da próxima execução.` : "O restante fica para a próxima execução."}`);
   } else if (e instanceof Fatal) {
+    moreWork = false; // token, código ou bloqueio: emendar outra execução não adianta
     console.error(`::error::${e.message}`);
     rows.push(`| - | - | - | parou: ${e.message} |`);
     process.exitCode = 1;
   } else throw e;
+}
+
+console.log(`Capítulos: ${cdnDirect} direto do CDN, ${apiLookups} pela API (1 por minuto).`);
+if (process.env.GITHUB_OUTPUT) {
+  try { appendFileSync(process.env.GITHUB_OUTPUT, `continuar=${moreWork && process.exitCode !== 1 ? "true" : "false"}\n`); } catch { /* opcional */ }
 }
 
 if (process.env.GITHUB_STEP_SUMMARY) {

@@ -551,7 +551,19 @@ final class EnvioEngine {
                 Map<String, Object> cm = Json.obj(c);
                 if (cm == null) continue;
                 Long id = Json.whole(cm.containsKey("cap_id") && cm.get("cap_id") != null ? cm.get("cap_id") : cm.get("id"));
-                if (id != null) out.map.put(id, cm);
+                if (id == null) continue;
+                // O UUID pode vir como cap_uuid ou em outro campo com "uuid" no nome: com ele as páginas vêm
+                // direto do CDN, sem gastar o pedido por minuto da API.
+                String uuid = Json.str(cm.get("cap_uuid"));
+                if (uuid == null || !UUID.matcher(uuid).matches()) {
+                    uuid = null;
+                    for (Map.Entry<String, Object> en : cm.entrySet()) {
+                        String v = Json.str(en.getValue());
+                        if (en.getKey().toLowerCase(java.util.Locale.ROOT).contains("uuid") && v != null && UUID.matcher(v).matches()) { uuid = v; break; }
+                    }
+                    if (uuid != null) { cm = new LinkedHashMap<>(cm); cm.put("cap_uuid", uuid); }
+                }
+                out.map.put(id, cm);
             }
         }
         Long obr = Json.whole(w.get("obr_id") != null ? w.get("obr_id") : w.get("id"));
@@ -624,6 +636,12 @@ final class EnvioEngine {
         String title = wm != null && Json.str(wm.get("obr_nome")) != null && !Json.str(wm.get("obr_nome")).isEmpty()
             ? Json.str(wm.get("obr_nome")) : name != null && !name.isEmpty() ? name : "Obra " + id;
         emit("work-start", "id", id, "name", title, "slug", w.get("slug"), "created", Json.truthy(w.get("created")), "total", total, "left", left);
+        if (!pending.isEmpty()) {
+            int fast = 0;
+            for (Long c : pending) { Map<String, Object> e = entries.map.get(c); if (e != null && e.get("cap_uuid") != null) fast++; }
+            log(fast > 0 ? fast + " de " + pending.size() + " capítulo(s) vêm direto do CDN (rápido)."
+                : "A lista desta obra não traz o código dos capítulos: cada um pede à API (1 por minuto).");
+        }
         long added = 0, skipped = 0, tried = 0;
         boolean failed = true;
         try {

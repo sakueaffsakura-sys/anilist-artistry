@@ -47,13 +47,17 @@ export function DeviceIngest() {
   const cmd = code && !code.longLived ? `SITE=${origin} CODIGO_ENVIO=${code.value} MEDIOCRE_TOKEN=SUA_CHAVE node mediocre-puxar.mjs --buscar "nome da obra"` : "";
   const auto = (list.data ?? []).filter((t) => isAutomation(t) && !t.revoked_at && new Date(t.expires_at).getTime() > Date.now());
   const lastRun = auto.map((t) => t.last_used_at).filter((v): v is string => Boolean(v)).sort().pop() ?? null;
+  // "Ativa" só quando o GitHub usou o código há pouco; código criado mas nunca usado = faltam os segredos no GitHub.
+  const running = lastRun !== null && Date.now() - new Date(lastRun).getTime() < 3 * 3_600_000;
+  const status = running ? "· ativa" : auto.length ? (lastRun ? "· parada" : "· esperando os segredos no GitHub") : "· desligada";
 
   return (
     <section className="grid gap-5 rounded-lg border p-4">
       <div className="grid gap-3">
         <div>
-          <h2 className="font-semibold">Automação pelo GitHub {auto.length ? "· ativa" : "· desligada"}</h2>
-          <p className="text-sm text-muted-foreground">Os servidores do GitHub buscam na MediocreScan (de outro IP, que não está bloqueado) e enviam para cá sozinhos, a cada hora: a fila de publicação, as obras novas que ainda não foram enviadas e os capítulos novos das obras já publicadas. Uma obra por vez, até o fim, 2 capítulos a cada 20 segundos; se a MediocreScan travar, pausa 1 minuto e continua.{lastRun ? ` Último envio: ${new Date(lastRun).toLocaleString("pt-BR")}.` : ""}</p>
+          <h2 className="font-semibold">Automação pelo GitHub {status}</h2>
+          <p className="text-sm text-muted-foreground">Os servidores do GitHub buscam na MediocreScan (de outro IP, que não está bloqueado) e enviam para cá sozinhos, sem parar enquanto houver fila: os pedidos dos leitores, a fila de publicação, as obras novas e os capítulos novos das obras já publicadas. Uma obra por vez, até o fim, 5 capítulos por envio; páginas direto do CDN quando possível e no máximo 1 pedido por minuto à API. Como usa outro IP, roda junto com o app Estúdio e dobra o ritmo da fila.{lastRun ? ` Último envio: ${new Date(lastRun).toLocaleString("pt-BR")}.` : ""}</p>
+          {auto.length && !lastRun ? <p className="mt-1 text-sm text-amber-500">O código existe, mas o GitHub ainda não usou: confira os segredos <code>CODIGO_ENVIO</code> e <code>MEDIOCRE_TOKEN</code> (passo 2).</p> : null}
         </div>
         <ol className="list-decimal grid gap-1 pl-5 text-sm">
           <li>Clique em "Gerar código da automação" e copie o código.</li>
