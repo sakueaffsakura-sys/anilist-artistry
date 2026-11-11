@@ -77,6 +77,7 @@ async function demoRows(route, url, headers) {
 }
 
 const log = [];
+const perf = [];
 async function setup(context, { signedIn, admin }) {
   await context.addInitScript(({ s, id, on }) => {
     try {
@@ -192,12 +193,31 @@ for (const [viewName, view] of Object.entries(VIEWS)) {
     const context = await browser.newContext({ ...view, locale: "pt-BR", timezoneId: "America/Manaus", colorScheme: "dark" });
     await setup(context, { signedIn: Boolean(p.signedIn), admin: Boolean(p.admin) });
     const page = await context.newPage();
+    // Medidas de desempenho: LCP e mudanças de layout desde o primeiro desenho.
+    await page.addInitScript(() => {
+      window.__perf = { lcp: 0, cls: 0 };
+      try {
+        new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__perf.lcp = e.startTime; }).observe({ type: "largest-contentful-paint", buffered: true });
+        new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__perf.cls += e.value; }).observe({ type: "layout-shift", buffered: true });
+      } catch { /* navegador sem suporte */ }
+    });
     page.on("pageerror", (e) => log.push(`[${viewName} ${p.name}] erro na página: ${e.message}`));
     page.on("console", (m) => { if (m.type() === "error") log.push(`[${viewName} ${p.name}] console: ${m.text().slice(0, 300)}`); });
     page.on("response", (r) => { if (r.status() >= 400 && !r.url().includes("click-sound")) log.push(`[${viewName} ${p.name}] ${r.status()} ${r.request().method()} ${r.url().slice(0, 260)}`); });
     try {
       await page.goto(BASE + p.path, { waitUntil: "domcontentloaded", timeout: 45000 });
       await settle(page);
+      perf.push(await page.evaluate((label) => {
+        const nav = performance.getEntriesByType("navigation")[0];
+        const res = performance.getEntriesByType("resource");
+        const kb = (list) => Math.round(list.reduce((n, r) => n + (r.encodedBodySize || r.transferSize || 0), 0) / 1024);
+        const js = res.filter((r) => r.initiatorType === "script" || /\.m?js(\?|$)/.test(r.name));
+        const css = res.filter((r) => /\.css(\?|$)/.test(r.name));
+        const db = res.filter((r) => r.name.includes("/rest/v1/") || r.name.includes("/_serverFn/"));
+        const slow = db.reduce((m, r) => Math.max(m, r.duration), 0);
+        const ms = (v) => `${Math.round(v)} ms`;
+        return `${label} · servidor ${ms(nav?.responseStart ?? 0)} · pronta ${ms(nav?.domContentLoadedEventEnd ?? 0)} · maior conteúdo ${ms(window.__perf?.lcp ?? 0)} · pulos ${(window.__perf?.cls ?? 0).toFixed(3)} · JS ${kb(js)} kB (${js.length}) · CSS ${kb(css)} kB · banco ${db.length} pedidos, mais lento ${ms(slow)}`;
+      }, `[${viewName} ${p.name}]`).catch((e) => `[${viewName} ${p.name}] medida falhou: ${e.message}`));
       // Abre um diálogo ou aba antes da foto (ex.: classificação de obras, formulário da obra).
       if (p.click) {
         await page.getByRole(p.role ?? "button", { name: p.click }).first().click({ timeout: 15000 });
@@ -221,4 +241,6 @@ for (const [viewName, view] of Object.entries(VIEWS)) {
 }
 await browser.close();
 writeFileSync(`${OUT}/registro.txt`, log.join("\n") + "\n");
+writeFileSync(`${OUT}/desempenho.txt`, perf.join("\n") + "\n");
+console.log(perf.join("\n"));
 console.log(log.join("\n"));
