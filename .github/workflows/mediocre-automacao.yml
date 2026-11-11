@@ -2,9 +2,11 @@ name: MediocreScan automação
 
 # Busca obras e capítulos na MediocreScan pelos servidores do GitHub e envia ao Better Mangá.
 # Segredos necessários: MEDIOCRE_TOKEN, CODIGO_ENVIO (gerado no painel) e, opcional, SITE.
+# Enquanto sobrar fila, cada execução emenda a próxima (o horário do GitHub atrasa várias horas);
+# o horário abaixo só religa a automação se a corrente parar.
 on:
   schedule:
-    - cron: "17 * * * *" # a cada hora
+    - cron: "17 * * * *" # a cada hora (o GitHub costuma atrasar)
   workflow_dispatch:
     inputs:
       obras:
@@ -14,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  actions: write # para emendar a próxima execução
 
 concurrency:
   group: mediocre-automacao
@@ -21,20 +24,26 @@ concurrency:
 
 jobs:
   puxar:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: scripts
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Puxar da MediocreScan e enviar ao site
+        id: puxar
         env:
           MEDIOCRE_TOKEN: ${{ secrets.MEDIOCRE_TOKEN }}
           CODIGO_ENVIO: ${{ secrets.CODIGO_ENVIO }}
           SITE: ${{ secrets.SITE }}
           OBRAS: ${{ github.event.inputs.obras }}
-          TEMPO_MAXIMO_MIN: "20"
+          TEMPO_MAXIMO_MIN: "45"
         run: node scripts/mediocre-actions.mjs
+      - name: Emendar a próxima execução
+        if: steps.puxar.outputs.continuar == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run mediocre-automacao.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}"

@@ -265,7 +265,16 @@
     function listEntries(work) {
       const w = unwrap(work);
       const map = new Map();
-      (w && Array.isArray(w.capitulos) ? w.capitulos : []).forEach((c) => { const cid = Number(c && (c.cap_id ?? c.id)); if (Number.isSafeInteger(cid)) map.set(cid, c); });
+      // O UUID do capítulo pode vir como cap_uuid ou em outro campo com "uuid" no nome: com ele as páginas
+      // vêm direto do CDN, sem gastar o pedido por minuto da API.
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      (w && Array.isArray(w.capitulos) ? w.capitulos : []).forEach((c) => {
+        const cid = Number(c && (c.cap_id ?? c.id));
+        if (!Number.isSafeInteger(cid)) return;
+        let uuid = typeof c.cap_uuid === "string" && UUID_RE.test(c.cap_uuid) ? c.cap_uuid : null;
+        if (!uuid) for (const k of Object.keys(c)) if (/uuid/i.test(k) && typeof c[k] === "string" && UUID_RE.test(c[k])) { uuid = c[k]; break; }
+        map.set(cid, uuid ? Object.assign({}, c, { cap_uuid: uuid }) : c);
+      });
       return { map, obrId: Number(w && (w.obr_id ?? w.id)) || null };
     }
     /**
@@ -305,6 +314,10 @@
       const entries = listEntries(work);
       const title = (unwrap(work) && unwrap(work).obr_nome) || name || `Obra ${id}`;
       emit({ type: "work-start", id, name: title, slug: w.slug, created: w.created, total });
+      if (pending.length) {
+        const fast = pending.filter((c) => entries.map.get(c) && entries.map.get(c).cap_uuid).length;
+        emit({ type: "log", text: fast ? `${fast} de ${pending.length} capítulo(s) vêm direto do CDN (rápido).` : "A lista desta obra não traz o código dos capítulos: cada um pede à API (1 por minuto)." });
+      }
       let added = 0, skipped = 0, tried = 0;
       try {
         for (let i = 0; i < pending.length; i += PACE.perSend) {
