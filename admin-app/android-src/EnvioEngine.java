@@ -2,6 +2,9 @@ package __PKG__;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -35,7 +38,17 @@ final class EnvioEngine {
     static final int SITE_TIMEOUT_MS = 120_000;
     static final long PACE_FRESH_MS = 10 * 60_000L;
 
-    private static final Pattern UUID = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
+    /* Modo automático: de quanto em quanto tempo olha as listas da MediocreScan e os pedidos. */
+    static final long AUTO_CYCLE_MS = 20 * 60_000L;
+    /** Obras do site conferidas por ciclo, das que estão há mais tempo sem conferir. */
+    static final int AUTO_ROUND_ROBIN = 4;
+    /** Pedidos de leitores procurados na MediocreScan por ciclo (1 pedido à API cada). */
+    static final int AUTO_REQUEST_SEARCHES = 2;
+    /** Obras novas colocadas na fila por ciclo. */
+    static final int AUTO_DISCOVER_MAX = 20;
+    /** Falhas seguidas de uma obra antes de o automático deixá-la para depois. */
+    static final int AUTO_MAX_FAILS = 2;
+    private static final Pattern UUID =Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
     private static final Pattern IP_BLOCK = Pattern.compile("ip\\s+bloquead|bloquead|blocked|banned", Pattern.CASE_INSENSITIVE);
 
     /** O usuário pediu para parar. */
@@ -46,6 +59,11 @@ final class EnvioEngine {
     /** Erro que para o envio inteiro (chave recusada, sessão encerrada, site em manutenção...). */
     static final class Fatal extends RuntimeException {
         Fatal(String message) { super(message); }
+    }
+
+    /** Falta de conexão ou recusas seguidas: o envio comum para; o automático espera e tenta de novo. */
+    static final class Retryable extends RuntimeException {
+        Retryable(String message) { super(message); }
     }
 
     /** Erro de uma obra ou de um capítulo: anota e segue para a próxima. */
@@ -186,6 +204,7 @@ final class EnvioEngine {
     private final Host host;
     private volatile boolean stop;
     private volatile boolean running;
+    private volatile boolean wake;
     private final Object pace = new Object();
     private long lastApi;
     private long lastCdn = -1;
@@ -216,6 +235,9 @@ final class EnvioEngine {
         stop = true;
         http.abort();
     }
+
+    /** Modo automático: acorda da espera (o admin pôs obras na fila pelo app). */
+    void wake() { wake = true; }
 
     /** Sessão renovada pelo app enquanto o envio roda. */
     void updateSession(Session s) {
@@ -254,7 +276,7 @@ final class EnvioEngine {
 
     private void netRetry(String where, int attempt, String detail) {
         if (attempt >= NET_WAITS.length) {
-            throw new Fatal("Sem resposta " + where + " depois de " + NET_WAITS.length + " tentativas (" + detail
+            throw new Retryable("Sem resposta " + where + " depois de " + NET_WAITS.length + " tentativas (" + detail
                 + "). O envio parou aqui e continua deste ponto quando você tocar em Continuar.");
         }
         long ms = NET_WAITS[attempt];
@@ -276,7 +298,7 @@ final class EnvioEngine {
     private void lockPause(String reason) {
         locksInRow++;
         if (locksInRow > MAX_LOCKS) {
-            throw new Fatal("A MediocreScan continua recusando os pedidos (" + reason + ") depois de " + MAX_LOCKS
+            throw new Retryable("A MediocreScan continua recusando os pedidos (" + reason + ") depois de " + MAX_LOCKS
                 + " esperas. Tente mais tarde" + ("IP bloqueado".equals(reason) ? " ou troque de rede (Wi-Fi ↔ dados móveis)" : "")
                 + "; o envio continua de onde parou.");
         }
@@ -489,7 +511,7 @@ final class EnvioEngine {
                     log("O site agora responde em " + there.replaceFirst("^https://", "") + ".");
                     continue;
                 }
-                if (next != null && there != null && there.equals(here) && next.contains("manutencao")) throw new Fatal("O site está em manutenção. Tente de novo depois.");
+                if (next != null && there != null && there.equals(here) && next.contains("manutencao")) throw new Retryable("O site está em manutenção. Tente de novo depois.");
                 throw new Fatal("O site redirecionou o pedido" + (next != null ? " para " + next.replaceFirst("^https?://", "") : "")
                     + ". Coloque o endereço certo em \"Endereço do site\".");
             }
@@ -500,7 +522,7 @@ final class EnvioEngine {
             if (r.status == 401 && !retried && !quiet && refreshSession()) { retried = true; continue; }
             if (r.status == 401) throw new Fatal(error != null ? error : "Sua sessão acabou. Entre de novo.");
             if (r.status == 403) throw new Fatal(error != null ? error : "Esta conta não é administradora do site.");
-            if (r.status == 503) throw new Fatal("O site está em manutenção. Tente de novo depois.");
+            if (r.status == 503) throw new Retryable("O site está em manutenção. Tente de novo depois.");
             if (r.status >= 500) {
                 if (quiet) throw new Soft("erro " + r.status);
                 netRetry("do site", netFails++, "erro " + r.status);
@@ -713,7 +735,7 @@ final class EnvioEngine {
             emit("run-done", "works", done, "added", totalAdded);
         } catch (Stopped e) {
             emit("run-stopped", "works", done, "added", totalAdded);
-        } catch (Fatal e) {
+        } catch (Fatal | Retryable e) {
             emit("run-error", "message", e.getMessage(), "works", done, "added", totalAdded);
         } catch (RuntimeException e) {
             emit("run-error", "message", "Erro inesperado no envio (" + e.getClass().getSimpleName() + "). O envio continua deste ponto quando você tocar em Continuar.", "works", done, "added", totalAdded);
@@ -779,12 +801,314 @@ final class EnvioEngine {
             emit("chapters-done", "id", id, "name", name, "added", added, "skipped", skipped, "already", already);
         } catch (Stopped e) {
             emit("run-stopped", "works", 0, "added", added);
-        } catch (Fatal e) {
+        } catch (Fatal | Retryable e) {
             emit("run-error", "message", e.getMessage(), "works", 0, "added", added);
         } catch (Soft e) {
             emit("run-error", "message", e.getMessage(), "works", 0, "added", added);
         } catch (RuntimeException e) {
             emit("run-error", "message", "Erro inesperado no envio (" + e.getClass().getSimpleName() + ").", "works", 0, "added", added);
+        } finally {
+            running = false;
+        }
+    }
+
+    /* ---------- modo automático ---------- */
+
+    /** Título comparável: sem acentos, minúsculo, só letras e números (igual ao site). */
+    static String titleKey(String v) {
+        if (v == null) return "";
+        String s = java.text.Normalizer.normalize(v, java.text.Normalizer.Form.NFD).replaceAll("[\\u0300-\\u036f]", "");
+        return s.toLowerCase(java.util.Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]+", " ").trim();
+    }
+
+    private static final String[] LIST_KEYS = { "data", "obras", "results", "items", "lista", "resultados" };
+
+    private static List<Object> findList(Object el, int depth) {
+        if (el == null || depth > 3) return new ArrayList<>();
+        List<Object> a = Json.arr(el);
+        if (a != null) return a;
+        Map<String, Object> m = Json.obj(el);
+        if (m == null) return new ArrayList<>();
+        for (String k : LIST_KEYS) {
+            Object v = m.get(k);
+            if (Json.arr(v) != null) return Json.arr(v);
+            if (Json.obj(v) != null) {
+                List<Object> inner = findList(v, depth + 1);
+                if (!inner.isEmpty()) return inner;
+            }
+        }
+        return new ArrayList<>();
+    }
+
+    /** Obras de uma resposta de lista/busca da MediocreScan. */
+    static List<Map<String, Object>> listOf(Object raw) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object o : findList(raw, 0)) {
+            Map<String, Object> m = Json.obj(o);
+            if (m == null) continue;
+            // Recomendações vêm como {obra: {...}}.
+            Map<String, Object> inner = Json.obj(m.get("obra"));
+            out.add(inner != null && !m.containsKey("obr_id") ? inner : m);
+        }
+        return out;
+    }
+
+    private static Long workIdOf(Map<String, Object> o) {
+        Long id = Json.whole(o.get("obr_id") != null ? o.get("obr_id") : o.get("id"));
+        return id != null && id > 0 ? id : null;
+    }
+
+    private static String workNameOf(Map<String, Object> o) {
+        String n = Json.str(o.get("obr_nome"));
+        return n != null ? n : Json.str(o.get("nome"));
+    }
+
+    /** O que a lista diz sobre a obra (último capítulo, data de atualização): se mudou, a obra tem novidade. */
+    static String signature(Map<String, Object> o) {
+        StringBuilder b = new StringBuilder();
+        List<Object> caps = Json.arr(o.get("capitulos"));
+        if (caps != null) {
+            long max = -1;
+            for (Object c : caps) {
+                Map<String, Object> cm = Json.obj(c);
+                Long id = cm == null ? null : Json.whole(cm.get("cap_id") != null ? cm.get("cap_id") : cm.get("id"));
+                if (id != null && id > max) max = id;
+            }
+            if (max >= 0) b.append('c').append(max);
+        }
+        for (Map.Entry<String, Object> e : o.entrySet()) {
+            Object v = e.getValue();
+            if (v == null || v instanceof Map || v instanceof List) continue;
+            String k = e.getKey().toLowerCase(java.util.Locale.ROOT);
+            if (k.contains("atualiz") || k.contains("updated") || k.contains("ultim")) b.append('|').append(k).append('=').append(v);
+        }
+        return b.toString();
+    }
+
+    private final Set<String> triedRequests = new HashSet<>();
+
+    /**
+     * Pedidos de leitores ainda sem obra: procura o título na MediocreScan e, se só uma obra tem exatamente
+     * esse nome, liga o pedido a ela (vai para a fila com prioridade). Os outros ficam para o admin escolher.
+     */
+    private int autoRequests() throws Soft {
+        Map<String, Object> r = site(Json.map("action", "requests"));
+        List<Object> groups = Json.arr(r.get("groups"));
+        if (groups == null) return 0;
+        int searched = 0, linked = 0;
+        for (Object go : groups) {
+            if (searched >= AUTO_REQUEST_SEARCHES) break;
+            Map<String, Object> g = Json.obj(go);
+            if (g == null || Json.whole(g.get("mediocreId")) != null) continue;
+            List<Object> kinds = Json.arr(g.get("kinds"));
+            if (kinds != null && kinds.contains("Novel")) continue;
+            String title = Json.str(g.get("title"));
+            String want = titleKey(title);
+            if (want.isEmpty() || !triedRequests.add(want)) continue;
+            searched++;
+            String q = title.replaceAll("\\s+", " ").trim();
+            if (q.length() > 80) q = q.substring(0, 80);
+            String enc;
+            try { enc = java.net.URLEncoder.encode(q, "UTF-8"); } catch (java.io.UnsupportedEncodingException e) { continue; }
+            Map<Long, String> hits = new LinkedHashMap<>();
+            for (Map<String, Object> o : listOf(mediocre(true, "/obras/buscar?string=" + enc))) {
+                Long id = workIdOf(o);
+                if (id == null) continue;
+                List<String> names = new ArrayList<>();
+                names.add(workNameOf(o));
+                List<Object> alts = Json.arr(o.get("obr_titulos_alternativos"));
+                if (alts != null) for (Object a : alts) names.add(Json.str(a));
+                for (String n : names) {
+                    if (n != null && titleKey(n).equals(want)) { hits.put(id, workNameOf(o) != null ? workNameOf(o) : title); break; }
+                }
+            }
+            if (hits.size() != 1) {
+                log("Pedido \"" + title + "\": " + (hits.isEmpty() ? "nada com esse nome" : hits.size() + " obras com esse nome")
+                    + " na MediocreScan. Fica para você escolher em Pedidos.");
+                continue;
+            }
+            Map.Entry<Long, String> h = hits.entrySet().iterator().next();
+            Map<String, Object> res = site(Json.map("action", "request_link", "ids", g.get("ids"), "obraId", h.getKey(), "title", h.getValue()));
+            linked++;
+            long position = count(res, "position");
+            log("Pedido \"" + title + "\" (" + count(g, "count") + " leitor(es)) ligado à obra " + h.getKey() + ": "
+                + (count(res, "fulfilled") > 0 ? "já estava no site, leitores avisados." : position > 0 ? "na fila em " + position + "º lugar." : "na fila."));
+            emit("auto-request", "title", title, "id", h.getKey());
+        }
+        return linked;
+    }
+
+    /**
+     * Olha as listas da MediocreScan: obras do site que aparecem como atualizadas (com novidade desde a última
+     * olhada) entram em `updates`; com `discover`, obras que ainda não estão no site vão para a fila.
+     */
+    private void scanLists(boolean discover, Map<Long, String> seen, Map<Long, String> updates) throws Soft {
+        Map<Long, Map<String, Object>> found = new LinkedHashMap<>();
+        for (Map<String, Object> o : listOf(mediocre(true, "/obras/atualizadas-recentes"))) {
+            Long id = workIdOf(o);
+            if (id != null && !found.containsKey(id)) found.put(id, o);
+        }
+        Set<Long> updated = new LinkedHashSet<>(found.keySet());
+        if (discover) {
+            for (Map<String, Object> o : listOf(mediocre(true, "/obras/adicionados-recentes"))) {
+                Long id = workIdOf(o);
+                if (id != null && !found.containsKey(id)) found.put(id, o);
+            }
+        }
+        if (found.isEmpty()) return;
+        List<Long> ids = new ArrayList<>(found.keySet());
+        Set<Long> imported = new HashSet<>(), known = new HashSet<>();
+        for (int i = 0; i < ids.size(); i += 100) {
+            Map<String, Object> r = site(Json.map("action", "check", "ids", new ArrayList<>(ids.subList(i, Math.min(ids.size(), i + 100)))));
+            imported.addAll(longs(r.get("imported")));
+            known.addAll(longs(r.get("imported")));
+            known.addAll(longs(r.get("queued")));
+            known.addAll(longs(r.get("failed")));
+        }
+        int news = 0;
+        for (Long id : updated) {
+            if (!imported.contains(id)) continue;
+            String sig = signature(found.get(id));
+            String before = seen.put(id, sig);
+            // Primeira vez nesta sessão: confere. Depois, só se a lista mostrar algo diferente.
+            if (before == null || (!sig.isEmpty() && !sig.equals(before))) {
+                if (!updates.containsKey(id)) news++;
+                updates.put(id, workNameOf(found.get(id)));
+            }
+        }
+        int queued = 0;
+        if (discover) {
+            List<Map<String, Object>> items = new ArrayList<>();
+            for (Long id : ids) {
+                if (known.contains(id)) continue;
+                if (items.size() >= AUTO_DISCOVER_MAX) break;
+                items.add(Json.map("obraId", id, "title", workNameOf(found.get(id))));
+            }
+            if (!items.isEmpty()) {
+                site(Json.map("action", "enqueue", "items", items));
+                queued = items.size();
+            }
+        }
+        log("Listas da MediocreScan: " + news + " obra(s) do site com capítulos novos"
+            + (discover ? ", " + queued + " obra(s) nova(s) na fila" : "") + ".");
+    }
+
+    /** Espera até `ms` (ou até o app pedir), avisando a tela de tempos em tempos. */
+    private void idle(long ms, int works, long added) {
+        long end = clock.now() + Math.max(60_000L, ms);
+        long nextBeat = 0;
+        while (clock.now() < end && !wake) {
+            checkStop();
+            if (clock.now() >= nextBeat) {
+                emit("auto-idle", "ms", end - clock.now(), "works", works, "added", added);
+                nextBeat = clock.now() + 5 * 60_000L;
+            }
+            try { clock.sleep(Math.min(500, Math.max(1, end - clock.now()))); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new Stopped(); }
+        }
+        checkStop();
+        if (wake) log("Obras novas na fila: o automático voltou a enviar.");
+        wake = false;
+    }
+
+    /**
+     * Modo automático: fica ligado e decide sozinho o que enviar, na ordem
+     * fila do site (pedidos de leitores primeiro) → obras do site atualizadas na MediocreScan → conferência das
+     * obras do site há mais tempo sem conferir. A cada ciclo também liga pedidos de leitores e (opcional) põe
+     * obras novas na fila. Sem nada para fazer, espera e olha de novo. A fila é relida depois de cada obra.
+     */
+    void runAuto(boolean discover, boolean requests) {
+        running = true;
+        locksInRow = 0;
+        long totalAdded = 0;
+        int done = 0;
+        Map<Long, Integer> fails = new HashMap<>();
+        Map<Long, String> seen = new HashMap<>();
+        Map<Long, String> updates = new LinkedHashMap<>();
+        long nextScan = 0;
+        int robin = 0;
+        emit("run-start", "count", 0, "auto", true);
+        log("Modo automático ligado: fila do site, obras atualizadas" + (discover ? ", obras novas" : "") + (requests ? " e pedidos de leitores" : "") + ".");
+        try {
+            for (;;) {
+                checkStop();
+                wake = false;
+                try {
+                if (clock.now() >= nextScan) {
+                    nextScan = clock.now() + AUTO_CYCLE_MS;
+                    robin = 0;
+                    emit("auto-scan");
+                    if (requests) {
+                        try { autoRequests(); } catch (Soft e) { log("Pedidos: " + e.getMessage()); }
+                    }
+                    try { scanLists(discover, seen, updates); } catch (Soft e) { log("Listas da MediocreScan: " + e.getMessage()); }
+                }
+                Map<String, Object> plan;
+                try {
+                    plan = site(Json.map("action", "plan", "syncLimit", Math.min(30, AUTO_ROUND_ROBIN + fails.size())));
+                } catch (Soft e) {
+                    log("Fila do site: " + e.getMessage());
+                    idle(5 * 60_000L, done, totalAdded);
+                    continue;
+                }
+                List<Long> queue = longs(plan.get("queue"));
+                Map<Long, String> titles = new HashMap<>();
+                List<Object> items = Json.arr(plan.get("items"));
+                if (items != null) for (Object io : items) {
+                    Map<String, Object> im = Json.obj(io);
+                    Long id = im == null ? null : Json.whole(im.get("id"));
+                    if (id != null) titles.put(id, Json.str(im.get("title")));
+                }
+                WorkRef next = null;
+                int queueLeft = 0;
+                for (Long id : queue) {
+                    if (fails.containsKey(id) && fails.get(id) >= AUTO_MAX_FAILS) continue;
+                    queueLeft++;
+                    if (next == null) next = new WorkRef(id, titles.get(id));
+                }
+                if (next == null) {
+                    for (Iterator<Map.Entry<Long, String>> it = updates.entrySet().iterator(); it.hasNext() && next == null;) {
+                        Map.Entry<Long, String> u = it.next();
+                        it.remove();
+                        if (!(fails.containsKey(u.getKey()) && fails.get(u.getKey()) >= AUTO_MAX_FAILS)) next = new WorkRef(u.getKey(), u.getValue());
+                    }
+                }
+                if (next == null && robin < AUTO_ROUND_ROBIN) {
+                    for (Long id : longs(plan.get("sync"))) {
+                        if (fails.containsKey(id) && fails.get(id) >= AUTO_MAX_FAILS) continue;
+                        next = new WorkRef(id, null);
+                        robin++;
+                        break;
+                    }
+                }
+                emit("auto-plan", "queue", queueLeft, "requests", count(plan, "requestsWaiting"), "updates", updates.size(), "works", done, "added", totalAdded);
+                if (next == null) {
+                    idle(nextScan - clock.now(), done, totalAdded);
+                    continue;
+                }
+                try {
+                    totalAdded += sendWork(next.id, next.title, Math.max(1, queueLeft + updates.size())).added;
+                    done++;
+                    fails.remove(next.id);
+                } catch (Soft e) {
+                    int n = (fails.containsKey(next.id) ? fails.get(next.id) : 0) + 1;
+                    fails.put(next.id, n);
+                    log((next.title != null && !next.title.isEmpty() ? next.title : "Obra " + next.id) + ": " + e.getMessage()
+                        + (n >= AUTO_MAX_FAILS ? " O automático deixa esta obra para depois." : ""));
+                }
+                } catch (Retryable e) {
+                    // Sem internet ou MediocreScan recusando: espera e tenta de novo, sem desligar o automático.
+                    log(e.getMessage().replaceFirst("\\. O envio.*$", ".") + " O automático tenta de novo em 15 min.");
+                    locksInRow = 0;
+                    idle(15 * 60_000L, done, totalAdded);
+                }
+            }
+        } catch (Stopped e) {
+            emit("run-stopped", "works", done, "added", totalAdded, "auto", true);
+        } catch (Fatal e) {
+            emit("run-error", "message", e.getMessage(), "works", done, "added", totalAdded, "auto", true);
+        } catch (RuntimeException e) {
+            emit("run-error", "message", "Erro inesperado no modo automático (" + e.getClass().getSimpleName() + "). Toque em Ligar para continuar.", "works", done, "added", totalAdded, "auto", true);
         } finally {
             running = false;
         }

@@ -219,6 +219,8 @@ public class EnvioService extends Service {
                 if (list != null) for (Object o : list) { Long c = Json.whole(o); if (c != null) caps.add(c); }
                 if (id == null) throw new IllegalArgumentException("obra");
                 e.runChapters(id, Json.str(job.get("title")), caps);
+            } else if ("auto".equals(type)) {
+                e.runAuto(job.get("discover") == null || Json.truthy(job.get("discover")), job.get("requests") == null || Json.truthy(job.get("requests")));
             } else {
                 emitLocal("run-error", "message", "Tipo de envio desconhecido.", "works", 0, "added", 0);
             }
@@ -271,7 +273,20 @@ public class EnvioService extends Service {
         long countdownEnd = 0;
         switch (type) {
             case "run-start":
-                text = num(e, "count") + " obra(s) na vez";
+                if (Json.truthy(e.get("auto"))) { workName = "Modo automático"; text = "Ligado: olhando a fila do site…"; }
+                else text = num(e, "count") + " obra(s) na vez";
+                break;
+            case "auto-scan":
+                workName = "Modo automático";
+                text = "Olhando as listas da MediocreScan e os pedidos…";
+                break;
+            case "auto-idle":
+                workName = "Modo automático";
+                done = 0;
+                total = 0;
+                countdownEnd = at + num(e, "ms");
+                text = "Tudo em dia · +" + num(e, "added") + " capítulo(s) desde que ligou. Olha de novo em " + clock(num(e, "ms"));
+                if (wakeLock != null) { try { wakeLock.acquire(WAKE_MS); } catch (RuntimeException ignored) { /* ok */ } }
                 break;
             case "work-start": {
                 workName = String.valueOf(e.get("name"));
@@ -481,6 +496,14 @@ public class EnvioService extends Service {
     }
 
     /* ---------- chamadas do plugin ---------- */
+
+    /** Modo automático: o app pôs obras na fila; sai da espera agora. */
+    static boolean wakeJob() {
+        EnvioService s = current;
+        if (s == null || !s.engineAlive()) return false;
+        s.engine.wake();
+        return true;
+    }
 
     static boolean stopJob() {
         EnvioService s = current;

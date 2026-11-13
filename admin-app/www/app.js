@@ -12,6 +12,7 @@
   const el = (tag, props, ...kids) => { const n = Object.assign(document.createElement(tag), props || {}); kids.forEach((k) => k != null && n.append(k)); return n; };
   const load = () => { try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch (_) { return {}; } };
   let state = Object.assign({ site: DEFAULT_SITE, token: "", session: null, font: 17 }, load());
+  state.auto = Object.assign({ on: false, discover: true, requests: true }, state.auto || {});
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (_) { /* sem armazenamento */ } };
   const host = (url) => { try { return new URL(url).host; } catch (_) { return url; } };
 
@@ -92,8 +93,10 @@
   const SEQ_KEY = "bm-estudio-seq";
   const TERMINAL = new Set(["run-done", "run-stopped", "run-error", "chapters-done"]);
   let lastSeq = (() => { try { return Number(localStorage.getItem(SEQ_KEY)) || 0; } catch (_) { return 0; } })();
-  let nativeRunning = false, nativeWaiters = [], syncing = null;
+  let nativeRunning = false, nativeWaiters = [], syncing = null, jobType = null;
   function busy() { return engine.running || nativeRunning; }
+  /** O serviço está no modo automático (fica ligado e decide sozinho o que enviar). */
+  const autoRunning = () => nativeRunning && jobType === "auto";
   const nativeConfig = () => ({ site: state.site || DEFAULT_SITE, token: state.token, session: state.session, supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY });
   async function nativeApiFetch(url) {
     const r = await Native.mediocreGet({ path: url.slice(API_ORIGIN.length), token: state.token });
@@ -120,7 +123,7 @@
       if (e.origin) { state.site = e.origin; save(); $("site-url").value = e.origin; if (state.session) $("who").textContent = whoText(); }
       return;
     }
-    if (e.type === "run-start" || e.type === "chapters-start") { nativeRunning = true; showRunning(); }
+    if (e.type === "run-start" || e.type === "chapters-start") { nativeRunning = true; jobType = e.type === "chapters-start" ? "chapters" : e.auto ? "auto" : "works"; showRunning(); }
     onEngineEvent(e);
     if (TERMINAL.has(e.type)) {
       nativeRunning = false;
@@ -145,6 +148,7 @@
         else if (r.running) (r.snapshot || []).forEach((e) => onEngineEvent(Object.assign({}, e, { silent: true })));
         const was = nativeRunning;
         nativeRunning = Boolean(r.running);
+        if (nativeRunning && r.job && r.job.type) jobType = r.job.type;
         if (nativeRunning) { showRunning(); if (!$("run-status").textContent) setStatus("Enviando em segundo plano…"); }
         else if (nativeWaiters.length) { const w = nativeWaiters; nativeWaiters = []; w.forEach((f) => f(null)); }
         if (was && !nativeRunning) setTimeout(() => { if (!busy()) { $("sender-run").hidden = true; $("sender-idle").hidden = false; repaint(); } }, 6000);
@@ -156,9 +160,9 @@
   }
   /** Começa um envio no serviço; devolve false se o Android não deixar (aí a tela envia). */
   async function startNative(job) {
-    nativeRunning = true; showRunning();
+    nativeRunning = true; jobType = job.type; showRunning(); renderAuto();
     try { await Native.startJob({ job, config: nativeConfig() }); return true; }
-    catch (e) { nativeRunning = false; log(`Envio em segundo plano indisponível (${e && e.message ? e.message : e}). Enviando pela tela.`); return false; }
+    catch (e) { nativeRunning = false; jobType = null; renderAuto(); log(`Envio em segundo plano indisponível (${e && e.message ? e.message : e}). Enviando pela tela.`); return false; }
   }
   if (NATIVE && Native.addListener) { try { Native.addListener("engine", onNativeLive); } catch (_) { /* sem eventos ao vivo: a tela busca ao voltar */ } }
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && state.session) syncNative(); });
@@ -238,10 +242,10 @@
   }
 
   /* ---------- rotas (# para o botão voltar do Android funcionar) ---------- */
-  const TABS = { inicio: "Início", recentes: "Recentes", novas: "Novas", buscar: "Buscar", site: "No site", fila: "Fila do site" };
-  const CHIPS = { inicio: [["destaques", "Destaques"], ["recomendacoes", "Recomendações"], ["listas", "Listas"], ["leitura", "Leitura"]], recentes: [["atualizadas", "Todas"], ["ia", "Com IA"]] };
-  let chip = { inicio: "destaques", recentes: "atualizadas" };
-  let current = { tab: "inicio" };
+  const TABS = { explorar: "Explorar", buscar: "Buscar", fila: "Fila do site" };
+  const CHIPS = { explorar: [["destaques", "Destaques"], ["atualizadas", "Atualizadas"], ["novas", "Novas"], ["ia", "Com IA"], ["recomendacoes", "Para você"], ["listas", "Listas"], ["leitura", "Leitura"]] };
+  let chip = { explorar: "destaques" };
+  let current = { tab: "painel" };
   window.addEventListener("hashchange", route);
   function go(hash) { if (location.hash === hash) route(); else location.hash = hash; }
   function route() {
@@ -254,25 +258,30 @@
     if (kind === "site") return openSiteTab();
     if (kind === "pedidos") return openRequests();
     if (kind === "pedido" && id) return openPick(decodeURIComponent(id));
-    openTab(TABS[kind] ? kind : "inicio");
+    // Endereços antigos (Recentes/Novas viraram filtros de Explorar).
+    if (kind === "recentes" || kind === "novas") { chip.explorar = kind === "novas" ? "novas" : "atualizadas"; return openTab("explorar"); }
+    if (TABS[kind]) return openTab(kind);
+    openPanel();
   }
   function setView(v, title, back) {
-    ["list", "work", "reader", "site", "manage", "requests", "pick"].forEach((n) => { $(`view-${n}`).hidden = n !== v; });
+    ["panel", "list", "work", "reader", "site", "manage", "requests", "pick"].forEach((n) => { $(`view-${n}`).hidden = n !== v; });
+    document.body.classList.toggle("on-panel", v === "panel");
     $("page-title").textContent = title; $("back").hidden = !back; $("brand").hidden = Boolean(back);
     window.scrollTo(0, 0);
     updateSendAll();
   }
-  $("back").onclick = () => { if (history.length > 1) history.back(); else go("#/inicio"); };
+  $("back").onclick = () => { if (history.length > 1) history.back(); else go("#/painel"); };
   document.querySelectorAll(".bottom-nav button").forEach((b) => { b.onclick = () => go(`#/${b.dataset.tab}`); });
-  $("open-queue").onclick = () => go("#/fila");
+  document.querySelectorAll("[data-go]").forEach((b) => { b.onclick = () => go(b.dataset.go); });
   $("open-requests").onclick = () => go("#/pedidos");
+  function navCurrent(tab) { document.querySelectorAll(".bottom-nav button").forEach((b) => { if (b.dataset.tab === tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); }); }
 
   /* ---------- listas ---------- */
   let page = 1, rows = [], loading = false, query = "", lastRaw = null;
   function openTab(tab) {
     current = { tab }; page = 1; rows = []; lastRaw = null; pickGroup = null;
     setView("list", TABS[tab], false);
-    document.querySelectorAll(".bottom-nav button").forEach((b) => { if (b.dataset.tab === tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+    navCurrent(tab);
     const chips = CHIPS[tab];
     $("chips").hidden = !chips; $("chips").innerHTML = "";
     if (chips) chips.forEach(([k, label]) => {
@@ -301,13 +310,13 @@
       if (tab === "fila") {
         const p = await engine.plan(); lastRaw = p;
         return renderQueue(p.items || []);
-      } else if (tab === "inicio" && chip.inicio === "listas") {
+      } else if (tab === "explorar" && chip.explorar === "listas") {
         const r = await engine.lists(); lastRaw = r.raw; return renderGroups(r.lists);
-      } else if (tab === "inicio" && chip.inicio === "leitura") {
+      } else if (tab === "explorar" && chip.explorar === "leitura") {
         const r = await engine.reading(); lastRaw = r.raw; return renderReading(r.chapters);
       } else if (tab === "buscar") { const r = await engine.search(query, page); lastRaw = r.raw; works = r.works; pageable = !/^\d+$/.test(query); }
       else {
-        const kind = tab === "inicio" ? (chip.inicio === "recomendacoes" ? "recomendacoes" : "inicio") : tab === "novas" ? "novas" : chip.recentes;
+        const kind = chip.explorar === "destaques" ? "inicio" : chip.explorar;
         const r = await engine.list(kind, page); lastRaw = r.raw; works = r.works; pageable = kind === "novas" || kind === "atualizadas";
       }
       const fresh = works.filter((w) => !rows.some((r) => r.id === w.id));
@@ -348,27 +357,26 @@
     items.forEach((i) => marks.queued.add(i.id));
     if (!items.length) { $("list-meta").textContent = ""; empty("A fila do site está vazia."); updateSendAll(); return; }
     const asked = items.filter((i) => i.priority > 0).length;
-    $("list-meta").textContent = `${items.length} obra(s) na fila${asked ? `, ${asked} pedida(s) por leitores (vão primeiro)` : ""}. Tire da fila as que você já finalizou.`;
+    $("list-meta").textContent = `${items.length} obra(s)${asked ? ` · ${asked} pedida(s) por leitores vão primeiro` : ""}${autoRunning() ? " · o automático envia nesta ordem" : ""}`;
     const clear = el("button", { type: "button", className: "btn ghost small", textContent: "Esvaziar a fila" });
     clear.onclick = async () => {
-      if (busy()) { toast("Pare o envio antes de mexer na fila."); return; }
+      if (busy() && !autoRunning()) { toast("Pare o envio antes de mexer na fila."); return; }
       if (!confirm(`Tirar as ${items.length} obras da fila? Elas e os capítulos já publicados continuam no site.`)) return;
       try { const r = await engine.queueClear(); items.forEach((i) => marks.queued.delete(i.id)); toast(`${r.removed} obra(s) tiradas da fila.`); checkQueueDot(); openTab("fila"); }
       catch (e) { toast(e.message); }
     };
     const ul = el("ul", { className: "site-rows" });
     items.forEach((i) => {
-      const status = i.status === "running" ? "Em andamento" : "Esperando";
       const info = el("div", { className: "min0" },
         el("p", { className: "t", textContent: i.title || `Obra ${i.id}` }),
-        el("p", { className: "s", textContent: `${i.chapters_on_site} capítulo(s) no site · ${status}` }),
-        el("div", {}, el("span", { className: `pill ${i.status === "running" ? "hot" : ""}`, textContent: "Fila" }),
+        el("p", { className: "s", textContent: `${i.chapters_on_site} capítulo(s) no site` }),
+        el("div", {}, i.id === sendingId ? el("span", { className: "pill ok", textContent: "Enviando agora" }) : el("span", { className: `pill ${i.status === "running" ? "hot" : ""}`, textContent: i.status === "running" ? "Em andamento" : "Fila" }),
           i.priority > 0 ? el("span", { className: "pill hot", textContent: `Pedida por ${i.priority} leitor${i.priority === 1 ? "" : "es"}` }) : null));
       const open = el("button", { type: "button", className: "site-row queue-open" }, i.cover ? el("img", { src: i.cover, alt: "", loading: "lazy" }) : el("div", { className: "ph" }), info);
       open.onclick = () => go(`#/obra/${i.id}`);
-      const remove = el("button", { type: "button", className: "chip-btn del", textContent: "Tirar da fila" });
+      const remove = el("button", { type: "button", className: "chip-btn del", textContent: "Tirar", title: "Tirar da fila", ariaLabel: `Tirar ${i.title || `obra ${i.id}`} da fila` });
       remove.onclick = async () => {
-        if (busy()) { toast("Pare o envio antes de mexer na fila."); return; }
+        if (busy() && (!autoRunning() || i.id === sendingId)) { toast(autoRunning() ? "Esta obra está sendo enviada agora. Espere terminar." : "Pare o envio antes de mexer na fila."); return; }
         remove.disabled = true;
         try { await engine.queueRemove([i.id]); marks.queued.delete(i.id); toast(`"${i.title || i.id}" saiu da fila.`); checkQueueDot(); openTab("fila"); }
         catch (e) { toast(e.message); remove.disabled = false; }
@@ -388,7 +396,7 @@
   }
   function updateMeta() {
     // A fila do site escreve o próprio resumo (renderQueue).
-    if (!rows.length || current.tab === "fila" || (current.tab === "inicio" && (chip.inicio === "listas" || chip.inicio === "leitura"))) return;
+    if (!rows.length || current.tab === "fila" || (current.tab === "explorar" && (chip.explorar === "listas" || chip.explorar === "leitura"))) return;
     const pub = rows.filter((w) => statusOf(w.id) === "ok").length;
     $("list-meta").textContent = `${rows.length} obras · ${pub} publicadas · ${rows.length - pub} para enviar`;
   }
@@ -510,8 +518,10 @@
   function renderSiteStatus() {
     if (!work) return;
     const s = statusOf(work.id), b = $("w-publish");
-    b.disabled = busy();
-    b.textContent = s === "ok" ? "Enviar o que falta" : s === "queue" ? "Continuar envio" : "Publicar no site";
+    // Com o automático ligado, o botão põe a obra na fila e ele envia logo depois da atual.
+    b.disabled = busy() && !autoRunning();
+    b.textContent = autoRunning() ? (s === "queue" ? "Já está na fila" : "Pôr na fila do automático") : s === "ok" ? "Enviar o que falta" : s === "queue" ? "Continuar envio" : "Publicar no site";
+    if (autoRunning() && s === "queue") b.disabled = true;
     $("w-manage").hidden = s === "new";
     const total = work.chapters.length, have = work.chapters.filter(onSite).length;
     $("w-site").textContent = s === "new" && !have
@@ -705,7 +715,7 @@
   function openSiteTab() {
     current = { tab: "site" }; rows = []; pickGroup = null;
     setView("site", "No site", false);
-    document.querySelectorAll(".bottom-nav button").forEach((b) => { if (b.dataset.tab === "site") b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+    navCurrent("site");
     $("site-chips").innerHTML = "";
     SITE_CHIPS.forEach(([k, label]) => {
       const b = el("button", { type: "button", textContent: label }); b.setAttribute("role", "tab"); b.setAttribute("aria-selected", String(siteFilter === k));
@@ -823,10 +833,10 @@
     if (!confirm(`Enviar ${list.length} obra(s), uma de cada vez? Cada obra vai até o último capítulo antes da próxima. Pode minimizar o app: o envio continua e aparece na notificação.`)) return;
     startRun(list);
   };
-  let queueLeft = 0, countdown = null, fetchNote = "";
+  let queueLeft = 0, countdown = null, fetchNote = "", sendingId = null;
   async function startRun(list) {
-    if (busy()) return;
     if (!state.token) { toast("Cole a chave da MediocreScan primeiro."); $("token-card").hidden = false; return; }
+    if (busy()) return addToQueue(list);
     queueLeft = list.length;
     $("sender").hidden = false; $("sender-idle").hidden = true; $("sender-run").hidden = false; $("log").innerHTML = "";
     setStatus("Colocando na fila do site…");
@@ -849,7 +859,24 @@
     keepAwake(false);
     native.stop();
   }
+  /**
+   * Com um envio rodando, as obras escolhidas entram na fila do site. No modo automático elas são
+   * enviadas logo depois da obra atual (o app acorda o automático se ele estiver esperando).
+   */
+  async function addToQueue(list) {
+    const auto = autoRunning();
+    const items = list.filter((w) => w && w.id && (auto || statusOf(w.id) === "new"));
+    if (!items.length) { toast("Espere o envio atual terminar."); return; }
+    try {
+      const r = await engine.enqueue(items);
+      items.forEach((w) => marks.queued.add(w.id)); repaint(); checkQueueDot();
+      if (auto && NATIVE && typeof Native.wakeJob === "function") Native.wakeJob().catch(() => {});
+      const n = r && typeof r.added === "number" ? r.added : items.length;
+      toast(auto ? `${n || items.length} obra(s) na fila: o automático envia em seguida.` : `${n} obra(s) na fila do site: vão no próximo envio da fila.`);
+    } catch (e) { toast(e.message); }
+  }
   $("stop").onclick = () => {
+    if (autoRunning()) { state.auto.on = false; save(); }
     if (nativeRunning && NATIVE) Native.stopJob().catch(() => {}); else engine.stop();
     setStatus("Parando depois do passo atual…");
   };
@@ -858,8 +885,15 @@
     document.querySelectorAll(".card-work").forEach((c) => { const id = Number(c.dataset.id); const w = rows.find((r) => r.id === id); if (w) c.replaceWith(card(w)); });
     renderSiteStatus(); updateMeta(); updateSendAll();
   }
-  function setStatus(text, warn) { const e = $("run-status"); e.textContent = text; e.classList.toggle("pause", Boolean(warn)); }
-  function setBar(done, total) { const pct = total ? (done > 0 ? Math.max(2, Math.round((done / total) * 100)) : 0) : 0; $("run-bar").firstElementChild.style.width = `${pct}%`; $("run-bar").setAttribute("aria-valuenow", String(pct)); }
+  function setStatus(text, warn) {
+    const e = $("run-status"); e.textContent = text; e.classList.toggle("pause", Boolean(warn));
+    if (autoRunning()) { const a = $("auto-text"); a.textContent = text; a.classList.toggle("pause", Boolean(warn)); }
+  }
+  function setBar(done, total) {
+    const pct = total ? (done > 0 ? Math.max(2, Math.round((done / total) * 100)) : 0) : 0;
+    [$("run-bar"), $("auto-bar")].forEach((b) => { b.firstElementChild.style.width = `${pct}%`; b.setAttribute("aria-valuenow", String(pct)); });
+    $("auto-bar").hidden = !autoRunning() || !total;
+  }
   /* Histórico guardado no celular: sobrevive se o app fechar, para sabermos por que o envio parou. */
   const LOG_KEY = "bm-estudio-log";
   function saveLog(line) {
@@ -870,6 +904,7 @@
     const line = `${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} ${text}`;
     saveLog(line);
     const li = el("li", { textContent: line.slice(6) }); const ol = $("log"); ol.prepend(li); while (ol.children.length > 40) ol.lastChild.remove();
+    if (!$("view-panel").hidden) renderActivity();
   }
   /** Marca que um envio está rodando; se o app reabrir com a marca, o envio foi cortado no meio. */
   const RUN_KEY = "bm-estudio-run";
@@ -895,12 +930,28 @@
     const at = e.at || Date.now(), quiet = Boolean(e.silent);
     const note2 = (text) => { if (!quiet) log(text, at); };
     switch (e.type) {
-      case "run-start": $("run-queue").textContent = `${e.count} obra(s) na vez`; if (typeof e.count === "number") queueLeft = e.count; break;
+      case "run-start":
+        if (e.auto) { $("run-work").textContent = "Modo automático"; $("run-queue").textContent = "Ligado"; setBar(0, 0); setStatus("Olhando a fila do site…"); renderAuto(); break; }
+        $("run-queue").textContent = `${e.count} obra(s) na vez`; if (typeof e.count === "number") queueLeft = e.count; break;
+      case "auto-scan": clearInterval(countdown); setStatus("Olhando as listas da MediocreScan e os pedidos…"); autoInfo.idle = false; renderAuto(); break;
+      case "auto-plan":
+        autoInfo = Object.assign(autoInfo, { queue: e.queue, updates: e.updates, works: e.works, added: e.added, idle: false });
+        if (typeof e.requests === "number") setRequestBadge(e.requests);
+        setPanelNumbers(e.queue, e.requests); renderAuto();
+        break;
+      case "auto-idle":
+        autoInfo = Object.assign(autoInfo, { idle: true, works: e.works, added: e.added });
+        $("run-work").textContent = "Modo automático"; $("run-queue").textContent = "Tudo em dia"; setBar(0, 0);
+        count(remaining(e), (s) => setStatus(`Nada para enviar agora. Olha de novo em ${mmss(s)}.`)); renderAuto();
+        break;
+      case "auto-request": checkQueueDot(); break;
       case "work-start":
+        sendingId = e.id;
         if (typeof e.left === "number") queueLeft = e.left;
         note = { work: e.name, total: e.total, done: 0 };
+        if (autoRunning()) { autoInfo.idle = false; renderAuto(); if (!$("view-panel").hidden && !quiet) renderPanelQueue(); }
         native.update(e.name, `${e.total} capítulo(s) para enviar · ${queueLeft} obra(s) na vez`, 0, e.total);
-        setBar(0, e.total); $("run-work").textContent = e.name;
+        setBar(0, e.total); $("run-work").textContent = autoRunning() ? `Automático · ${e.name}` : e.name;
         $("run-queue").textContent = `${queueLeft} obra(s) na vez · ${e.total} capítulo(s) nesta`;
         note2(`${e.name}: ${e.created ? "criada no site" : "já estava no site"}, ${e.total} capítulo(s) para enviar.`);
         if (!e.total) setStatus("Nenhum capítulo novo.");
@@ -946,20 +997,30 @@
         if (work && work.id === e.id) { capState[e.capId] = e.state; renderChapters(); }
         break;
       case "chapters-done":
+        if (!quiet) addToday(e.added, at);
         finishRun(`${e.name}: +${e.added} capítulo(s)${e.already ? `, ${e.already} já estavam no site` : ""}${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}.`, false, quiet, at);
         break;
       case "work-done":
         queueLeft = typeof e.left === "number" ? e.left : Math.max(0, queueLeft - 1); marks.imported.add(e.id); marks.queued.delete(e.id); repaint();
+        sendingId = null; if (!quiet) addToday(e.added, at);
+        if (autoRunning() && !$("view-panel").hidden) renderPanelQueue();
         note2(`${e.name}: ${e.note ? e.note : `+${e.added} capítulo(s)${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}`}.`);
         break;
       case "log": note2(e.text); break;
       case "run-done": finishRun(`Pronto: ${e.works} obra(s), ${e.added} capítulo(s) enviados.`, false, quiet, at); break;
-      case "run-stopped": finishRun(`Envio parado. ${e.added} capítulo(s) enviados. A obra atual continua de onde parou na próxima vez.`, false, quiet, at); break;
-      case "run-error": finishRun(e.message, true, quiet, at); break;
+      case "run-stopped":
+        if (e.auto) { finishRun(`Automático desligado. ${e.added} capítulo(s) enviados desde que ligou.`, false, quiet, at); break; }
+        finishRun(`Envio parado. ${e.added} capítulo(s) enviados. A obra atual continua de onde parou na próxima vez.`, false, quiet, at); break;
+      case "run-error":
+        if (e.auto) { state.auto.on = false; save(); finishRun(`Automático parou: ${e.message}`, true, quiet, at); break; }
+        finishRun(e.message, true, quiet, at); break;
     }
   }
   function finishRun(text, isError, quiet, at) {
-    clearRun();
+    const wasAuto = jobType === "auto";
+    clearRun(); sendingId = null; jobType = null; autoInfo.idle = false; setTimeout(renderAuto, 0);
+    // O cartão do automático já mostra o resultado: a barra de envio some na hora.
+    if (wasAuto) setTimeout(() => { if (!busy()) { $("sender-run").hidden = true; $("sender-idle").hidden = false; updateSendAll(); } }, 0);
     if (engine.running) native.stop();
     if (work && !$("view-work").hidden && chapterJob === null) refreshChapterMarks(work.id);
     clearInterval(countdown); setStatus(text, isError); if (!quiet) { log(text, at); if (!at || Date.now() - at < 120_000) toast(text); }
@@ -971,6 +1032,124 @@
     try { if (on && navigator.wakeLock) wakeLock = await navigator.wakeLock.request("screen"); if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; } }
     catch (_) { /* o app Android já mantém a tela acesa */ }
   }
+
+  /* ---------- painel e modo automático ---------- */
+  let autoInfo = { idle: false, queue: null, updates: 0, works: 0, added: 0 };
+  const TODAY_KEY = "bm-estudio-hoje";
+  const dayOf = (t) => new Date(t || Date.now()).toLocaleDateString("pt-BR");
+  function today() {
+    try { const v = JSON.parse(localStorage.getItem(TODAY_KEY) || "null"); if (v && v.d === dayOf()) return v; } catch (_) { /* recomeça */ }
+    return { d: dayOf(), caps: 0, works: 0 };
+  }
+  /** Capítulos enviados hoje (contados no celular, a partir dos eventos do envio). */
+  function addToday(added, at) {
+    if (dayOf(at) !== dayOf()) return;
+    const v = today(); v.caps += Number(added) || 0; v.works += 1;
+    try { localStorage.setItem(TODAY_KEY, JSON.stringify(v)); } catch (_) { /* ok */ }
+    $("n-today").textContent = String(v.caps);
+  }
+  function setPanelNumbers(queue, requests) {
+    if (typeof queue === "number") { $("n-queue").textContent = String(queue); $("queue-dot").hidden = queue <= 0; }
+    if (typeof requests === "number") $("n-requests").textContent = String(requests);
+  }
+  const AUTO_OFF_TEXT = "Ligue e deixe o celular carregando: o app envia a fila do site, busca capítulos novos das obras do site e atende pedidos sozinho.";
+  function renderAuto() {
+    const on = autoRunning(), other = busy() && !on, sw = $("auto-toggle");
+    $("auto-card").dataset.state = on ? (autoInfo.idle ? "idle" : "work") : other ? "busy" : "off";
+    sw.setAttribute("aria-checked", String(on));
+    sw.disabled = other || !NATIVE;
+    $("auto-title").textContent = on ? (autoInfo.idle ? "Tudo em dia" : sendingId && note.work ? note.work : "Ligado") : "Desligado";
+    if (!on) {
+      const t = $("auto-text"); t.classList.remove("pause");
+      t.textContent = !NATIVE ? "O modo automático funciona no app do Android (com o envio em segundo plano)." : other ? "Há um envio rodando. Quando ele terminar, você pode ligar o automático." : AUTO_OFF_TEXT;
+      $("auto-bar").hidden = true;
+    }
+    const sub = $("auto-sub");
+    sub.hidden = !on;
+    if (on) sub.textContent = [`+${autoInfo.added || 0} capítulo(s) desde que ligou`, `${autoInfo.works || 0} obra(s) conferidas`, autoInfo.updates ? `${autoInfo.updates} atualizada(s) esperando` : null].filter(Boolean).join(" · ");
+    $("sender").classList.toggle("auto", on);
+    $("q-send").hidden = busy() || !(Number($("n-queue").textContent) > 0);
+  }
+  async function startAuto(silent) {
+    if (!NATIVE) { toast("O modo automático funciona no app do Android."); return; }
+    if (!state.token) { toast("Cole a chave da MediocreScan primeiro."); $("token-card").hidden = false; return; }
+    if (busy()) { toast("Espere o envio atual terminar."); return; }
+    state.auto.on = true; save();
+    if (!silent) await askBattery();
+    $("log").innerHTML = ""; autoInfo = { idle: false, queue: autoInfo.queue, updates: 0, works: 0, added: 0 };
+    const ok = await startNative({ type: "auto", discover: state.auto.discover, requests: state.auto.requests });
+    if (!ok) { state.auto.on = false; save(); toast("O Android não deixou ligar o automático. Tente de novo."); }
+    else { setStatus("Ligando…"); if (!silent) toast("Automático ligado. Pode minimizar o app."); }
+    renderAuto();
+  }
+  function stopAuto() {
+    state.auto.on = false; save();
+    if (NATIVE) Native.stopJob().catch(() => {});
+    setStatus("Desligando depois do passo atual…"); renderAuto();
+  }
+  $("auto-toggle").onclick = () => { if (autoRunning()) stopAuto(); else startAuto(false); };
+  $("auto-discover").checked = state.auto.discover; $("auto-requests").checked = state.auto.requests;
+  const optionChanged = () => {
+    state.auto.discover = $("auto-discover").checked; state.auto.requests = $("auto-requests").checked; save();
+    if (autoRunning()) toast("Vale da próxima vez que ligar o automático.");
+  };
+  $("auto-discover").onchange = optionChanged; $("auto-requests").onchange = optionChanged;
+
+  function openPanel() {
+    current = { tab: "painel" }; pickGroup = null;
+    setView("panel", "Estúdio", false); navCurrent("painel");
+    $("n-today").textContent = String(today().caps);
+    renderActivity(); renderAuto(); renderPanelQueue();
+  }
+  let panelLoading = false;
+  async function renderPanelQueue() {
+    if (panelLoading) return;
+    panelLoading = true;
+    try {
+      const p = await freshPlan();
+      const items = p.items || [];
+      setPanelNumbers((p.queue || []).length, Number(p.requestsWaiting) || 0);
+      setRequestBadge(Number(p.requestsWaiting) || 0);
+      const ul = $("panel-queue"); ul.innerHTML = "";
+      items.slice(0, 3).forEach((i) => {
+        marks.queued.add(i.id);
+        const now = i.id === sendingId;
+        const info = el("div", { className: "min0" },
+          el("p", { className: "t", textContent: i.title || `Obra ${i.id}` }),
+          el("p", { className: "s", textContent: `${i.chapters_on_site} capítulo(s) no site` }),
+          el("div", {}, now ? el("span", { className: "pill ok", textContent: "Enviando agora" }) : i.status === "running" ? el("span", { className: "pill hot", textContent: "Em andamento" }) : null,
+            i.priority > 0 ? el("span", { className: "pill hot", textContent: `Pedida por ${readers(i.priority)}` }) : null));
+        const b = el("button", { type: "button", className: "site-row queue-open" }, i.cover ? el("img", { src: i.cover, alt: "", loading: "lazy" }) : el("div", { className: "ph" }), info);
+        b.onclick = () => go(`#/obra/${i.id}`);
+        ul.append(el("li", {}, b));
+      });
+      if (items.length > 3) ul.append(el("li", { className: "more-row" }, el("button", { type: "button", className: "link", textContent: `+ ${items.length - 3} obra(s) na fila`, onclick: () => go("#/fila") })));
+      const e = $("panel-queue-empty"); e.textContent = "Fila vazia. Escolha obras em Explorar ou deixe o automático achar as novas."; e.hidden = items.length > 0;
+    } catch (err) {
+      const e = $("panel-queue-empty"); e.textContent = err.message; e.hidden = false;
+    } finally { panelLoading = false; renderAuto(); }
+  }
+  function renderActivity() {
+    let lines = [];
+    try { lines = JSON.parse(localStorage.getItem(LOG_KEY) || "[]"); } catch (_) { lines = []; }
+    const ol = $("panel-log"); ol.innerHTML = "";
+    if (!lines.length) { ol.append(el("li", { className: "muted" }, el("span", { textContent: "Nada ainda. O que o app enviar aparece aqui." }))); return; }
+    lines.slice(0, 6).forEach((l) => {
+      const m = /^(\S+) (\S+) (.*)$/.exec(l);
+      ol.append(el("li", {}, el("time", { textContent: m ? m[2].slice(0, 5) : "" }), el("span", { textContent: redact(m ? m[3] : l) })));
+    });
+  }
+  $("panel-history").onclick = () => $("open-history").onclick();
+  $("q-send").onclick = async () => {
+    try {
+      const p = await engine.plan();
+      const titles = new Map((p.items || []).map((i) => [i.id, i.title]));
+      const list = (p.queue || []).map((id) => ({ id, title: titles.get(id) || `Obra ${id}` }));
+      if (!list.length) { toast("A fila do site está vazia."); return; }
+      if (!confirm(`Enviar as ${list.length} obra(s) da fila agora, uma de cada vez? Dica: com o automático ligado isso acontece sozinho.`)) return;
+      startRun(list);
+    } catch (e) { toast(e.message); }
+  };
 
   /* ---------- chave e configurações ---------- */
   $("form-token-inline").onsubmit = (e) => {
@@ -996,11 +1175,21 @@
     state.session = null; save(); $("settings").close(); $("password").value = ""; $("code").value = ""; show("login");
   };
 
+  /** Um pedido de "plan" serve o painel, o aviso da fila e o contador de pedidos ao mesmo tempo. */
+  let planMemo = null;
+  function freshPlan() {
+    if (planMemo && Date.now() - planMemo.at < 4000) return planMemo.p;
+    const p = engine.plan();
+    planMemo = { at: Date.now(), p };
+    p.catch(() => { planMemo = null; });
+    return p;
+  }
   async function checkQueueDot() {
     try {
-      const p = await engine.plan();
-      $("queue-dot").hidden = !(p.queue || []).length;
+      const p = await freshPlan();
+      setPanelNumbers((p.queue || []).length, Number(p.requestsWaiting) || 0);
       setRequestBadge(Number(p.requestsWaiting) || 0);
+      renderAuto();
     } catch (_) { /* sem aviso */ }
   }
   function setRequestBadge(n) {
@@ -1024,6 +1213,7 @@
     }
   }
   function describeJob(job) {
+    if (job.type === "auto") return "o modo automático";
     if (job.type === "chapters") return `${job.title || `obra ${job.workId}`} (${(job.capIds || []).length} capítulo(s))`;
     const works = job.works || [], i = Math.max(0, Number(job.index) || 0), first = works[i] || {};
     return `${Math.max(0, works.length - i)} obra(s), começando por ${first.title || `obra ${first.id || ""}`}`;
@@ -1031,6 +1221,9 @@
   /** Ao abrir: se um envio foi cortado (app fechado, atualizado ou encerrado pelo Android), oferece continuar. */
   async function checkResume(nat) {
     if (busy()) return;
+    // Automático: o Android fechou o app com ele ligado (ou o app foi atualizado): religa sem perguntar.
+    if (nat && nat.job && !nat.running && nat.job.type === "auto") { log("O Android fechou o app com o automático ligado. Religando…"); state.auto.on = true; save(); startNative(nat.job); return; }
+    if (NATIVE && state.auto.on && !(nat && nat.job)) { log("Automático religado ao abrir o app."); startAuto(true); return; }
     // Motor nativo: o trabalho guardado no celular continua exatamente de onde parou.
     if (nat && nat.job && !nat.running) {
       const job = nat.job, what = describeJob(job);
@@ -1044,6 +1237,8 @@
     if (NATIVE) clearRun(); // marca da versão antiga (envio pela tela) não vale mais
     const cut = NATIVE ? null : interruptedRun();
     if (cut) { log(`Envio interrompido (${cut.what}): o app foi fechado, atualizado ou encerrado pelo Android antes de terminar.`); clearRun(); }
+    // Sem envio cortado, a fila aparece no Painel (sem cartão extra no topo).
+    if (!cut) return;
     try {
       const p = await engine.plan();
       const items = p.items || []; const n = (p.queue || []).length;
@@ -1059,7 +1254,7 @@
 
   function enterMain() {
     show("main"); $("who").textContent = whoText(); $("token-card").hidden = Boolean(state.token);
-    if (!location.hash) location.hash = "#/inicio"; else route();
+    if (!location.hash || location.hash === "#/inicio") location.hash = "#/painel"; else route();
     checkQueueDot();
     if (NATIVE) syncNative().then((r) => { if (!nativeRunning) checkResume(r); }); else checkResume();
   }

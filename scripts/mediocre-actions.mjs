@@ -236,8 +236,12 @@ async function pull(id, { publish }) {
 }
 
 /** Procura nas listas da API obras que ainda não estão no site nem na fila e as coloca na fila. */
+/** Obras do site que a MediocreScan listou como atualizadas: conferidas antes do rodízio normal. */
+const updatedOnSite = [];
+
 async function discover() {
   const found = new Map();
+  const updated = new Set();
   for (const list of DISCOVER_LISTS) {
     for (let page = 1; page <= DISCOVER_PAGES; page++) {
       if (timeLeft() < 3 * 60_000) return [];
@@ -247,6 +251,7 @@ async function discover() {
       for (const o of rows) {
         const id = Number(o?.obr_id ?? o?.id);
         if (Number.isSafeInteger(id) && id > 0 && !found.has(id)) found.set(id, String(o?.obr_nome ?? o?.nome ?? "") || null);
+        if (Number.isSafeInteger(id) && id > 0 && list === "/obras/atualizadas-recentes") updated.add(id);
       }
       if (!rows.length) break;
     }
@@ -256,6 +261,7 @@ async function discover() {
   for (let i = 0; i < ids.length; i += 100) {
     const r = await send({ action: "check", ids: ids.slice(i, i + 100) });
     const known = new Set([...(r.imported || []), ...(r.queued || []), ...(r.failed || [])]);
+    for (const id of r.imported || []) if (updated.has(id) && !updatedOnSite.includes(id)) updatedOnSite.push(id);
     fresh.push(...ids.slice(i, i + 100).filter((id) => !known.has(id)));
   }
   const items = fresh.slice(0, 50).map((obraId) => ({ obraId, title: found.get(obraId) }));
@@ -334,7 +340,10 @@ try {
   await runAll(queue, "fila", true);
   const fresh = await discover();
   await runAll(fresh, "nova", true);
-  const sync = (plan.sync || []).filter((id) => !MANUAL.includes(id) && !fresh.includes(id));
+  // Primeiro as obras do site que apareceram como atualizadas, depois o rodízio das mais antigas.
+  const recent = updatedOnSite.filter((id) => !MANUAL.includes(id) && !fresh.includes(id) && !queue.includes(id)).slice(0, 20);
+  await runAll(recent, "atualizada", false);
+  const sync = (plan.sync || []).filter((id) => !MANUAL.includes(id) && !fresh.includes(id) && !recent.includes(id));
   await runAll(sync, "atualização", false);
   console.log(`Concluído: ${totalAdded} capítulos enviados.`);
 } catch (e) {

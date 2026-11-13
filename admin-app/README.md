@@ -23,6 +23,20 @@ que não está bloqueado) e envia ao site pelo endpoint `/api/public/mediocre-in
   para a tela (o token de renovação muda a cada uso). No Android 14+ o serviço é de "uso especial" (sem o limite de
   6 h por dia da sincronização de dados do Android 15). No navegador, o `engine.js` envia pela tela.
 
+- **Painel e modo automático:** a primeira aba (Painel) mostra o cartão do modo automático, os números da fila,
+  dos pedidos e dos capítulos enviados hoje (contados no celular), as próximas obras da fila e a atividade recente.
+  Ligado, o automático (`EnvioEngine.runAuto`, trabalho `{type:"auto"}` no serviço) fica rodando e decide sozinho:
+  fila do site (pedidos de leitores na frente; a fila é relida depois de cada obra) → obras do site que aparecem em
+  `/obras/atualizadas-recentes` com novidade desde a última olhada → até 4 obras por ciclo das que estão há mais
+  tempo sem conferir. A cada 20 min também liga pedidos de leitores quando só uma obra da busca tem exatamente o mesmo
+  título (até 2 buscas por ciclo) e, se marcado, põe na fila obras novas das listas (até 20). Sem nada para enviar,
+  espera; obras escolhidas no app enquanto ele roda entram na fila e o acordam (`wakeJob`). Sem internet, site em
+  manutenção ou recusas seguidas da MediocreScan, espera 15 min e tenta de novo (`Retryable`) em vez de desligar;
+  chave recusada ou sessão encerrada desligam. Uma obra que falha 2 vezes fica para depois. Se o Android fechar o
+  app com o automático ligado, ele volta sozinho (serviço recriado ou ao abrir o app).
+- **Abas:** Painel, Explorar (Destaques, Atualizadas, Novas, Com IA, Para você, Listas, Leitura da MediocreScan),
+  Buscar, Fila e No site. Pedidos dos leitores e configurações ficam no topo.
+
 ## Como o APK é gerado
 O workflow `.github/workflows/estudio-apk.yml` compila o app a cada mudança em `admin-app/` na `main` e
 publica o arquivo na release **estudio-apk** do repositório. Os builds em branches `apk-*` só testam.
