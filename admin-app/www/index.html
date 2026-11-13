@@ -56,10 +56,6 @@
           <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path fill="currentColor" d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm0 2v9h3.5a3.5 3.5 0 0 0 7 0H19V5zm3 3h8v2H8zm0-3h8v2H8z"/></svg>
           <span class="count" id="requests-count" hidden></span>
         </button>
-        <button type="button" class="icon-btn" id="open-queue" aria-label="Fila do site">
-          <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path fill="currentColor" d="M4 6h12v2H4zm0 5h12v2H4zm0 5h8v2H4zm14-2v-4h2v4h3l-4 4-4-4z"/></svg>
-          <span class="dot" id="queue-dot" hidden></span>
-        </button>
         <button type="button" class="icon-btn" id="open-settings" aria-label="Configurações">
           <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true"><path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Zm7.4-2.5.1-1-.1-1 2.1-1.6-2-3.5-2.5 1a7 7 0 0 0-1.7-1L15 2.5h-4l-.4 2.4a7 7 0 0 0-1.7 1l-2.5-1-2 3.5L6.5 10l-.1 1 .1 1-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.4h4l.4-2.4c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5-2.1-1.6Z"/></svg>
         </button>
@@ -80,6 +76,56 @@
         <button id="resume-go" type="button" class="btn primary">Continuar envio</button>
         <button id="resume-dismiss" type="button" class="btn ghost">Agora não</button>
       </div>
+    </div>
+
+    <!-- Painel -->
+    <div id="view-panel" class="view" hidden>
+      <section id="auto-card" class="auto-card" data-state="off" aria-live="polite">
+        <div class="auto-head">
+          <div class="min0">
+            <p class="eyebrow"><span class="pulse" aria-hidden="true"></span>Modo automático</p>
+            <h2 id="auto-title">Desligado</h2>
+          </div>
+          <button id="auto-toggle" type="button" role="switch" class="switch big" aria-checked="false" aria-label="Modo automático"><span></span></button>
+        </div>
+        <p id="auto-text" class="auto-text">Ligue e deixe o celular carregando: o app envia a fila do site, busca capítulos novos das obras do site e atende pedidos sozinho.</p>
+        <div id="auto-bar" class="bar" role="progressbar" aria-label="Capítulos desta obra" aria-valuemin="0" aria-valuemax="100" hidden><span></span></div>
+        <p id="auto-sub" class="auto-sub" hidden></p>
+        <details class="auto-options">
+          <summary>Como funciona</summary>
+          <ol class="auto-steps">
+            <li><strong>Fila do site</strong> — pedidos de leitores na frente.</li>
+            <li><strong>Obras do site atualizadas</strong> na MediocreScan.</li>
+            <li><strong>Conferência</strong> das obras há mais tempo sem conferir.</li>
+          </ol>
+          <label class="check"><input type="checkbox" id="auto-discover" /><span>Pôr na fila as obras novas da MediocreScan</span></label>
+          <label class="check"><input type="checkbox" id="auto-requests" /><span>Atender pedidos quando só uma obra tem o mesmo nome</span></label>
+          <p class="hint">Olha as listas e os pedidos a cada 20 min. Sem internet ou com a MediocreScan recusando, espera e tenta de novo sozinho.</p>
+        </details>
+      </section>
+
+      <div class="stats">
+        <button type="button" class="stat" data-go="#/fila"><strong id="n-queue">–</strong><span>na fila</span></button>
+        <button type="button" class="stat" data-go="#/pedidos"><strong id="n-requests">–</strong><span>pedidos</span></button>
+        <div class="stat"><strong id="n-today">0</strong><span>capítulos hoje</span></div>
+      </div>
+
+      <div class="section-head">
+        <h2 class="caption">Próximas da fila</h2>
+        <button type="button" class="link" data-go="#/fila">Ver fila</button>
+      </div>
+      <ul id="panel-queue" class="site-rows"></ul>
+      <p id="panel-queue-empty" class="empty compact" hidden>Fila vazia. Escolha obras em Explorar ou deixe o automático achar as novas.</p>
+      <div class="quick">
+        <button id="q-send" type="button" class="btn primary" hidden>Enviar a fila agora</button>
+        <button type="button" class="btn ghost" data-go="#/explorar">Explorar MediocreScan</button>
+      </div>
+
+      <div class="section-head">
+        <h2 class="caption">Atividade</h2>
+        <button id="panel-history" type="button" class="link">Histórico</button>
+      </div>
+      <ol id="panel-log" class="activity"></ol>
     </div>
 
     <!-- Listas -->
@@ -235,14 +281,14 @@
     </section>
 
     <nav class="bottom-nav" aria-label="Seções">
-      <button type="button" data-tab="inicio" aria-current="page">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3 2 11h3v9h6v-6h2v6h6v-9h3z"/></svg>Início</button>
-      <button type="button" data-tab="recentes">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 10.4 3.5 2.1-1 1.7-4.5-2.7V6h2z"/></svg>Recentes</button>
-      <button type="button" data-tab="novas">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z"/></svg>Novas</button>
+      <button type="button" data-tab="painel" aria-current="page">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 13h7V4H4zm0 7h7v-5H4zm9 0h7v-9h-7zm0-16v5h7V4z"/></svg>Painel</button>
+      <button type="button" data-tab="explorar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16Zm4.2 3.8-6 2.2-2.2 6 6-2.2zM12 11a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg>Explorar</button>
       <button type="button" data-tab="buscar">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9.5 3a6.5 6.5 0 0 1 5.2 10.4l5.4 5.4-1.4 1.4-5.4-5.4A6.5 6.5 0 1 1 9.5 3Zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Z"/></svg>Buscar</button>
+      <button type="button" data-tab="fila">
+        <span class="nav-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 6h12v2H4zm0 5h12v2H4zm0 5h8v2H4zm14-2v-4h2v4h3l-4 4-4-4z"/></svg><span class="dot" id="queue-dot" hidden></span></span>Fila</button>
       <button type="button" data-tab="site">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 4h16v12H4zm2 2v8h12V6zm-2 12h16v2H4zm6.6-4.6L8 10.8l1.4-1.4 1.2 1.2 3.9-3.9L16 8.1z"/></svg>No site</button>
     </nav>

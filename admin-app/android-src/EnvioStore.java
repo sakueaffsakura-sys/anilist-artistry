@@ -93,7 +93,7 @@ final class EnvioStore {
     private static boolean isStatus(String type) {
         switch (type) {
             case "sending": case "fetching": case "posting": case "waiting": case "api-wait":
-            case "pause": case "net-retry": case "resume":
+            case "pause": case "net-retry": case "resume": case "auto-idle": case "auto-scan": case "auto-plan":
                 return true;
             default:
                 return false;

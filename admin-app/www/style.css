@@ -257,3 +257,49 @@ select { min-height: 40px; padding: 0 10px; border-radius: 10px; border: 1px sol
 .pick-item .site-row { grid-template-columns: 52px 1fr; }
 .pick-item .btn { white-space: nowrap; }
 #pick-head { margin-bottom: 12px; }
+
+/* ---------- painel e modo automático ---------- */
+.auto-card { position: relative; margin-bottom: 14px; padding: 16px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); }
+.auto-card[data-state="work"], .auto-card[data-state="idle"] { border-color: color-mix(in oklab, var(--primary) 55%, var(--border)); background: linear-gradient(160deg, color-mix(in oklab, var(--primary) 14%, var(--surface)) 0%, var(--surface) 60%); }
+.auto-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.eyebrow { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.pulse { width: 8px; height: 8px; border-radius: 999px; background: var(--muted); }
+.auto-card[data-state="work"] .pulse { background: var(--ok); box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 60%, transparent); animation: pulse 1.6s infinite; }
+.auto-card[data-state="idle"] .pulse { background: var(--primary); }
+@keyframes pulse { to { box-shadow: 0 0 0 8px transparent; } }
+.auto-head h2 { margin: 2px 0 0; font-size: 22px; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.switch.big { width: 62px; height: 36px; }
+.switch.big span { width: 28px; height: 28px; }
+.switch.big[aria-checked="true"] span { transform: translateX(26px); }
+.auto-text { margin: 10px 0 0; font-size: 14px; color: color-mix(in oklab, var(--paper) 85%, var(--muted)); }
+.auto-text.pause { color: #ffc27a; }
+.auto-card .bar { margin: 12px 0 0; }
+.auto-sub { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); }
+.auto-options { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.auto-options summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); }
+.auto-steps { margin: 10px 0; padding-left: 20px; font-size: 13px; color: var(--muted); display: grid; gap: 4px; }
+.auto-steps strong { color: var(--paper); font-weight: 700; }
+.check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; color: var(--paper); }
+.check input { flex-shrink: 0; width: 20px; min-height: 20px; height: 20px; padding: 0; accent-color: var(--primary); }
+.auto-options .hint { margin-top: 4px; }
+
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 4px; }
+.stat { display: grid; gap: 2px; padding: 12px 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); text-align: left; color: inherit; }
+button.stat:active { background: var(--surface-2); }
+.stat strong { font-size: 24px; line-height: 1; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; color: var(--muted); }
+#view-panel .section-head { margin-top: 20px; }
+#view-panel .site-rows li > .site-row { grid-template-columns: 52px 1fr; }
+.more-row { text-align: center; }
+.empty.compact { padding: 14px 8px; font-size: 13px; }
+.quick { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 12px; }
+.activity { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.activity li { display: grid; grid-template-columns: 44px 1fr; gap: 8px; padding: 9px 12px; font-size: 13px; line-height: 1.4; }
+.activity li + li { border-top: 1px solid var(--border); }
+.activity time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.activity span { overflow-wrap: anywhere; }
+.activity li.muted { grid-template-columns: 1fr; }
+.nav-ico { position: relative; display: grid; }
+.nav-ico .dot { top: -2px; right: -4px; }
+/* No Painel o cartão do automático já mostra o andamento: a barra de envio de baixo some. */
+body.on-panel .sender.auto { display: none; }

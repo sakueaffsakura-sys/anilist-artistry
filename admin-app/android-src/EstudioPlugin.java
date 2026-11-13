@@ -83,6 +83,14 @@ public class EstudioPlugin extends Plugin {
         call.resolve(r);
     }
 
+    /** Modo automático ligado: acorda da espera porque há obras novas na fila. */
+    @PluginMethod
+    public void wakeJob(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("woken", EnvioService.wakeJob());
+        call.resolve(r);
+    }
+
     /** Eventos desde `since` + estado (rodando, trabalho guardado, sessão renovada). */
     @PluginMethod
     public void events(PluginCall call) {

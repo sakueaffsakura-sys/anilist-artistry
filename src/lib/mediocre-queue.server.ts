@@ -80,10 +80,11 @@ export async function enqueueWorks(admin: Admin, items: { obraId: number; title?
   const ids = items.map((i) => i.obraId);
   const { data: existing } = await admin.from("mediocre_queue").select("obra_id, status").in("obra_id", ids);
   const known = new Map((existing ?? []).map((r) => [r.obra_id, r.status]));
-  // Failed works go back to the end of the line.
-  const retry = ids.filter((id) => known.get(id) === "error");
-  if (retry.length) await admin.from("mediocre_queue").delete().in("obra_id", retry).eq("status", "error");
-  const fresh = items.filter((i) => !known.has(i.obraId) || known.get(i.obraId) === "error");
+  // Failed and finished works go back to the end of the line (asking again = look for new chapters).
+  const again = (s: string | undefined) => s === "error" || s === "done";
+  const retry = ids.filter((id) => again(known.get(id)));
+  if (retry.length) await admin.from("mediocre_queue").delete().in("obra_id", retry).in("status", ["error", "done"]);
+  const fresh = items.filter((i) => !known.has(i.obraId) || again(known.get(i.obraId)));
   let added = 0;
   // Sequential inserts keep created_at in the order the admin chose.
   for (const i of fresh) {
