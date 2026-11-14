@@ -38,17 +38,18 @@ final class EnvioEngine {
     static final int SITE_TIMEOUT_MS = 120_000;
     static final long PACE_FRESH_MS = 10 * 60_000L;
 
-    /* Velocidade máxima (opção "Máxima"): mira 15 capítulos por minuto e se ajusta sozinha. */
-    /** Menor intervalo entre pedidos à API (15 por minuto). */
-    static final long FAST_API_FLOOR_MS = 4_000L;
-    /** Intervalo inicial sem histórico: começa com folga e acelera. */
-    static final long FAST_START_MS = 12_000L;
-    /** No máximo 5 capítulos a cada 20 s (15 por minuto). */
-    static final long FAST_PAIR_MS = 20_000L;
-    /** Pedidos aceitos seguidos antes de acelerar um passo (15% mais rápido). */
-    static final int FAST_STEP_OK = 8;
-    /** Depois de uma recusa, não volta a ficar tão rápido por 6 h. */
-    static final long FAST_MEMORY_MS = 6 * 3600_000L;
+    /*
+     * Ciclo (padrão, escolhido pelo dono): pega 5 capítulos, espera 33 s, pega mais 5, espera 33 s, pega mais 5 e,
+     * completados os 15, pausa 2 min antes de recomeçar. Os números vêm dos Ajustes (Config.cycle*).
+     */
+    static final int CYCLE_BATCH = 5;
+    static final long CYCLE_GAP_MS = 33_000L;
+    static final int CYCLE_BATCHES = 3;
+    static final long CYCLE_PAUSE_MS = 120_000L;
+    /** Entre os pedidos de capítulo de um mesmo lote. */
+    static final long CYCLE_BURST_GAP_MS = 2_000L;
+    /** Entre os outros pedidos à API (obra, listas, busca), para não virar rajada fora do lote. */
+    static final long CYCLE_OTHER_GAP_MS = 10_000L;
 
     /* Modo automático: de quanto em quanto tempo olha as obras atualizadas na MediocreScan (1 pedido à API). */
     static final long AUTO_CYCLE_MS = 10 * 60_000L;
@@ -211,8 +212,13 @@ final class EnvioEngine {
         long paceApi = -1;
         long pacePair = -1;
         long paceLock = -1;
-        /** "max" (padrão): até 15 capítulos por minuto, ajustando sozinho; "safe": 1 pedido por minuto. */
+        /** "cycle" (padrão): lotes com espera e pausa a cada ciclo; "safe": 1 pedido por minuto, 5 a cada 1 min 12 s. */
         boolean fast = true;
+        int cycleBatch = CYCLE_BATCH;
+        long cycleGapMs = CYCLE_GAP_MS;
+        int cycleBatches = CYCLE_BATCHES;
+        long cyclePauseMs = CYCLE_PAUSE_MS;
+        /** Lotes já feitos no ciclo atual e fim do último (guardados para continuar o ciclo depois de reabrir). */
         long speedGap = -1;
         long speedMin = -1;
         long speedMinUntil = -1;
@@ -227,7 +233,19 @@ final class EnvioEngine {
             c.supabaseKey = Json.str(m.get("supabaseKey"));
             c.session = Session.from(m.get("session"));
             c.fast = !"safe".equals(Json.str(m.get("speed")));
+            Map<String, Object> cy = Json.obj(m.get("cycle"));
+            if (cy != null) {
+                c.cycleBatch = (int) clamp(cy.get("batch"), 1, PER_SEND, CYCLE_BATCH);
+                c.cycleGapMs = clamp(cy.get("gap"), 0, 600, CYCLE_GAP_MS / 1000) * 1000L;
+                c.cycleBatches = (int) clamp(cy.get("batches"), 1, 20, CYCLE_BATCHES);
+                c.cyclePauseMs = clamp(cy.get("pause"), 0, 3600, CYCLE_PAUSE_MS / 1000) * 1000L;
+            }
             return c;
+        }
+
+        private static long clamp(Object v, long min, long max, long def) {
+            Long n = Json.whole(v);
+            return n == null ? def : Math.max(min, Math.min(max, n));
         }
 
         Map<String, Object> toMap() {
@@ -238,7 +256,8 @@ final class EnvioEngine {
             m.put("supabaseKey", supabaseKey);
             Session s = session;
             m.put("session", s == null ? null : s.toMap());
-            m.put("speed", fast ? "max" : "safe");
+            m.put("speed", fast ? "cycle" : "safe");
+            m.put("cycle", Json.map("batch", cycleBatch, "gap", cycleGapMs / 1000, "batches", cycleBatches, "pause", cyclePauseMs / 1000));
             return m;
         }
     }
@@ -279,11 +298,9 @@ final class EnvioEngine {
     private long lastLockEnd;
     private int locksInRow;
     private int cdnRefusals;
-    /* Velocidade aprendida (modo "Máxima"). */
-    private long apiGap = FAST_START_MS;
-    private long minGap = -1;
-    private long minGapUntil = -1;
-    private int okStreak;
+    /* Ciclo: lotes feitos no ciclo atual; enquanto busca os capítulos de um lote, os pedidos saem mais juntos. */
+    private int cycleDone;
+    private volatile boolean inBatch;
 
     EnvioEngine(Config cfg, Http http, Http uiHttp, Clock clock, Host host) {
         this.cfg = cfg;
@@ -295,45 +312,38 @@ final class EnvioEngine {
         lastApi = fresh(cfg.paceApi, now);
         lastPair = fresh(cfg.pacePair, now);
         lastLockEnd = fresh(cfg.paceLock, now);
-        if (cfg.speedGap >= FAST_API_FLOOR_MS && cfg.speedGap <= API_GAP_MS) apiGap = cfg.speedGap;
-        if (cfg.speedMinUntil > now) { minGap = cfg.speedMin; minGapUntil = cfg.speedMinUntil; }
-        if (minGapUntil > now && apiGap < minGap) apiGap = minGap;
+        // Continua o ciclo de onde parou (se o último lote foi há pouco).
+        if (cfg.speedGap > 0 && cfg.speedMin > 0 && now - cfg.speedMin < PACE_FRESH_MS) cycleDone = (int) Math.min(cfg.speedGap, cfg.cycleBatches);
     }
 
     /** Intervalo atual entre pedidos à API. */
-    long apiGapMs() { return cfg.fast ? apiGap : API_GAP_MS; }
-
-    /** Capítulos por minuto que o ritmo atual permite (pela API, que é o limite quando a obra não traz o código). */
-    int perMinute() {
-        long gap = apiGapMs();
-        long pair = cfg.fast ? FAST_PAIR_MS : WAIT_MS;
-        return (int) Math.max(1, Math.min(60_000L / gap, PER_SEND * 60_000L / pair));
+    long apiGapMs() {
+        if (!cfg.fast) return API_GAP_MS;
+        return inBatch ? CYCLE_BURST_GAP_MS : CYCLE_OTHER_GAP_MS;
     }
+
+    /** Duração aproximada de um ciclo completo (lotes + esperas + pausa). */
+    long cycleMs() {
+        long fetch = (long) cfg.cycleBatch * CYCLE_BURST_GAP_MS + 5_000L;
+        return cfg.cycleBatches * fetch + Math.max(0, cfg.cycleBatches - 1) * cfg.cycleGapMs + cfg.cyclePauseMs;
+    }
+
+    /** Capítulos por hora no ritmo escolhido (quando cada capítulo pede à API). */
+    int perHour() {
+        if (!cfg.fast) return (int) (3600_000L / API_GAP_MS);
+        return (int) Math.max(1, (long) cfg.cycleBatch * cfg.cycleBatches * 3600_000L / Math.max(1, cycleMs()));
+    }
+
+    /** Capítulos por minuto, para o texto de registro. */
+    int perMinute() { return Math.max(1, Math.round(perHour() / 60f)); }
 
     private void emitSpeed() {
-        emit("speed", "perMin", perMinute(), "gapMs", apiGapMs(), "fast", cfg.fast);
-        try { host.saveSpeed(apiGap, minGap, minGapUntil); } catch (RuntimeException ignored) { /* ok */ }
+        emit("speed", "fast", cfg.fast, "perHour", perHour(), "batch", cfg.cycleBatch, "gapS", cfg.cycleGapMs / 1000,
+            "batches", cfg.cycleBatches, "pauseS", cfg.cyclePauseMs / 1000);
     }
 
-    /** Pedido aceito: depois de alguns seguidos, acelera um passo (até 15 por minuto). */
-    private void apiAccepted() {
-        if (!cfg.fast) return;
-        if (++okStreak < FAST_STEP_OK) return;
-        okStreak = 0;
-        long floor = clock.now() < minGapUntil ? Math.max(FAST_API_FLOOR_MS, minGap) : FAST_API_FLOOR_MS;
-        long g = Math.max(floor, apiGap * 85 / 100);
-        if (g < apiGap) { apiGap = g; emitSpeed(); }
-    }
-
-    /** A MediocreScan recusou: desacelera na hora e não volta a esse ritmo por 6 h. */
-    private void apiRefused() {
-        if (!cfg.fast) return;
-        okStreak = 0;
-        minGap = Math.min(API_GAP_MS, Math.max(FAST_API_FLOOR_MS, apiGap * 3 / 2));
-        minGapUntil = clock.now() + FAST_MEMORY_MS;
-        apiGap = Math.min(API_GAP_MS, Math.max(apiGap * 2, minGap));
-        log("A MediocreScan recusou no ritmo atual: o app desacelerou para até " + perMinute() + " capítulo(s) por minuto e acelera de novo aos poucos.");
-        emitSpeed();
+    private void saveCycle() {
+        try { host.saveSpeed(cycleDone, clock.now(), 0); } catch (RuntimeException ignored) { /* ok */ }
     }
 
     private static long fresh(long v, long now) {
@@ -398,15 +408,39 @@ final class EnvioEngine {
         pause(ms);
     }
 
-    /** 5 capítulos por lote: a cada 20 s na velocidade máxima, a cada 1 min 12 s na segura (do começo do último lote). */
+    /**
+     * Antes de cada lote. Ritmo segura: 1 min 12 s do começo do lote anterior. Ciclo: espera entre lotes
+     * (33 s) contada do fim do lote anterior e, completados os lotes do ciclo (3 = 15 capítulos), a pausa (2 min).
+     */
     private void pairWait() {
+        inBatch = false;
         long mark = Math.max(lastPair, lastLockEnd);
-        if (mark < 0) return;
-        long ms = Math.max(0, (cfg.fast ? FAST_PAIR_MS : WAIT_MS) - (clock.now() - mark));
-        if (ms > 0) {
-            emit("waiting", "ms", ms);
-            pause(ms);
+        if (!cfg.fast) {
+            if (mark < 0) return;
+            long ms = Math.max(0, WAIT_MS - (clock.now() - mark));
+            if (ms > 0) { emit("waiting", "ms", ms); pause(ms); }
+            return;
         }
+        boolean cycleEnd = cycleDone >= cfg.cycleBatches;
+        if (mark >= 0) {
+            long need = cycleEnd ? cfg.cyclePauseMs : cfg.cycleGapMs;
+            long ms = Math.max(0, need - (clock.now() - mark));
+            if (ms > 0) {
+                emit("waiting", "ms", ms, "cycle", cycleEnd, "next", cfg.cycleBatch, "batches", cfg.cycleBatches);
+                pause(ms);
+            }
+        }
+        if (cycleEnd) cycleDone = 0;
+    }
+
+    /** Fim de um lote: conta no ciclo e marca a hora (as esperas contam daqui). */
+    private void batchDone() {
+        synchronized (pace) {
+            lastPair = clock.now();
+            savePace();
+        }
+        cycleDone++;
+        saveCycle();
     }
 
     private void lockPause(String reason) {
@@ -445,7 +479,7 @@ final class EnvioEngine {
                 try { clock.sleep(Math.min(wait, 500)); }
                 catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new Stopped(); }
             } else {
-                if (api && wait > 2000 && !announced) { emit("api-wait", "ms", wait); announced = true; }
+                if (api && wait > 2000 && !announced) { emit("api-wait", "ms", wait, "gapMs", gap); announced = true; }
                 pause(wait);
             }
         }
@@ -493,13 +527,11 @@ final class EnvioEngine {
                     return null;
                 }
                 String reason = r.status == 429 ? "pedidos demais" : blocked ? "IP bloqueado" : api ? "acesso recusado" : "o CDN recusou as páginas";
-                if (api || blocked) apiRefused();
                 lockPause(reason);
                 continue;
             }
             locksInRow = 0;
             if (!api) cdnRefusals = 0;
-            else apiAccepted();
             if (r.status == 404) return null;
             if (r.status >= 500) {
                 netRetry("da MediocreScan", netFails++, "erro " + r.status);
@@ -747,6 +779,9 @@ final class EnvioEngine {
         return out;
     }
 
+    /** Capítulos por lote: os do ciclo (até 5, o máximo do site) ou 5 no ritmo seguro. */
+    private int batchSize() { return cfg.fast ? Math.max(1, Math.min(PER_SEND, cfg.cycleBatch)) : PER_SEND; }
+
     private static long count(Map<String, Object> m, String key) {
         Long v = m == null ? null : Json.whole(m.get(key));
         return v == null ? 0 : v;
@@ -766,6 +801,7 @@ final class EnvioEngine {
      * (primeira passada do automático em obras novas); o resto vem quando as outras obras novas tiverem a delas.
      */
     private Outcome sendWork(long id, String name, int left, int limit) throws Soft {
+        inBatch = false;
         Outcome out = new Outcome();
         Object work = mediocre(true, "/obras/" + id);
         if (work == null) {
@@ -789,16 +825,18 @@ final class EnvioEngine {
             int fast = 0;
             for (Long c : pending) { Map<String, Object> e = entries.map.get(c); if (e != null && e.get("cap_uuid") != null) fast++; }
             log(fast > 0 ? fast + " de " + pending.size() + " capítulo(s) vêm direto do CDN (rápido)."
-                : "A lista desta obra não traz o código dos capítulos: cada um pede à API (" + perMinute() + " por minuto agora).");
+                : "A lista desta obra não traz o código dos capítulos: cada um pede à API" + (cfg.fast ? " (lotes de " + batchSize() + ")." : " (1 por minuto)."));
         }
         long added = 0, skipped = 0, tried = 0;
         boolean failed = true;
         try {
-            for (int i = 0; i < pending.size(); i += PER_SEND) {
+            int per = batchSize();
+            for (int i = 0; i < pending.size(); i += per) {
                 holdIfNeeded();
                 pairWait();
                 long batchStart = clock.now();
-                List<Long> group = pending.subList(i, Math.min(pending.size(), i + PER_SEND));
+                List<Long> group = pending.subList(i, Math.min(pending.size(), i + per));
+                inBatch = true;
                 emit("sending", "from", tried + 1, "to", tried + group.size(), "total", total);
                 List<Map<String, Object>> chapters = new ArrayList<>();
                 for (int k = 0; k < group.size(); k++) {
@@ -812,6 +850,7 @@ final class EnvioEngine {
                         log("Capítulo " + capId + ": " + e.getMessage());
                     }
                 }
+                inBatch = false;
                 tried += group.size();
                 skipped += group.size() - chapters.size();
                 if (!chapters.isEmpty()) {
@@ -820,9 +859,9 @@ final class EnvioEngine {
                     added += count(r, "added");
                     skipped += count(r, "skipped");
                 }
-                synchronized (pace) {
-                    // No máximo 5 capítulos a cada 1 min 12 s, contados do começo do lote: quando buscar o lote já
-                    // levou mais que isso (1 pedido à API por minuto), o próximo sai na hora, sem espera extra.
+                if (cfg.fast) batchDone();
+                else synchronized (pace) {
+                    // Segura: no máximo 5 capítulos a cada 1 min 12 s, contados do começo do lote.
                     lastPair = batchStart;
                     savePace();
                 }
@@ -899,10 +938,12 @@ final class EnvioEngine {
                 if (pending.contains(c)) todo.add(c);
                 else { already++; emit("chapter-state", "id", id, "capId", c, "state", "site"); }
             }
-            for (int i = 0; i < todo.size(); i += PER_SEND) {
+            int per = batchSize();
+            for (int i = 0; i < todo.size(); i += per) {
                 pairWait();
                 long batchStart = clock.now();
-                List<Long> group = todo.subList(i, Math.min(todo.size(), i + PER_SEND));
+                List<Long> group = todo.subList(i, Math.min(todo.size(), i + per));
+                inBatch = true;
                 for (Long c : group) emit("chapter-state", "id", id, "capId", c, "state", "sending");
                 emit("sending", "from", i + 1, "to", i + group.size(), "total", todo.size());
                 List<Map<String, Object>> chapters = new ArrayList<>();
@@ -928,7 +969,9 @@ final class EnvioEngine {
                     // O site responde em conjunto; quem falhou aparece na conferência do fim.
                     for (Map<String, Object> c : chapters) emit("chapter-state", "id", id, "capId", c.get("capId"), "state", sk > 0 ? "check" : "site");
                 }
-                synchronized (pace) {
+                inBatch = false;
+                if (cfg.fast) batchDone();
+                else synchronized (pace) {
                     lastPair = batchStart;
                     savePace();
                 }
@@ -1028,6 +1071,7 @@ final class EnvioEngine {
      * esse nome, liga o pedido a ela (vai para a fila com prioridade). Os outros ficam para o admin escolher.
      */
     private int autoRequests() throws Soft {
+        inBatch = false;
         Map<String, Object> r = site(Json.map("action", "requests"));
         List<Object> groups = Json.arr(r.get("groups"));
         if (groups == null) return 0;
@@ -1106,6 +1150,7 @@ final class EnvioEngine {
     }
 
     private void scanLists(boolean discover, Map<Long, String> seen, Map<Long, String> updates) throws Soft {
+        inBatch = false;
         Map<Long, Map<String, Object>> found = new LinkedHashMap<>();
         for (Map<String, Object> o : listOf(mediocre(true, "/obras/atualizadas-recentes"))) {
             Long id = workIdOf(o);
