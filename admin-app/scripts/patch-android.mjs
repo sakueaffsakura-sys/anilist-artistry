@@ -144,6 +144,10 @@ if (!m.includes(".EnvioService")) {
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Envio contínuo de capítulos ao site, escolhido pelo usuário, com notificação e botão Parar." />
         </service>\n    </application>`);
 }
+if (!m.includes(".EnvioWatch")) {
+  // Vigia do automático (JobScheduler, só com internet): religa o envio se o Android encerrar o serviço.
+  m = m.replace("</application>", `        <service android:name=".EnvioWatch" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="false" />\n    </application>`);
+}
 if (!m.includes(".EnvioBoot")) {
   // Religa o automático depois de reiniciar o celular ou atualizar o app (só se ele estava ligado).
   m = m.replace("</application>", `        <receiver android:name=".EnvioBoot" android:exported="true">
@@ -157,5 +161,5 @@ if (!m.includes(".EnvioBoot")) {
 writeFileSync(manifestPath, m);
 
 if (!m.includes("FOREGROUND_SERVICE_SPECIAL_USE") || !m.includes("specialUse")) throw new Error("Manifesto sem o serviço de uso especial");
-if (!m.includes(".EnvioBoot") || !m.includes("RECEIVE_BOOT_COMPLETED")) throw new Error("Manifesto sem o religamento do automático");
+if (!m.includes(".EnvioBoot") || !m.includes(".EnvioWatch") || !m.includes("RECEIVE_BOOT_COMPLETED")) throw new Error("Manifesto sem o religamento do automático");
 console.log(`Android ajustado: versão 1.${build}, motor de envio nativo em primeiro plano.`);

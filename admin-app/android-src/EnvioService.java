@@ -197,6 +197,12 @@ public class EnvioService extends Service {
         c.paceApi = p[0];
         c.pacePair = p[1];
         c.paceLock = p[2];
+        long[] sp = store.loadSpeed();
+        c.speedGap = sp[0];
+        c.speedMin = sp[1];
+        c.speedMinUntil = sp[2];
+        // Automático: um vigia do Android religa o serviço quando houver internet, se ele for encerrado.
+        if ("auto".equals(Json.str(job.get("type")))) EnvioWatch.schedule(this);
         final EnvioEngine e = new EnvioEngine(c, new HttpConn(null), new HttpConn(null), CLOCK, host);
         engine = e;
         jsMode = false;
@@ -242,7 +248,12 @@ public class EnvioService extends Service {
         } catch (Throwable t) {
             emitLocal("run-error", "message", "Erro inesperado no envio (" + t.getClass().getSimpleName() + ").", "works", 0, "added", 0);
         } finally {
-            store.clearJob();
+            // O automático só sai da memória quando o admin desliga; se caiu por erro, o vigia religa.
+            boolean auto = "auto".equals(Json.str(job.get("type")));
+            if (!auto || e.stopRequested()) {
+                store.clearJob();
+                if (auto) EnvioWatch.cancel(this);
+            }
             engine = null;
             finishForeground(endTitle != null ? endTitle : "Envio encerrado", endText != null ? endText : "");
         }
@@ -255,6 +266,7 @@ public class EnvioService extends Service {
         @Override public void moved(String origin) { store.saveSite(origin); }
         @Override public void workDone(int index) { store.advanceJob(index + 1); }
         @Override public EnvioEngine.Device device() { return readDevice(); }
+        @Override public void saveSpeed(long gap, long min, long minUntil) { store.saveSpeed(gap, min, minUntil); }
     };
 
     private void emitLocal(String type, Object... kv) {
@@ -330,6 +342,8 @@ public class EnvioService extends Service {
                 workName = "Modo automático";
                 text = "Olhando as listas da MediocreScan e os pedidos…";
                 break;
+            case "speed":
+                return;
             case "auto-idle":
                 workName = "Modo automático";
                 done = 0;

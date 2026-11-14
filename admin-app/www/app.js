@@ -12,7 +12,10 @@
   const el = (tag, props, ...kids) => { const n = Object.assign(document.createElement(tag), props || {}); kids.forEach((k) => k != null && n.append(k)); return n; };
   const load = () => { try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch (_) { return {}; } };
   let state = Object.assign({ site: DEFAULT_SITE, token: "", session: null, font: 17 }, load());
-  state.auto = Object.assign({ on: false, discover: true, requests: true, wifiOnly: false, chargingOnly: false, firstPass: 10 }, state.auto || {});
+  state.auto = Object.assign({ on: true, discover: true, requests: true, wifiOnly: false, chargingOnly: false, firstPass: 10 }, state.auto || {});
+  // Versão 2: o automático fica sempre ligado (liga sozinho com internet); só desliga se o admin desligar.
+  if (!state.auto.v || state.auto.v < 2) { state.auto.on = true; state.auto.v = 2; }
+  if (state.speed !== "safe") state.speed = "max";
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (_) { /* sem armazenamento */ } };
   const host = (url) => { try { return new URL(url).host; } catch (_) { return url; } };
   /** 1234 → "1,2 mil" (mesmo jeito do site). */
@@ -117,7 +120,7 @@
   function busy() { return engine.running || nativeRunning; }
   /** O serviço está no modo automático (fica ligado e decide sozinho o que enviar). */
   const autoRunning = () => nativeRunning && jobType === "auto";
-  const nativeConfig = () => ({ site: state.site || DEFAULT_SITE, token: state.token, session: state.session, supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY });
+  const nativeConfig = () => ({ site: state.site || DEFAULT_SITE, token: state.token, session: state.session, supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY, speed: state.speed });
   async function nativeApiFetch(url) {
     const r = await Native.mediocreGet({ path: url.slice(API_ORIGIN.length), token: state.token });
     const body = typeof r.body === "string" ? r.body : "";
@@ -388,7 +391,7 @@
       el("div", {}, el("strong", { textContent: String(asked) }), el("span", { textContent: "pedidas" })),
       el("div", {}, el("strong", { textContent: String(running) }), el("span", { textContent: "em envio" }))));
     const known = items.reduce((n, i) => n + (i.chapters_remaining > 0 ? i.chapters_remaining : 0), 0), rate = ratePerHour();
-    const order = state.auto.firstPass > 0 ? `Ordem: pedidas por leitores, depois os primeiros ${state.auto.firstPass} capítulos de cada obra nova, depois o resto.` : "Ordem: pedidas por leitores primeiro, depois a ordem de chegada.";
+    const order = `Ordem do automático: pedidas por leitores, depois obras do site que ganharam capítulos na MediocreScan, depois ${state.auto.firstPass > 0 ? `os primeiros ${state.auto.firstPass} capítulos de cada obra nova e então o resto` : "a ordem de chegada"}.`;
     const more = totalAll > items.length ? ` Mostrando as ${items.length} primeiras de ${totalAll.toLocaleString("pt-BR")}.` : "";
     $("groups").append(el("p", { className: "list-meta" }, document.createTextNode(order + more + (known ? ` Faltam ${known.toLocaleString("pt-BR")} capítulos nas obras já começadas${rate ? ` (~${Math.max(1, Math.round(known / rate))} h no ritmo atual)` : ""}.` : ""))));
     const clear = el("button", { type: "button", className: "btn ghost small", textContent: "Esvaziar a fila" });
@@ -990,6 +993,7 @@
         }
         $("run-queue").textContent = `${e.count} obra(s) na vez`; if (typeof e.count === "number") queueLeft = e.count; break;
       case "auto-scan": clearInterval(countdown); autoInfo.idle = false; autoInfo.scanning = true; autoInfo.hold = null; setStatus("Olhando as listas da MediocreScan e os pedidos dos leitores…"); renderAuto(); break;
+      case "speed": autoInfo.perMin = Number(e.perMin) || 0; autoInfo.fast = e.fast !== false; renderAuto(); break;
       case "auto-pick": autoInfo.pick = { id: e.id, source: e.source, priority: Number(e.priority) || 0, limit: Number(e.limit) || 0 }; autoInfo.idle = false; autoInfo.scanning = false; autoInfo.hold = null; break;
       case "auto-hold":
         clearInterval(countdown); autoInfo.hold = e.reason; setStatus(holdText(e.reason), true); renderAuto();
@@ -1075,7 +1079,11 @@
           restartAuto = false; finishRun("Religando o automático com as opções novas…", false, true, at);
           setTimeout(() => { if (!busy()) startAuto(true); }, 400); break;
         }
-        if (e.auto) { finishRun(`Automático desligado. ${e.added} capítulo(s) enviados desde que ligou.`, false, quiet, at); break; }
+        if (e.auto) {
+          // Desligado pelo admin (aqui ou no Parar da notificação): fica desligado até ligar de novo.
+          if (state.auto.on) { state.auto.on = false; save(); }
+          finishRun(`Automático desligado. ${e.added} capítulo(s) enviados desde que ligou.`, false, quiet, at); break;
+        }
         finishRun(`Envio parado. ${e.added} capítulo(s) enviados. A obra atual continua de onde parou na próxima vez.`, false, quiet, at); break;
       case "run-error":
         if (e.auto) { state.auto.on = false; save(); finishRun(`Automático parou: ${e.message}`, true, quiet, at); break; }
@@ -1177,12 +1185,13 @@
     if (typeof requests === "number") $("n-requests").textContent = String(requests);
     $("n-queue-sub").textContent = queueAsked ? `${queueAsked} pedida${queueAsked === 1 ? "" : "s"} por leitores` : "obras esperando";
   }
-  const AUTO_OFF_TEXT = "Ligue e deixe o celular carregando: o app envia a fila do site, busca capítulos novos das obras do site e atende pedidos sozinho.";
+  const AUTO_OFF_TEXT = "Você desligou o automático. Ligado, ele fica sempre ativo: liga sozinho com internet, envia a fila do site, atualiza as obras que ganharam capítulos e atende pedidos.";
   /** O que falta para o automático seguir, em uma frase. */
   const holdText = (r) => /wi-?fi/i.test(r) ? "Nos dados móveis ele espera. Continua sozinho quando o Wi-Fi voltar."
     : /carregador/i.test(r) ? "Continua sozinho quando o celular for para o carregador."
     : /internet/i.test(r) ? "Continua sozinho quando a internet voltar."
     : /bateria/i.test(r) ? "Continua sozinho no carregador ou com a bateria acima de 15%."
+    : /^precisa de você/i.test(r) ? `${r.replace(/^precisa de você:\s*/i, "")} Corrija em Ajustes; o automático tenta de novo a cada 30 min.`
     : "Continua sozinho quando der.";
   const PICK_TEXT = { fila: "Da fila do site", atualizada: "Ganhou capítulos na MediocreScan", conferencia: "Conferência de rotina" };
   const pickText = (p) => p.priority > 0 ? `Pedida por ${readers(p.priority)}` : p.limit > 0 ? `Obra nova: primeiros ${p.limit} capítulos` : PICK_TEXT[p.source] || "";
@@ -1197,7 +1206,7 @@
     sw.disabled = other || !NATIVE;
     $("auto-label").textContent = on ? (autoInfo.since ? `Automático ligado desde ${hhmm(autoInfo.since)}` : "Automático ligado") : "Modo automático";
     $("auto-title").textContent = !on ? (other ? "Outro envio rodando" : "Desligado")
-      : hold ? hold : autoInfo.idle ? "Tudo em dia" : autoInfo.scanning ? "Procurando novidades" : sending ? "Enviando" : "Ligado";
+      : hold ? (/^precisa de você/i.test(hold) ? "Precisa de você" : hold) : autoInfo.idle ? "Tudo em dia" : autoInfo.scanning ? "Procurando novidades" : sending ? "Enviando" : "Ligado";
     if (!on) {
       const t = $("auto-text"); t.classList.remove("pause");
       t.textContent = !NATIVE ? "O modo automático funciona no app do Android (com o envio em segundo plano)." : other ? "Quando o envio atual terminar, você pode ligar o automático." : AUTO_OFF_TEXT;
@@ -1228,7 +1237,8 @@
     }
     $("sender").classList.toggle("auto", on);
     const rate = ratePerHour();
-    $("auto-rate").textContent = on && rate ? `~${rate} capítulos por hora` : "";
+    const speed = autoInfo.perMin ? `até ${autoInfo.perMin}/min` : "";
+    $("auto-rate").textContent = on ? [speed, rate ? `~${rate}/h feitos` : ""].filter(Boolean).join(" · ") : "";
     $("q-send").hidden = busy() || !(Number($("n-queue").textContent) > 0);
   }
   /** Quanto falta da obra atual, pelo ritmo medido desde que ela começou. */
@@ -1392,8 +1402,21 @@
     $("account").textContent = state.session && state.session.mode === "email" ? `Conectado como ${state.session.email}.` : "Conectado com código do painel.";
     $("app-version").textContent = `Versão ${window.BM_VERSION || "de teste"}. Envio ${NATIVE ? "nativo: continua com o app fechado" : "pela tela"}; no máximo 5 capítulos a cada 1 min 12 s e 1 pedido por minuto à API.`;
     $("open-battery").hidden = $("battery-hint").hidden = !NATIVE;
-    renderAutoSwitches();
+    renderAutoSwitches(); renderSpeed();
   }
+  function renderSpeed() {
+    document.querySelectorAll("[data-speed]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.speed === state.speed)));
+    $("speed-hint").textContent = state.speed === "max"
+      ? "Começa com folga e acelera até 15 capítulos por minuto enquanto a MediocreScan aceitar. Na primeira recusa desacelera sozinho e não volta àquele ritmo por 6 h."
+      : "1 pedido por minuto à MediocreScan e 5 capítulos a cada 1 min 12 s (o ritmo antigo, sem risco de bloqueio).";
+  }
+  /** Religa o que estiver rodando no automático para valer a configuração nova. */
+  function applyToAuto(msg) {
+    if (autoRunning() && NATIVE) { restartAuto = true; Native.stopJob().catch(() => {}); toast(msg || "Aplicando: o automático religa com a configuração nova."); }
+  }
+  document.querySelectorAll("[data-speed]").forEach((b) => {
+    b.onclick = () => { state.speed = b.dataset.speed; save(); renderSpeed(); applyToAuto(); };
+  });
   function renderAutoSwitches() {
     document.querySelectorAll("[data-auto]").forEach((sw) => {
       const k = sw.dataset.auto, on = k === "firstPass" ? state.auto.firstPass > 0 : Boolean(state.auto[k]);
@@ -1407,14 +1430,15 @@
       if (k === "firstPass") state.auto.firstPass = state.auto.firstPass > 0 ? 0 : 10; else state.auto[k] = !state.auto[k];
       save(); renderAutoSwitches();
       // Com o automático ligado, religa com as opções novas (ele termina o passo atual antes).
-      if (autoRunning() && NATIVE) { restartAuto = true; Native.stopJob().catch(() => {}); toast("Aplicando: o automático religa com as opções novas."); }
+      applyToAuto();
     };
   });
   $("open-battery").onclick = () => { if (Native) Native.openAppSettings().catch(() => toast("Abra Configurações → Aplicativos → BM Estúdio → Bateria.")); };
   $("form-settings").onsubmit = (e) => {
     e.preventDefault();
     state.token = $("token").value.trim(); state.site = normalizeSite($("site-url-2").value) || DEFAULT_SITE;
-    save(); $("token-card").hidden = Boolean(state.token); $("who").textContent = whoText(); toast("Ajustes salvos.");
+    save(); $("token-card").hidden = Boolean(state.token); $("who").textContent = whoText();
+    if (autoRunning()) applyToAuto("Ajustes salvos: o automático religa com a chave nova."); else toast("Ajustes salvos.");
   };
   $("logout").onclick = () => {
     if (busy()) { toast("Pare o envio antes de sair."); return; }

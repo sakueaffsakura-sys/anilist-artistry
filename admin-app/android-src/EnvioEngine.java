@@ -38,8 +38,24 @@ final class EnvioEngine {
     static final int SITE_TIMEOUT_MS = 120_000;
     static final long PACE_FRESH_MS = 10 * 60_000L;
 
-    /* Modo automático: de quanto em quanto tempo olha as listas da MediocreScan e os pedidos. */
-    static final long AUTO_CYCLE_MS = 20 * 60_000L;
+    /* Velocidade máxima (opção "Máxima"): mira 15 capítulos por minuto e se ajusta sozinha. */
+    /** Menor intervalo entre pedidos à API (15 por minuto). */
+    static final long FAST_API_FLOOR_MS = 4_000L;
+    /** Intervalo inicial sem histórico: começa com folga e acelera. */
+    static final long FAST_START_MS = 12_000L;
+    /** No máximo 5 capítulos a cada 20 s (15 por minuto). */
+    static final long FAST_PAIR_MS = 20_000L;
+    /** Pedidos aceitos seguidos antes de acelerar um passo (15% mais rápido). */
+    static final int FAST_STEP_OK = 8;
+    /** Depois de uma recusa, não volta a ficar tão rápido por 6 h. */
+    static final long FAST_MEMORY_MS = 6 * 3600_000L;
+
+    /* Modo automático: de quanto em quanto tempo olha as obras atualizadas na MediocreScan (1 pedido à API). */
+    static final long AUTO_CYCLE_MS = 10 * 60_000L;
+    /** De quanto em quanto tempo procura obras novas e liga pedidos de leitores. */
+    static final long AUTO_DISCOVER_MS = 30 * 60_000L;
+    /** Espera antes de tentar de novo quando algo precisa do admin (chave recusada, sessão encerrada). */
+    static final long AUTO_FATAL_RETRY_MS = 30 * 60_000L;
     /** Obras do site conferidas por ciclo, das que estão há mais tempo sem conferir. */
     static final int AUTO_ROUND_ROBIN = 4;
     /** Pedidos de leitores procurados na MediocreScan por ciclo (1 pedido à API cada). */
@@ -114,6 +130,8 @@ final class EnvioEngine {
         void workDone(int index);
         /** Estado do aparelho para as condições do automático (null = não sabe; nada segura o envio). */
         default Device device() { return null; }
+        /** Guarda a velocidade aprendida (intervalo atual, intervalo mínimo e até quando ele vale). */
+        default void saveSpeed(long gap, long min, long minUntil) { }
     }
 
     /** Rede e bateria no momento. */
@@ -193,6 +211,11 @@ final class EnvioEngine {
         long paceApi = -1;
         long pacePair = -1;
         long paceLock = -1;
+        /** "max" (padrão): até 15 capítulos por minuto, ajustando sozinho; "safe": 1 pedido por minuto. */
+        boolean fast = true;
+        long speedGap = -1;
+        long speedMin = -1;
+        long speedMinUntil = -1;
 
         static Config from(Object v) {
             Map<String, Object> m = Json.obj(v);
@@ -203,6 +226,7 @@ final class EnvioEngine {
             c.supabaseUrl = Json.str(m.get("supabaseUrl"));
             c.supabaseKey = Json.str(m.get("supabaseKey"));
             c.session = Session.from(m.get("session"));
+            c.fast = !"safe".equals(Json.str(m.get("speed")));
             return c;
         }
 
@@ -214,6 +238,7 @@ final class EnvioEngine {
             m.put("supabaseKey", supabaseKey);
             Session s = session;
             m.put("session", s == null ? null : s.toMap());
+            m.put("speed", fast ? "max" : "safe");
             return m;
         }
     }
@@ -254,6 +279,11 @@ final class EnvioEngine {
     private long lastLockEnd;
     private int locksInRow;
     private int cdnRefusals;
+    /* Velocidade aprendida (modo "Máxima"). */
+    private long apiGap = FAST_START_MS;
+    private long minGap = -1;
+    private long minGapUntil = -1;
+    private int okStreak;
 
     EnvioEngine(Config cfg, Http http, Http uiHttp, Clock clock, Host host) {
         this.cfg = cfg;
@@ -265,6 +295,45 @@ final class EnvioEngine {
         lastApi = fresh(cfg.paceApi, now);
         lastPair = fresh(cfg.pacePair, now);
         lastLockEnd = fresh(cfg.paceLock, now);
+        if (cfg.speedGap >= FAST_API_FLOOR_MS && cfg.speedGap <= API_GAP_MS) apiGap = cfg.speedGap;
+        if (cfg.speedMinUntil > now) { minGap = cfg.speedMin; minGapUntil = cfg.speedMinUntil; }
+        if (minGapUntil > now && apiGap < minGap) apiGap = minGap;
+    }
+
+    /** Intervalo atual entre pedidos à API. */
+    long apiGapMs() { return cfg.fast ? apiGap : API_GAP_MS; }
+
+    /** Capítulos por minuto que o ritmo atual permite (pela API, que é o limite quando a obra não traz o código). */
+    int perMinute() {
+        long gap = apiGapMs();
+        long pair = cfg.fast ? FAST_PAIR_MS : WAIT_MS;
+        return (int) Math.max(1, Math.min(60_000L / gap, PER_SEND * 60_000L / pair));
+    }
+
+    private void emitSpeed() {
+        emit("speed", "perMin", perMinute(), "gapMs", apiGapMs(), "fast", cfg.fast);
+        try { host.saveSpeed(apiGap, minGap, minGapUntil); } catch (RuntimeException ignored) { /* ok */ }
+    }
+
+    /** Pedido aceito: depois de alguns seguidos, acelera um passo (até 15 por minuto). */
+    private void apiAccepted() {
+        if (!cfg.fast) return;
+        if (++okStreak < FAST_STEP_OK) return;
+        okStreak = 0;
+        long floor = clock.now() < minGapUntil ? Math.max(FAST_API_FLOOR_MS, minGap) : FAST_API_FLOOR_MS;
+        long g = Math.max(floor, apiGap * 85 / 100);
+        if (g < apiGap) { apiGap = g; emitSpeed(); }
+    }
+
+    /** A MediocreScan recusou: desacelera na hora e não volta a esse ritmo por 6 h. */
+    private void apiRefused() {
+        if (!cfg.fast) return;
+        okStreak = 0;
+        minGap = Math.min(API_GAP_MS, Math.max(FAST_API_FLOOR_MS, apiGap * 3 / 2));
+        minGapUntil = clock.now() + FAST_MEMORY_MS;
+        apiGap = Math.min(API_GAP_MS, Math.max(apiGap * 2, minGap));
+        log("A MediocreScan recusou no ritmo atual: o app desacelerou para até " + perMinute() + " capítulo(s) por minuto e acelera de novo aos poucos.");
+        emitSpeed();
     }
 
     private static long fresh(long v, long now) {
@@ -272,6 +341,9 @@ final class EnvioEngine {
     }
 
     boolean isRunning() { return running; }
+
+    /** O admin pediu para parar (botão Parar ou desligou o automático). */
+    boolean stopRequested() { return stop; }
 
     void requestStop() {
         stop = true;
@@ -326,11 +398,11 @@ final class EnvioEngine {
         pause(ms);
     }
 
-    /** 1 min 12 s a cada 5 capítulos: conta do começo do último lote (ou do fim da última pausa por recusa). */
+    /** 5 capítulos por lote: a cada 20 s na velocidade máxima, a cada 1 min 12 s na segura (do começo do último lote). */
     private void pairWait() {
         long mark = Math.max(lastPair, lastLockEnd);
         if (mark < 0) return;
-        long ms = Math.max(0, WAIT_MS - (clock.now() - mark));
+        long ms = Math.max(0, (cfg.fast ? FAST_PAIR_MS : WAIT_MS) - (clock.now() - mark));
         if (ms > 0) {
             emit("waiting", "ms", ms);
             pause(ms);
@@ -356,7 +428,7 @@ final class EnvioEngine {
 
     /** Reserva a vez de falar com a MediocreScan (API: 1 por minuto; CDN: 1,5 s), em qualquer thread. */
     private void slot(boolean api, boolean ui) {
-        long gap = api ? API_GAP_MS : CDN_GAP_MS;
+        long gap = api ? apiGapMs() : CDN_GAP_MS;
         boolean announced = false;
         for (;;) {
             long wait;
@@ -421,11 +493,13 @@ final class EnvioEngine {
                     return null;
                 }
                 String reason = r.status == 429 ? "pedidos demais" : blocked ? "IP bloqueado" : api ? "acesso recusado" : "o CDN recusou as páginas";
+                if (api || blocked) apiRefused();
                 lockPause(reason);
                 continue;
             }
             locksInRow = 0;
             if (!api) cdnRefusals = 0;
+            else apiAccepted();
             if (r.status == 404) return null;
             if (r.status >= 500) {
                 netRetry("da MediocreScan", netFails++, "erro " + r.status);
@@ -715,7 +789,7 @@ final class EnvioEngine {
             int fast = 0;
             for (Long c : pending) { Map<String, Object> e = entries.map.get(c); if (e != null && e.get("cap_uuid") != null) fast++; }
             log(fast > 0 ? fast + " de " + pending.size() + " capítulo(s) vêm direto do CDN (rápido)."
-                : "A lista desta obra não traz o código dos capítulos: cada um pede à API (1 por minuto).");
+                : "A lista desta obra não traz o código dos capítulos: cada um pede à API (" + perMinute() + " por minuto agora).");
         }
         long added = 0, skipped = 0, tried = 0;
         boolean failed = true;
@@ -779,6 +853,7 @@ final class EnvioEngine {
         long totalAdded = 0;
         int done = 0;
         emit("run-start", "count", Math.max(0, works.size() - start));
+        emitSpeed();
         try {
             for (int i = Math.max(0, start); i < works.size(); i++) {
                 checkStop();
@@ -812,6 +887,7 @@ final class EnvioEngine {
         locksInRow = 0;
         long added = 0, skipped = 0, already = 0;
         emit("chapters-start", "id", id, "name", name, "count", capIds.size());
+        emitSpeed();
         try {
             Object work = mediocre(true, "/obras/" + id);
             if (work == null) throw new Fatal("Obra não encontrada na MediocreScan.");
@@ -1002,6 +1078,33 @@ final class EnvioEngine {
      * Olha as listas da MediocreScan: obras do site que aparecem como atualizadas (com novidade desde a última
      * olhada) entram em `updates`; com `discover`, obras que ainda não estão no site vão para a fila.
      */
+    /** Maior número de capítulo que a lista mostra para a obra (capítulos recentes ou campo de último capítulo), ou -1. */
+    static double listLatest(Map<String, Object> o) {
+        double max = -1;
+        List<Object> caps = Json.arr(o.get("capitulos"));
+        if (caps != null) for (Object c : caps) {
+            Map<String, Object> cm = Json.obj(c);
+            Object n = cm == null ? null : cm.get("cap_num") != null ? cm.get("cap_num") : cm.get("numero");
+            double v = number(n);
+            if (v > max) max = v;
+        }
+        for (Map.Entry<String, Object> e : o.entrySet()) {
+            String k = e.getKey().toLowerCase(java.util.Locale.ROOT);
+            if (!(k.contains("ultim") && k.contains("cap")) && !k.equals("cap_num") && !k.contains("total_cap")) continue;
+            Object v = e.getValue();
+            if (v instanceof Map) { Map<String, Object> m = Json.obj(v); v = m == null ? null : m.get("cap_num") != null ? m.get("cap_num") : m.get("numero"); }
+            double d = number(v);
+            if (d > max) max = d;
+        }
+        return max;
+    }
+
+    private static double number(Object v) {
+        if (v instanceof Number) return ((Number) v).doubleValue();
+        if (v instanceof String) { try { return Double.parseDouble(((String) v).trim().replace(',', '.')); } catch (NumberFormatException ignored) { return -1; } }
+        return -1;
+    }
+
     private void scanLists(boolean discover, Map<Long, String> seen, Map<Long, String> updates) throws Soft {
         Map<Long, Map<String, Object>> found = new LinkedHashMap<>();
         for (Map<String, Object> o : listOf(mediocre(true, "/obras/atualizadas-recentes"))) {
@@ -1018,22 +1121,39 @@ final class EnvioEngine {
         if (found.isEmpty()) return;
         List<Long> ids = new ArrayList<>(found.keySet());
         Set<Long> imported = new HashSet<>(), known = new HashSet<>();
+        Map<Long, Double> siteLatest = new HashMap<>();
         for (int i = 0; i < ids.size(); i += 100) {
             Map<String, Object> r = site(Json.map("action", "check", "ids", new ArrayList<>(ids.subList(i, Math.min(ids.size(), i + 100)))));
+            // Último capítulo que o site já tem de cada obra (sites novos mandam; os antigos não).
+            Map<String, Object> latest = Json.obj(r.get("latest"));
+            if (latest != null) for (Map.Entry<String, Object> e : latest.entrySet()) {
+                try { siteLatest.put(Long.parseLong(e.getKey()), number(e.getValue())); } catch (NumberFormatException ignored) { /* ok */ }
+            }
             imported.addAll(longs(r.get("imported")));
             known.addAll(longs(r.get("imported")));
             known.addAll(longs(r.get("queued")));
             known.addAll(longs(r.get("failed")));
         }
-        int news = 0;
+        int news = 0, upToDate = 0;
         for (Long id : updated) {
             if (!imported.contains(id)) continue;
-            String sig = signature(found.get(id));
+            Map<String, Object> entry = found.get(id);
+            String sig = signature(entry);
             String before = seen.put(id, sig);
-            // Primeira vez nesta sessão: confere. Depois, só se a lista mostrar algo diferente.
-            if (before == null || (!sig.isEmpty() && !sig.equals(before))) {
+            double theirs = listLatest(entry);
+            Double ours = siteLatest.get(id);
+            boolean newer;
+            if (theirs >= 0 && ours != null && ours >= 0) {
+                // Dá para comparar: só confere a obra se a MediocreScan tem capítulo depois do último do site.
+                newer = theirs > ours;
+                if (!newer) upToDate++;
+            } else {
+                // Sem números: primeira vez nesta sessão confere; depois, só se a lista mudou.
+                newer = before == null || (!sig.isEmpty() && !sig.equals(before));
+            }
+            if (newer) {
                 if (!updates.containsKey(id)) news++;
-                updates.put(id, workNameOf(found.get(id)));
+                updates.put(id, workNameOf(entry));
             }
         }
         int queued = 0;
@@ -1049,8 +1169,10 @@ final class EnvioEngine {
                 queued = items.size();
             }
         }
-        log("Listas da MediocreScan: " + news + " obra(s) do site com capítulos novos"
-            + (discover ? ", " + queued + " obra(s) nova(s) na fila" : "") + ".");
+        if (news > 0 || queued > 0 || discover) {
+            log("Listas da MediocreScan: " + news + " obra(s) do site com capítulos novos"
+                + (upToDate > 0 ? " (" + upToDate + " já em dia)" : "") + (discover ? ", " + queued + " obra(s) nova(s) na fila" : "") + ".");
+        }
     }
 
     /** Espera até `ms` (ou até o app pedir), avisando a tela de tempos em tempos. */
@@ -1141,10 +1263,10 @@ final class EnvioEngine {
         Map<Long, long[]> fails = new HashMap<>();
         Map<Long, String> seen = new HashMap<>();
         Map<Long, String> updates = new LinkedHashMap<>();
-        long nextScan = 0;
+        long nextScan = 0, nextDiscover = 0;
         int robin = 0;
-        boolean lastWasQueue = false;
         emit("run-start", "count", 0, "auto", true);
+        emitSpeed();
         log("Modo automático ligado: fila do site" + (opts.firstPass > 0 ? " (obras novas primeiro com " + opts.firstPass + " capítulos)" : "")
             + ", obras atualizadas" + (opts.discover ? ", obras novas" : "") + (opts.requests ? " e pedidos de leitores" : "")
             + (opts.wifiOnly ? "; só no Wi-Fi" : "") + (opts.chargingOnly ? "; só carregando" : "") + ".");
@@ -1155,13 +1277,15 @@ final class EnvioEngine {
                 try {
                 holdIfNeeded();
                 if (clock.now() >= nextScan) {
+                    // A cada 10 min: obras do site atualizadas. A cada 30 min: também obras novas e pedidos.
+                    boolean full = clock.now() >= nextDiscover;
                     nextScan = clock.now() + AUTO_CYCLE_MS;
-                    robin = 0;
+                    if (full) { nextDiscover = clock.now() + AUTO_DISCOVER_MS; robin = 0; }
                     emit("auto-scan");
-                    if (opts.requests) {
+                    if (full && opts.requests) {
                         try { autoRequests(); } catch (Soft e) { log("Pedidos: " + e.getMessage()); }
                     }
-                    try { scanLists(opts.discover, seen, updates); } catch (Soft e) { log("Listas da MediocreScan: " + e.getMessage()); }
+                    try { scanLists(full && opts.discover, seen, updates); } catch (Soft e) { log("Listas da MediocreScan: " + e.getMessage()); }
                 }
                 Map<String, Object> plan;
                 try {
@@ -1184,8 +1308,10 @@ final class EnvioEngine {
                 WorkRef next = null;
                 String source = "fila";
                 int limit = 0;
+                // 1) pedida por leitores, ou obra que parou no meio: na ordem do site.
+                // 2) obras do site com capítulos novos na MediocreScan (leitores esperando a continuação).
+                // 3) primeira passada das obras novas. 4) o resto da fila.
                 if (!open.isEmpty()) {
-                    // 1) obra pela metade (parou no meio) ou pedida por leitores: vai inteira, na ordem do site.
                     Long pick = null;
                     for (Long id : open) {
                         Map<String, Object> im = info.get(id);
@@ -1198,23 +1324,26 @@ final class EnvioEngine {
                             break;
                         }
                     }
-                    // 2) primeira passada: obra nova (ainda com poucos capítulos no site) recebe só os primeiros.
-                    if (pick == null && opts.firstPass > 0) {
+                    if (pick == null && !updates.isEmpty()) {
+                        for (Iterator<Map.Entry<Long, String>> it = updates.entrySet().iterator(); it.hasNext() && next == null;) {
+                            Map.Entry<Long, String> u = it.next();
+                            it.remove();
+                            if (!failedOut(fails, u.getKey())) { next = new WorkRef(u.getKey(), u.getValue()); source = "atualizada"; }
+                        }
+                    }
+                    // Primeira passada: obra nova (ainda com poucos capítulos no site) recebe só os primeiros.
+                    if (next == null && pick == null && opts.firstPass > 0) {
                         for (Long id : open) {
                             Map<String, Object> im = info.get(id);
                             long onSite = count(im, "chapters_on_site");
                             if (onSite < opts.firstPass) { pick = id; limit = (int) (opts.firstPass - onSite); break; }
                         }
                     }
-                    // 3) o resto, inteiro, na ordem da fila.
-                    if (pick == null) pick = open.get(0);
-                    Map<String, Object> im = info.get(pick);
-                    next = new WorkRef(pick, im == null ? null : Json.str(im.get("title")));
-                }
-                // Fila grande: obras do site com capítulos novos não ficam esperando; alterna uma da fila, uma atualizada.
-                if (next != null && lastWasQueue && !updates.isEmpty() && count(info.get(next.id), "priority") == 0) {
-                    next = null;
-                    limit = 0;
+                    if (next == null) {
+                        if (pick == null) pick = open.get(0);
+                        Map<String, Object> im = info.get(pick);
+                        next = new WorkRef(pick, im == null ? null : Json.str(im.get("title")));
+                    }
                 }
                 if (next == null) {
                     for (Iterator<Map.Entry<Long, String>> it = updates.entrySet().iterator(); it.hasNext() && next == null;) {
@@ -1232,7 +1361,6 @@ final class EnvioEngine {
                         break;
                     }
                 }
-                lastWasQueue = "fila".equals(source) && next != null;
                 emit("auto-plan", "queue", Math.max(open.size(), count(plan, "queueTotal")), "requests", count(plan, "requestsWaiting"), "updates", updates.size(), "works", done, "added", totalAdded);
                 if (next == null) {
                     idle(nextScan - clock.now(), done, totalAdded);
@@ -1257,6 +1385,13 @@ final class EnvioEngine {
                     log(e.getMessage().replaceFirst("\\. O envio.*$", ".") + " O automático tenta de novo em 15 min.");
                     locksInRow = 0;
                     idle(15 * 60_000L, done, totalAdded);
+                } catch (Fatal e) {
+                    // Chave recusada, sessão encerrada...: o automático não desliga; avisa e tenta de novo depois.
+                    String why = "Precisa de você: " + e.getMessage();
+                    log(why + " O automático tenta de novo em 30 min.");
+                    emit("auto-hold", "reason", why, "since", clock.now());
+                    pause(AUTO_FATAL_RETRY_MS);
+                    emit("resume");
                 }
             }
         } catch (Stopped e) {

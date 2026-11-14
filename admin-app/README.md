@@ -50,6 +50,19 @@ que não está bloqueado) e envia ao site pelo endpoint `/api/public/mediocre-in
   (Ajustes): só no Wi-Fi, só carregando; sempre espera sem internet ou com bateria abaixo de 15% fora do carregador
   (`auto-hold`), entre lotes e entre obras, sem desligar. Obras que falham 2 vezes ficam 6 h de lado. Mudar opção com
   ele ligado religa sozinho. `EnvioBoot` religa o automático guardado quando o celular reinicia ou o APK é atualizado.
+- **Sempre ligado (1.45):** o automático vem ligado e só desliga se o admin desligar (Painel ou Parar da notificação).
+  Erro que precisa do admin (chave recusada, sessão encerrada) vira espera "Precisa de você" com nova tentativa a cada
+  30 min; o trabalho "auto" só sai do celular quando o admin desliga. `EnvioWatch` (JobScheduler, a cada 15 min, só com
+  internet, persistente) religa o serviço se o Android o encerrou; `EnvioBoot` também usa o vigia.
+- **Obras do site atualizadas:** a lista `/obras/atualizadas-recentes` é olhada a cada 10 min (obras novas e pedidos a
+  cada 30 min); `check` devolve `latest` (último capítulo publicado de cada obra no site) e a obra só é conferida se a
+  MediocreScan mostra capítulo depois desse (sem números, usa a assinatura da lista). Ordem: pedidas/pela metade →
+  atualizadas → primeira passada das novas → resto → conferência.
+- **Velocidade (Ajustes):** "Máxima" (padrão) começa com 12 s entre pedidos à API e acelera 15% a cada 8 pedidos aceitos
+  até 4 s (15 capítulos/min; lotes de 5 a cada 20 s). Na primeira recusa (429/403/IP bloqueado) dobra o intervalo e não
+  fica mais rápido que 1,5× o ritmo recusado por 6 h; a velocidade aprendida fica guardada (`speedGap`). "Segura" é o
+  ritmo antigo (1 pedido/min, 5 capítulos a cada 1 min 12 s). Sem o código dos capítulos na lista da obra, cada capítulo
+  custa 1 pedido à API, então o limite real é o que a MediocreScan aceitar.
 - **Ajustes e Histórico** são telas: Ajustes tem as opções do automático, conta/chave/site e bateria; Histórico agrupa
   por dia com filtros (enviados, avisos, pedidos) e o resumo de hoje. "Enviadas hoje" no Painel mostra as capas
   (registros em `bm-estudio-envios`) e o ritmo em capítulos por hora. A fila mostra o total real (`queueTotal`) e
