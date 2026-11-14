@@ -14,6 +14,19 @@ Não publicar o APK 2.17 antes da correção do site e da migration de anúncios
 
 O teste `tests/app-version-response.test.ts` executa o handler com clientes simulados, confirma assinatura pelo cliente privilegiado e proíbe uso do cliente público no Storage. Não substitui download de um APK real.
 
+## Atualização opcional (app 2.87+)
+
+1. Publicar uma versão sem marcar "Exigir esta versão" e com código mínimo abaixo da versão instalada no aparelho.
+2. `/api/public/version?version_code=<instalada>`: esperado `update_required = false`, `update_available = true` e
+   `changes` com as versões publicadas depois da instalada (no máximo 5, da mais nova para a mais antiga, com
+   `version_name`, `notes` e `released_at`).
+3. No app instalado pelo site: o Início mostra "Versão X disponível" com as novidades; "Agora não" esconde o aviso
+   por 3 dias para essa versão, e "Atualizar" baixa o APK. Em Perfil → Sobre aparece o mesmo estado.
+4. No app instalado pela Play Store, o aviso não aparece (a Play cuida das atualizações). "Procurar atualização",
+   em Sobre, abre a página do app na Play.
+
+O teste `tests/app-version-response.test.ts` confere o contrato novo e que os campos antigos continuam iguais.
+
 ## Manutenção
 
 - `/api/public/maintenance` sem sessão: HTTP 200, somente projeção pública.
