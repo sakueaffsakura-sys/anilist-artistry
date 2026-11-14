@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#14151b" />
   <title>Estúdio Better Mangá</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -82,39 +85,65 @@
     <div id="view-panel" class="view" hidden>
       <section id="auto-card" class="auto-card" data-state="off" aria-live="polite">
         <div class="auto-head">
-          <div class="min0">
-            <p class="eyebrow"><span class="pulse" aria-hidden="true"></span>Modo automático</p>
-            <h2 id="auto-title">Desligado</h2>
-          </div>
+          <p class="auto-label"><span class="pulse" aria-hidden="true"></span><span id="auto-label">Modo automático</span></p>
           <button id="auto-toggle" type="button" role="switch" class="switch big" aria-checked="false" aria-label="Modo automático"><span></span></button>
         </div>
+        <h2 id="auto-title">Desligado</h2>
         <p id="auto-text" class="auto-text">Ligue e deixe o celular carregando: o app envia a fila do site, busca capítulos novos das obras do site e atende pedidos sozinho.</p>
-        <div id="auto-bar" class="bar" role="progressbar" aria-label="Capítulos desta obra" aria-valuemin="0" aria-valuemax="100" hidden><span></span></div>
+
+        <div id="auto-now" class="auto-now" hidden>
+          <div id="auto-cover" class="auto-cover" aria-hidden="true"></div>
+          <div class="min0">
+            <p id="auto-work" class="auto-work"></p>
+            <p id="auto-why" class="auto-why"></p>
+            <div id="auto-bar" class="bar" role="progressbar" aria-label="Capítulos desta obra" aria-valuemin="0" aria-valuemax="100"><span></span></div>
+            <p class="auto-progress"><span id="auto-count"></span><span id="auto-eta"></span></p>
+          </div>
+        </div>
+
+        <ol id="auto-cycle" class="cycle" aria-label="Ordem do automático">
+          <li data-step="fila"><span>Fila</span></li>
+          <li data-step="atualizada"><span>Atualizadas</span></li>
+          <li data-step="conferencia"><span>Conferência</span></li>
+          <li data-step="espera"><span>Espera</span></li>
+        </ol>
         <p id="auto-sub" class="auto-sub" hidden></p>
+
         <details class="auto-options">
-          <summary>Como funciona</summary>
-          <ol class="auto-steps">
-            <li><strong>Fila do site</strong> — pedidos de leitores na frente.</li>
-            <li><strong>Obras do site atualizadas</strong> na MediocreScan.</li>
-            <li><strong>Conferência</strong> das obras há mais tempo sem conferir.</li>
-          </ol>
+          <summary>Como funciona e opções</summary>
+          <dl class="cycle-help">
+            <div><dt>Fila</dt><dd>Obras da fila do site, com as pedidas por leitores na frente.</dd></div>
+            <div><dt>Atualizadas</dt><dd>Obras que já estão no site e ganharam capítulos na MediocreScan.</dd></div>
+            <div><dt>Conferência</dt><dd>Até 4 obras do site por vez, das que estão há mais tempo sem conferir.</dd></div>
+            <div><dt>Espera</dt><dd>Sem nada para enviar, espera 20 min e olha de novo.</dd></div>
+          </dl>
           <label class="check"><input type="checkbox" id="auto-discover" /><span>Pôr na fila as obras novas da MediocreScan</span></label>
           <label class="check"><input type="checkbox" id="auto-requests" /><span>Atender pedidos quando só uma obra tem o mesmo nome</span></label>
-          <p class="hint">Olha as listas e os pedidos a cada 20 min. Sem internet ou com a MediocreScan recusando, espera e tenta de novo sozinho.</p>
+          <p class="hint">Sem internet ou com a MediocreScan recusando, o automático espera e tenta de novo sozinho.</p>
         </details>
       </section>
 
       <div class="stats">
-        <button type="button" class="stat" data-go="#/fila"><strong id="n-queue">–</strong><span>na fila</span></button>
-        <button type="button" class="stat" data-go="#/pedidos"><strong id="n-requests">–</strong><span>pedidos</span></button>
-        <div class="stat"><strong id="n-today">0</strong><span>capítulos hoje</span></div>
+        <button type="button" class="stat" data-go="#/fila">
+          <span class="stat-k">Na fila</span><strong id="n-queue">–</strong><span id="n-queue-sub" class="stat-sub">obras esperando</span>
+        </button>
+        <button type="button" class="stat" data-go="#/pedidos">
+          <span class="stat-k">Pedidos</span><strong id="n-requests">–</strong><span class="stat-sub">leitores esperando</span>
+        </button>
+        <div class="stat">
+          <span class="stat-k">Hoje</span><strong id="n-today">0</strong><span id="n-today-sub" class="stat-sub">capítulos enviados</span>
+        </div>
+        <div class="stat">
+          <span class="stat-k">7 dias</span><strong id="n-week">0</strong>
+          <div id="week-bars" class="spark" role="img" aria-label="Capítulos enviados por dia"></div>
+        </div>
       </div>
 
       <div class="section-head">
         <h2 class="caption">Próximas da fila</h2>
-        <button type="button" class="link" data-go="#/fila">Ver fila</button>
+        <button type="button" class="link" data-go="#/fila" id="panel-queue-all">Ver fila</button>
       </div>
-      <ul id="panel-queue" class="site-rows"></ul>
+      <ol id="panel-queue" class="site-rows ranked"></ol>
       <p id="panel-queue-empty" class="empty compact" hidden>Fila vazia. Escolha obras em Explorar ou deixe o automático achar as novas.</p>
       <div class="quick">
         <button id="q-send" type="button" class="btn primary" hidden>Enviar a fila agora</button>
@@ -174,14 +203,18 @@
             <div id="w-badges" class="badges"></div>
             <h1 id="w-title"></h1>
             <p id="w-alt" class="muted small clamp2"></p>
-            <p id="w-meta" class="muted small"></p>
           </div>
         </div>
       </div>
       <div class="work-actions">
         <button id="w-publish" type="button" class="btn primary">Publicar no site</button>
         <button id="w-manage" type="button" class="btn ghost" hidden>Gerenciar</button>
-        <button id="w-json" type="button" class="btn ghost">JSON</button>
+        <button id="w-json" type="button" class="btn ghost square" aria-label="Ver o JSON da obra" title="JSON">{ }</button>
+      </div>
+      <dl id="w-facts" class="facts"></dl>
+      <div id="w-progress" class="site-progress" hidden>
+        <div class="site-progress-head"><strong id="w-site-num"></strong><span id="w-site-pct"></span></div>
+        <div class="bar ok" role="progressbar" aria-label="Capítulos no site" aria-valuemin="0" aria-valuemax="100" id="w-site-bar"><span></span></div>
       </div>
       <p id="w-site" class="site-status"></p>
       <div id="w-tags" class="tags"></div>
@@ -214,10 +247,10 @@
         <img id="m-cover" class="work-cover" alt="" />
         <div class="min0">
           <h1 id="m-title"></h1>
-          <p id="m-meta" class="muted small"></p>
           <p id="m-origin" class="muted small"></p>
         </div>
       </div>
+      <dl id="m-facts" class="facts"></dl>
       <div class="manage-links">
         <a id="m-open" class="btn ghost small" target="_blank" rel="noopener">Abrir no site</a>
         <button id="m-mediocre" type="button" class="btn ghost small" hidden>Ver na MediocreScan</button>

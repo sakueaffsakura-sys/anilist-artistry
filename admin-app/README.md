@@ -34,6 +34,13 @@ que não está bloqueado) e envia ao site pelo endpoint `/api/public/mediocre-in
   manutenção ou recusas seguidas da MediocreScan, espera 15 min e tenta de novo (`Retryable`) em vez de desligar;
   chave recusada ou sessão encerrada desligam. Uma obra que falha 2 vezes fica para depois. Se o Android fechar o
   app com o automático ligado, ele volta sozinho (serviço recriado ou ao abrir o app).
+- **Visual:** mesma identidade do site (tinta, papel, laranja; Sora nos títulos e Manrope no texto, carregadas
+  do Google Fonts, com fonte do sistema sem internet). O cartão do automático é um quadro de mangá (borda de papel,
+  sombra laranja, retícula no canto) com a obra da vez (capa, de onde veio: fila/pedido, atualizada ou conferência,
+  barra, "faltam ~N min" pelo ritmo medido) e a etapa do ciclo marcada. O Painel mostra fila, pedidos, capítulos de
+  hoje e um gráfico dos últimos 7 dias (contados no celular em `bm-estudio-dias`). A obra mostra fatos (formato,
+  status, capítulos, último, ID) e a barra de capítulos no site; a fila é numerada; "No site" mostra capítulos,
+  leituras e nota; pedidos mostram quantos leitores pediram e as observações como balões de fala.
 - **Abas:** Painel, Explorar (Destaques, Atualizadas, Novas, Com IA, Para você, Listas, Leitura da MediocreScan),
   Buscar, Fila e No site. Pedidos dos leitores e configurações ficam no topo.
 

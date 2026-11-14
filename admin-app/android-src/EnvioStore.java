@@ -36,7 +36,7 @@ final class EnvioStore {
     private final ArrayDeque<String> recent = new ArrayDeque<>();
     private long seq;
     private int fileLines;
-    private String lastStart, lastProgress, lastStatus;
+    private String lastPick, lastStart, lastProgress, lastStatus;
 
     static synchronized EnvioStore get(Context context) {
         if (instance == null) instance = new EnvioStore(context.getApplicationContext());
@@ -82,7 +82,9 @@ final class EnvioStore {
         recent.addLast(line);
         if (recent.size() > KEEP_EVENTS) recent.removeFirst();
         String type = String.valueOf(event.get("type"));
-        if ("work-start".equals(type) || "chapters-start".equals(type) || "run-start".equals(type)) { lastStart = line; lastProgress = null; lastStatus = null; }
+        if ("run-start".equals(type) || "chapters-start".equals(type)) lastPick = null;
+        if ("auto-pick".equals(type)) lastPick = line;
+        else if ("work-start".equals(type) || "chapters-start".equals(type) || "run-start".equals(type)) { lastStart = line; lastProgress = null; lastStatus = null; }
         else if ("progress".equals(type)) lastProgress = line;
         else if (isStatus(type)) lastStatus = line;
         writeLine(line);
@@ -144,7 +146,7 @@ final class EnvioStore {
         }
         b.append("],\"snapshot\":[");
         first = true;
-        for (String line : new String[] { lastStart, lastProgress, lastStatus }) {
+        for (String line : new String[] { lastPick, lastStart, lastProgress, lastStatus }) {
             if (line == null) continue;
             if (!first) b.append(',');
             first = false;

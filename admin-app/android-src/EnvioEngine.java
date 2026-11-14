@@ -1053,13 +1053,15 @@ final class EnvioEngine {
                 }
                 List<Long> queue = longs(plan.get("queue"));
                 Map<Long, String> titles = new HashMap<>();
+                Map<Long, Long> priority = new HashMap<>();
                 List<Object> items = Json.arr(plan.get("items"));
                 if (items != null) for (Object io : items) {
                     Map<String, Object> im = Json.obj(io);
                     Long id = im == null ? null : Json.whole(im.get("id"));
-                    if (id != null) titles.put(id, Json.str(im.get("title")));
+                    if (id != null) { titles.put(id, Json.str(im.get("title"))); priority.put(id, count(im, "priority")); }
                 }
                 WorkRef next = null;
+                String source = "fila";
                 int queueLeft = 0;
                 for (Long id : queue) {
                     if (fails.containsKey(id) && fails.get(id) >= AUTO_MAX_FAILS) continue;
@@ -1070,13 +1072,14 @@ final class EnvioEngine {
                     for (Iterator<Map.Entry<Long, String>> it = updates.entrySet().iterator(); it.hasNext() && next == null;) {
                         Map.Entry<Long, String> u = it.next();
                         it.remove();
-                        if (!(fails.containsKey(u.getKey()) && fails.get(u.getKey()) >= AUTO_MAX_FAILS)) next = new WorkRef(u.getKey(), u.getValue());
+                        if (!(fails.containsKey(u.getKey()) && fails.get(u.getKey()) >= AUTO_MAX_FAILS)) { next = new WorkRef(u.getKey(), u.getValue()); source = "atualizada"; }
                     }
                 }
                 if (next == null && robin < AUTO_ROUND_ROBIN) {
                     for (Long id : longs(plan.get("sync"))) {
                         if (fails.containsKey(id) && fails.get(id) >= AUTO_MAX_FAILS) continue;
                         next = new WorkRef(id, null);
+                        source = "conferencia";
                         robin++;
                         break;
                     }
@@ -1086,6 +1089,8 @@ final class EnvioEngine {
                     idle(nextScan - clock.now(), done, totalAdded);
                     continue;
                 }
+                // Diz à tela de onde veio a obra (fila/pedido, atualizada na MediocreScan ou conferência de rotina).
+                emit("auto-pick", "id", next.id, "source", source, "priority", priority.containsKey(next.id) ? priority.get(next.id) : 0L);
                 try {
                     totalAdded += sendWork(next.id, next.title, Math.max(1, queueLeft + updates.size())).added;
                     done++;

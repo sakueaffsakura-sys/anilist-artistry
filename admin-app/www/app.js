@@ -15,6 +15,26 @@
   state.auto = Object.assign({ on: false, discover: true, requests: true }, state.auto || {});
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (_) { /* sem armazenamento */ } };
   const host = (url) => { try { return new URL(url).host; } catch (_) { return url; } };
+  /** 1234 → "1,2 mil" (mesmo jeito do site). */
+  const compact = (n) => {
+    const v = Number(n) || 0;
+    if (v >= 1e6) return `${(v / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`;
+    if (v >= 1e3) return `${(v / 1e3).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil`;
+    return v.toLocaleString("pt-BR");
+  };
+  /** Capa ou, sem capa, um quadro com a inicial do título. */
+  const coverImg = (src, title, cls) => src
+    ? el("img", { src, alt: "", loading: "lazy", className: cls || "" })
+    : el("div", { className: `ph ${cls || ""}`, textContent: String(title || "?").trim().charAt(0).toUpperCase() });
+  /** Lista de fatos (rótulo em cima, valor embaixo) para obra, gerenciamento e fila. */
+  function fillFacts(dl, pairs) {
+    dl.innerHTML = "";
+    pairs.filter((p) => p && p[1] != null && p[1] !== "").forEach(([k, v]) => dl.append(el("div", {}, el("dt", { textContent: k }), el("dd", { textContent: String(v) }))));
+    dl.hidden = !dl.children.length;
+  }
+  /** Capas já vistas (fila, listas, site), para o painel mostrar a obra que o automático está enviando. */
+  const covers = new Map();
+  const rememberCover = (id, src) => { if (id && src) covers.set(Number(id), src); };
 
   /* ---------- conta ---------- */
   async function authRequest(grant, body) {
@@ -334,7 +354,10 @@
     if (s !== "new") cover.append(el("span", { className: `mark ${s}`, textContent: s === "ok" ? "✓" : "Fila", title: s === "ok" ? "Publicada no site" : "Na fila do site" }));
     const flags = [w.isAi ? "IA" : null, w.isOfficial ? "Oficial" : null, w.isNovel ? "Novel" : null].filter(Boolean);
     if (flags.length) cover.append(el("div", { className: "flags" }, ...flags.map((f) => el("span", { className: "flag", textContent: f }))));
-    const b = el("button", { type: "button", className: "card-work" }, cover, el("p", { className: "name", textContent: w.title }));
+    rememberCover(w.id, w.cover);
+    const last = w.chapters.reduce((m, c) => (Number.isFinite(c.numberValue) && c.numberValue > m ? c.numberValue : m), -1);
+    const sub = el("p", { className: "sub" }, w.format ? el("span", { textContent: w.format }) : null, last >= 0 ? el("span", { className: "cap", textContent: `Cap. ${last.toLocaleString("pt-BR")}` }) : null);
+    const b = el("button", { type: "button", className: "card-work" }, cover, el("p", { className: "name", textContent: w.title }), sub.children.length ? sub : null);
     b.dataset.id = String(w.id);
     b.onclick = () => go(`#/obra/${w.id}`);
     return b;
@@ -356,8 +379,13 @@
     rows = items.map((i) => ({ id: i.id, title: i.title || `Obra ${i.id}`, cover: i.cover }));
     items.forEach((i) => marks.queued.add(i.id));
     if (!items.length) { $("list-meta").textContent = ""; empty("A fila do site está vazia."); updateSendAll(); return; }
-    const asked = items.filter((i) => i.priority > 0).length;
-    $("list-meta").textContent = `${items.length} obra(s)${asked ? ` · ${asked} pedida(s) por leitores vão primeiro` : ""}${autoRunning() ? " · o automático envia nesta ordem" : ""}`;
+    const asked = items.filter((i) => i.priority > 0).length, running = items.filter((i) => i.status === "running").length;
+    $("list-meta").textContent = "";
+    $("groups").append(el("div", { className: "queue-summary" },
+      el("div", {}, el("strong", { textContent: String(items.length) }), el("span", { textContent: "na fila" })),
+      el("div", {}, el("strong", { textContent: String(asked) }), el("span", { textContent: "pedidas" })),
+      el("div", {}, el("strong", { textContent: String(running) }), el("span", { textContent: "em envio" }))));
+    $("groups").append(el("p", { className: "list-meta" }, document.createTextNode(autoRunning() ? "O automático envia nesta ordem: pedidas por leitores primeiro." : "Enviadas nesta ordem: pedidas por leitores primeiro.")));
     const clear = el("button", { type: "button", className: "btn ghost small", textContent: "Esvaziar a fila" });
     clear.onclick = async () => {
       if (busy() && !autoRunning()) { toast("Pare o envio antes de mexer na fila."); return; }
@@ -365,14 +393,17 @@
       try { const r = await engine.queueClear(); items.forEach((i) => marks.queued.delete(i.id)); toast(`${r.removed} obra(s) tiradas da fila.`); checkQueueDot(); openTab("fila"); }
       catch (e) { toast(e.message); }
     };
-    const ul = el("ul", { className: "site-rows" });
-    items.forEach((i) => {
+    const ul = el("ol", { className: "site-rows ranked" });
+    items.forEach((i, idx) => {
+      rememberCover(i.id, i.cover);
+      const facts = el("p", { className: "s facts-inline" },
+        el("span", { textContent: `${i.chapters_on_site} no site` }),
+        i.chapters_added ? el("span", { textContent: `+${i.chapters_added} nesta vez` }) : null);
       const info = el("div", { className: "min0" },
-        el("p", { className: "t", textContent: i.title || `Obra ${i.id}` }),
-        el("p", { className: "s", textContent: `${i.chapters_on_site} capítulo(s) no site` }),
-        el("div", {}, i.id === sendingId ? el("span", { className: "pill ok", textContent: "Enviando agora" }) : el("span", { className: `pill ${i.status === "running" ? "hot" : ""}`, textContent: i.status === "running" ? "Em andamento" : "Fila" }),
+        el("p", { className: "t", textContent: i.title || `Obra ${i.id}` }), facts,
+        el("div", {}, i.id === sendingId ? el("span", { className: "pill ok", textContent: "Enviando agora" }) : i.status === "running" ? el("span", { className: "pill hot", textContent: "Em andamento" }) : null,
           i.priority > 0 ? el("span", { className: "pill hot", textContent: `Pedida por ${i.priority} leitor${i.priority === 1 ? "" : "es"}` }) : null));
-      const open = el("button", { type: "button", className: "site-row queue-open" }, i.cover ? el("img", { src: i.cover, alt: "", loading: "lazy" }) : el("div", { className: "ph" }), info);
+      const open = el("button", { type: "button", className: "site-row queue-open" }, el("span", { className: "pos", textContent: String(idx + 1) }), coverImg(i.cover, i.title), info);
       open.onclick = () => go(`#/obra/${i.id}`);
       const remove = el("button", { type: "button", className: "chip-btn del", textContent: "Tirar", title: "Tirar da fila", ariaLabel: `Tirar ${i.title || `obra ${i.id}`} da fila` });
       remove.onclick = async () => {
@@ -383,7 +414,7 @@
       };
       ul.append(el("li", { className: "queue-item" }, open, remove));
     });
-    $("groups").append(el("div", { className: "queue-tools" }, clear), ul);
+    $("groups").append(ul, el("div", { className: "queue-tools" }, clear));
     updateSendAll();
   }
 
@@ -421,7 +452,7 @@
     setView("work", "Obra", true);
     if (!work || work.id !== id) {
       work = null; siteNums = new Set(); siteSeries = null; capState = {}; $("w-title").textContent = "Carregando…"; $("w-chapters").innerHTML = ""; $("w-tags").innerHTML = ""; $("w-badges").innerHTML = "";
-      $("w-desc").textContent = ""; $("w-alt").textContent = ""; $("w-meta").textContent = ""; $("w-site").textContent = ""; $("w-cover").removeAttribute("src"); $("w-banner").style.backgroundImage = "";
+      $("w-desc").textContent = ""; $("w-alt").textContent = ""; $("w-facts").innerHTML = ""; $("w-progress").hidden = true; $("w-site").textContent = ""; $("w-cover").removeAttribute("src"); $("w-banner").style.backgroundImage = "";
       try {
         const r = await engine.work(id); work = r.work; workRaw = r.raw;
         if (!work) throw new Error("Formato da obra não reconhecido. Veja o JSON.");
@@ -441,7 +472,10 @@
     if (w.cover) $("w-cover").src = w.cover;
     $("w-banner").style.backgroundImage = w.banner || w.cover ? `url("${w.banner || w.cover}")` : "";
     $("w-alt").textContent = w.altTitles.join(" · ");
-    $("w-meta").textContent = [w.format, w.status, `${w.chapters.length} capítulos`, `ID ${w.id}`].filter(Boolean).join(" · ");
+    rememberCover(w.id, w.cover);
+    const nums = w.chapters.map((c) => c.numberValue).filter(Number.isFinite);
+    fillFacts($("w-facts"), [["Formato", w.format || "—"], ["Status", w.status || "—"], ["Capítulos", w.chapters.length.toLocaleString("pt-BR")],
+      ["Último", nums.length ? `Cap. ${Math.max(...nums).toLocaleString("pt-BR")}` : "—"], ["ID", w.id]]);
     $("w-badges").innerHTML = "";
     [w.isAi ? "IA" : null, w.isOfficial ? "Oficial" : null, w.isNovel ? "Novel" : null].filter(Boolean).forEach((b) => $("w-badges").append(el("span", { className: "badge hot", textContent: b })));
     $("w-tags").innerHTML = ""; w.tags.forEach((t) => $("w-tags").append(el("span", { textContent: t })));
@@ -524,9 +558,14 @@
     if (autoRunning() && s === "queue") b.disabled = true;
     $("w-manage").hidden = s === "new";
     const total = work.chapters.length, have = work.chapters.filter(onSite).length;
-    $("w-site").textContent = s === "new" && !have
+    const fresh = s === "new" && !have, pct = total ? Math.round((have / total) * 100) : 0;
+    $("w-progress").hidden = fresh || !total;
+    $("w-site-num").textContent = `${have.toLocaleString("pt-BR")} de ${total.toLocaleString("pt-BR")} capítulos no site`;
+    $("w-site-pct").textContent = `${pct}%`;
+    $("w-site-bar").firstElementChild.style.width = `${pct}%`; $("w-site-bar").setAttribute("aria-valuenow", String(pct));
+    $("w-site").textContent = fresh
       ? "Esta obra ainda não está no Better Mangá. Publique tudo ou envie capítulos soltos pelo botão de cada um."
-      : `${have} de ${total} capítulos já estão no site${have < total ? `; faltam ${total - have}. Os que já estão não são enviados de novo.` : ". Está em dia."}`;
+      : have < total ? `Faltam ${total - have}. Os que já estão no site não são enviados de novo.` : "Está em dia com a MediocreScan.";
   }
   $("w-publish").onclick = () => { if (work) startRun([work]); };
   $("w-manage").onclick = async () => {
@@ -565,10 +604,16 @@
   function requestInfo(g) {
     const when = fmtDate(g.first);
     const state = g.queue === "running" ? "Enviando agora" : g.queue === "waiting" ? "Na fila com prioridade" : g.mediocreId ? "Obra escolhida (fora da fila)" : "Esperando você escolher a obra";
-    return [el("h2", {}, el("span", { className: "req-count", textContent: readers(g.count) }), document.createTextNode(g.title)),
-      el("p", { className: "s", textContent: [g.kinds.join(", "), `pedido em ${when}`, g.mediocreId ? `MediocreScan ${g.mediocreId}` : null].filter(Boolean).join(" · ") }),
-      el("span", { className: `pill ${g.mediocreId ? "hot" : "draft"}`, textContent: state }),
-      ...g.notes.map((n) => el("p", { className: "notes", textContent: n }))];
+    const last = g.last && g.last !== g.first ? fmtDate(g.last) : null;
+    const head = el("div", { className: "req-head" },
+      el("div", { className: "req-count", ariaLabel: readers(g.count) }, el("strong", { textContent: String(g.count) }), el("span", { textContent: g.count === 1 ? "leitor" : "leitores" })),
+      el("div", { className: "min0" },
+        el("h2", { textContent: g.title }),
+        el("p", { className: "s", textContent: last ? `Pedida de ${when} a ${last}` : `Pedida em ${when}` }),
+        el("div", {}, ...g.kinds.map((k) => el("span", { className: "pill", textContent: k })),
+          el("span", { className: `pill ${g.queue === "running" ? "ok" : g.mediocreId ? "hot" : "draft"}`, textContent: state }),
+          g.mediocreId ? el("span", { className: "pill", textContent: `ID ${g.mediocreId}` }) : null)));
+    return [head, ...g.notes.map((n) => el("p", { className: "balloon", textContent: n }))];
   }
   function requestCard(g, actions) {
     const card = el("div", { className: "card req-card" }, ...requestInfo(g));
@@ -745,11 +790,18 @@
       w.pinned ? el("span", { className: "pill hot", textContent: "Fixada" }) : null,
       w.in_slider ? el("span", { className: "pill hot", textContent: "Destaque" }) : null,
     ];
+    if (w.source_mediocre_id) rememberCover(w.source_mediocre_id, w.cover_url);
+    const rating = Number(w.rating);
     const info = el("div", { className: "min0" },
       el("p", { className: "t", textContent: w.title }),
-      el("p", { className: "s", textContent: [`${w.chapter_count} capítulos`, w.kind, `atualizada ${fmtDate(w.updated_at)}`].filter(Boolean).join(" · ") }),
+      el("p", { className: "s facts-inline" },
+        el("span", { textContent: `${Number(w.chapter_count || 0).toLocaleString("pt-BR")} cap.` }),
+        w.views ? el("span", { textContent: `${compact(w.views)} leituras` }) : null,
+        rating > 0 ? el("span", { textContent: `nota ${rating.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}` }) : null,
+        w.kind ? el("span", { textContent: w.kind }) : null),
+      el("p", { className: "s", textContent: `Atualizada ${fmtDate(w.updated_at)}` }),
       el("div", {}, ...pills));
-    const b = el("button", { type: "button", className: "site-row" }, w.cover_url ? el("img", { src: w.cover_url, alt: "", loading: "lazy" }) : el("div", { className: "ph" }), info, el("span", { className: "muted", textContent: "›" }));
+    const b = el("button", { type: "button", className: "site-row" }, coverImg(w.cover_url, w.title), info, el("span", { className: "chev", textContent: "›", ariaHidden: "true" }));
     b.onclick = () => go(`#/gerir/${w.id}`);
     return b;
   }
@@ -757,7 +809,7 @@
   let managed = null;
   async function openManage(seriesId) {
     setView("manage", "Gerenciar obra", true);
-    $("m-title").textContent = "Carregando…"; $("m-meta").textContent = ""; $("m-origin").textContent = ""; $("m-chapters").innerHTML = ""; $("m-cover").removeAttribute("src");
+    $("m-title").textContent = "Carregando…"; $("m-facts").innerHTML = ""; $("m-origin").textContent = ""; $("m-chapters").innerHTML = ""; $("m-cover").removeAttribute("src");
     try { const r = await engine.siteWork(seriesId); managed = r; renderManage(); }
     catch (e) { $("m-title").textContent = e.message; }
   }
@@ -765,13 +817,15 @@
     const w = managed.work, chapters = managed.chapters || [];
     $("page-title").textContent = w.title; $("m-title").textContent = w.title;
     if (w.cover_url) $("m-cover").src = w.cover_url;
-    $("m-meta").textContent = [w.kind, w.status, `${w.views ?? 0} visualizações`, `atualizada ${fmtDate(w.updated_at)}`].filter(Boolean).join(" · ");
+    const hidden = chapters.filter((c) => !c.published).length, rating = Number(w.rating);
+    fillFacts($("m-facts"), [["Leituras", compact(w.views ?? 0)], ["Nota", rating > 0 ? rating.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—"],
+      ["Capítulos", hidden ? `${chapters.length} (${hidden} ocultos)` : chapters.length], ["Formato", w.kind || "—"], ["Atualizada", fmtDate(w.updated_at)]]);
     $("m-origin").textContent = w.source_mediocre_id ? `Vinculada à MediocreScan, obra ${w.source_mediocre_id}` : "Obra criada no site (sem vínculo com a MediocreScan).";
     $("m-open").href = `${(state.site || DEFAULT_SITE).replace(/\/+$/, "")}/obra/${encodeURIComponent(w.slug)}`;
     $("m-mediocre").hidden = !w.source_mediocre_id; $("m-sync").hidden = !w.source_mediocre_id || busy();
     document.querySelectorAll("#view-manage .switch").forEach((sw) => { sw.setAttribute("aria-checked", String(Boolean(w[sw.dataset.field]))); sw.disabled = false; });
     const st = $("m-status"); if (![...st.options].some((o) => o.value === w.status)) st.append(el("option", { textContent: w.status })); st.value = w.status;
-    $("m-count").textContent = `${chapters.length} capítulos · ${chapters.filter((c) => !c.published).length} ocultos`;
+    $("m-count").textContent = hidden ? `${chapters.length}, ${hidden} ocultos` : `${chapters.length}`;
     $("m-empty").hidden = chapters.length > 0;
     const ul = $("m-chapters"); ul.innerHTML = "";
     chapters.forEach((c) => {
@@ -931,22 +985,27 @@
     const note2 = (text) => { if (!quiet) log(text, at); };
     switch (e.type) {
       case "run-start":
-        if (e.auto) { $("run-work").textContent = "Modo automático"; $("run-queue").textContent = "Ligado"; setBar(0, 0); setStatus("Olhando a fila do site…"); renderAuto(); break; }
+        if (e.auto) {
+          if (!quiet || !state.auto.since) { state.auto.since = at; save(); }
+          autoInfo.since = state.auto.since;
+          $("run-work").textContent = "Modo automático"; $("run-queue").textContent = "Ligado"; setBar(0, 0); setStatus("Olhando a fila do site…"); renderAuto(); break;
+        }
         $("run-queue").textContent = `${e.count} obra(s) na vez`; if (typeof e.count === "number") queueLeft = e.count; break;
-      case "auto-scan": clearInterval(countdown); setStatus("Olhando as listas da MediocreScan e os pedidos…"); autoInfo.idle = false; renderAuto(); break;
+      case "auto-scan": clearInterval(countdown); autoInfo.idle = false; autoInfo.scanning = true; setStatus("Olhando as listas da MediocreScan e os pedidos dos leitores…"); renderAuto(); break;
+      case "auto-pick": autoInfo.pick = { id: e.id, source: e.source, priority: Number(e.priority) || 0 }; autoInfo.idle = false; autoInfo.scanning = false; break;
       case "auto-plan":
-        autoInfo = Object.assign(autoInfo, { queue: e.queue, updates: e.updates, works: e.works, added: e.added, idle: false });
+        autoInfo = Object.assign(autoInfo, { queue: e.queue, updates: e.updates, works: e.works, added: e.added, idle: false, scanning: false, since: autoInfo.since || state.auto.since || null });
         if (typeof e.requests === "number") setRequestBadge(e.requests);
         setPanelNumbers(e.queue, e.requests); renderAuto();
         break;
       case "auto-idle":
-        autoInfo = Object.assign(autoInfo, { idle: true, works: e.works, added: e.added });
+        autoInfo = Object.assign(autoInfo, { idle: true, scanning: false, works: e.works, added: e.added, since: autoInfo.since || state.auto.since || null });
         $("run-work").textContent = "Modo automático"; $("run-queue").textContent = "Tudo em dia"; setBar(0, 0);
         count(remaining(e), (s) => setStatus(`Nada para enviar agora. Olha de novo em ${mmss(s)}.`)); renderAuto();
         break;
       case "auto-request": checkQueueDot(); break;
       case "work-start":
-        sendingId = e.id;
+        sendingId = e.id; workClock = { id: e.id, at, done: 0 };
         if (typeof e.left === "number") queueLeft = e.left;
         note = { work: e.name, total: e.total, done: 0 };
         if (autoRunning()) { autoInfo.idle = false; renderAuto(); if (!$("view-panel").hidden && !quiet) renderPanelQueue(); }
@@ -961,7 +1020,9 @@
         note2(`${note.work || "Envio"}: buscando capítulos ${e.from}${e.to > e.from ? `–${e.to}` : ""} de ${e.total}.`);
         break;
       case "progress":
-        beatRun(); setBar(e.done, e.total); note.done = e.done; note.total = e.total;
+        beatRun(); note.done = e.done; note.total = e.total; setBar(e.done, e.total);
+        if (!workClock || workClock.id !== e.id) workClock = { id: e.id, at, done: e.done };
+        if (autoRunning()) renderAuto();
         if (typeof e.left === "number") queueLeft = e.left;
         $("run-queue").textContent = `${e.done} de ${e.total} capítulos · ${queueLeft} obra(s) na vez`;
         note2(`${note.work || "Envio"}: ${e.done} de ${e.total} prontos (+${e.added} no site${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}).`);
@@ -1018,6 +1079,7 @@
   }
   function finishRun(text, isError, quiet, at) {
     const wasAuto = jobType === "auto";
+    workClock = null; if (wasAuto) { state.auto.since = null; save(); autoInfo.since = null; }
     clearRun(); sendingId = null; jobType = null; autoInfo.idle = false; setTimeout(renderAuto, 0);
     // O cartão do automático já mostra o resultado: a barra de envio some na hora.
     if (wasAuto) setTimeout(() => { if (!busy()) { $("sender-run").hidden = true; $("sender-idle").hidden = false; updateSendAll(); } }, 0);
@@ -1034,41 +1096,101 @@
   }
 
   /* ---------- painel e modo automático ---------- */
-  let autoInfo = { idle: false, queue: null, updates: 0, works: 0, added: 0 };
-  const TODAY_KEY = "bm-estudio-hoje";
-  const dayOf = (t) => new Date(t || Date.now()).toLocaleDateString("pt-BR");
-  function today() {
-    try { const v = JSON.parse(localStorage.getItem(TODAY_KEY) || "null"); if (v && v.d === dayOf()) return v; } catch (_) { /* recomeça */ }
-    return { d: dayOf(), caps: 0, works: 0 };
+  // step: etapa do ciclo (fila, atualizada, conferencia, espera); pick: de onde veio a obra atual.
+  let autoInfo = { idle: false, scanning: false, queue: null, updates: 0, works: 0, added: 0, since: null, pick: null };
+  let workClock = null; // { id, at, done } para estimar quanto falta da obra atual
+
+  /* Capítulos enviados por dia (contados neste celular), para "Hoje" e "7 dias". */
+  const DAYS_KEY = "bm-estudio-dias";
+  const dayKey = (t) => { const d = new Date(t || Date.now()); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  function days() {
+    let v = {};
+    try { v = JSON.parse(localStorage.getItem(DAYS_KEY) || "{}") || {}; } catch (_) { v = {}; }
+    // Contador antigo (só o dia de hoje), da versão anterior.
+    try {
+      const old = JSON.parse(localStorage.getItem("bm-estudio-hoje") || "null");
+      if (old && old.d === new Date().toLocaleDateString("pt-BR") && !v[dayKey()]) v[dayKey()] = { caps: old.caps || 0, works: old.works || 0 };
+    } catch (_) { /* ok */ }
+    return v;
   }
-  /** Capítulos enviados hoje (contados no celular, a partir dos eventos do envio). */
   function addToday(added, at) {
-    if (dayOf(at) !== dayOf()) return;
-    const v = today(); v.caps += Number(added) || 0; v.works += 1;
-    try { localStorage.setItem(TODAY_KEY, JSON.stringify(v)); } catch (_) { /* ok */ }
-    $("n-today").textContent = String(v.caps);
+    const k = dayKey(at), v = days();
+    const d = v[k] || { caps: 0, works: 0 };
+    d.caps += Number(added) || 0; d.works += 1; v[k] = d;
+    // Guarda só as duas últimas semanas.
+    Object.keys(v).sort().slice(0, -14).forEach((x) => delete v[x]);
+    try { localStorage.setItem(DAYS_KEY, JSON.stringify(v)); localStorage.removeItem("bm-estudio-hoje"); } catch (_) { /* ok */ }
+    renderDays();
   }
+  function renderDays() {
+    const v = days(), t = v[dayKey()] || { caps: 0, works: 0 };
+    $("n-today").textContent = t.caps.toLocaleString("pt-BR");
+    $("n-today-sub").textContent = t.works ? `capítulos em ${t.works} obra${t.works === 1 ? "" : "s"}` : "capítulos enviados";
+    const week = [];
+    for (let i = 6; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); week.push({ d, caps: (v[dayKey(d)] || {}).caps || 0 }); }
+    const max = Math.max(1, ...week.map((x) => x.caps));
+    $("n-week").textContent = week.reduce((n, x) => n + x.caps, 0).toLocaleString("pt-BR");
+    const bars = $("week-bars"); bars.innerHTML = "";
+    week.forEach((x, i) => bars.append(el("span", { className: i === 6 ? "now" : "", title: `${x.d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit" })}: ${x.caps}` }, el("i", { style: `height:${Math.max(x.caps ? 12 : 4, Math.round((x.caps / max) * 100))}%` }))));
+    bars.setAttribute("aria-label", `Capítulos por dia nos últimos 7 dias: ${week.map((x) => x.caps).join(", ")}`);
+  }
+  let queueAsked = 0;
   function setPanelNumbers(queue, requests) {
     if (typeof queue === "number") { $("n-queue").textContent = String(queue); $("queue-dot").hidden = queue <= 0; }
     if (typeof requests === "number") $("n-requests").textContent = String(requests);
+    $("n-queue-sub").textContent = queueAsked ? `${queueAsked} pedida${queueAsked === 1 ? "" : "s"} por leitores` : "obras esperando";
   }
   const AUTO_OFF_TEXT = "Ligue e deixe o celular carregando: o app envia a fila do site, busca capítulos novos das obras do site e atende pedidos sozinho.";
+  const PICK_TEXT = { fila: "Da fila do site", atualizada: "Ganhou capítulos na MediocreScan", conferencia: "Conferência de rotina" };
+  const hhmm = (t) => new Date(t).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   function renderAuto() {
     const on = autoRunning(), other = busy() && !on, sw = $("auto-toggle");
+    const sending = on && !autoInfo.idle && !autoInfo.scanning && sendingId != null;
+    const step = !on ? null : autoInfo.idle ? "espera" : sending ? (autoInfo.pick && autoInfo.pick.source) || "fila" : null;
     $("auto-card").dataset.state = on ? (autoInfo.idle ? "idle" : "work") : other ? "busy" : "off";
     sw.setAttribute("aria-checked", String(on));
     sw.disabled = other || !NATIVE;
-    $("auto-title").textContent = on ? (autoInfo.idle ? "Tudo em dia" : sendingId && note.work ? note.work : "Ligado") : "Desligado";
+    $("auto-label").textContent = on ? (autoInfo.since ? `Automático ligado desde ${hhmm(autoInfo.since)}` : "Automático ligado") : "Modo automático";
+    $("auto-title").textContent = !on ? (other ? "Outro envio rodando" : "Desligado")
+      : autoInfo.idle ? "Tudo em dia" : autoInfo.scanning ? "Procurando novidades" : sending ? "Enviando" : "Ligado";
     if (!on) {
       const t = $("auto-text"); t.classList.remove("pause");
-      t.textContent = !NATIVE ? "O modo automático funciona no app do Android (com o envio em segundo plano)." : other ? "Há um envio rodando. Quando ele terminar, você pode ligar o automático." : AUTO_OFF_TEXT;
-      $("auto-bar").hidden = true;
+      t.textContent = !NATIVE ? "O modo automático funciona no app do Android (com o envio em segundo plano)." : other ? "Quando o envio atual terminar, você pode ligar o automático." : AUTO_OFF_TEXT;
     }
+    // Obra que está indo agora: capa, de onde veio, capítulos e quanto falta.
+    $("auto-now").hidden = !sending;
+    if (sending) {
+      const cov = $("auto-cover"), src = covers.get(Number(sendingId));
+      cov.innerHTML = ""; cov.append(coverImg(src, note.work));
+      $("auto-work").textContent = note.work || `Obra ${sendingId}`;
+      const p = autoInfo.pick && autoInfo.pick.id === sendingId ? autoInfo.pick : null;
+      $("auto-why").textContent = p ? (p.priority > 0 ? `Pedida por ${readers(p.priority)}` : PICK_TEXT[p.source] || "") : "";
+      $("auto-count").textContent = note.total ? `${(note.done || 0).toLocaleString("pt-BR")} de ${note.total.toLocaleString("pt-BR")} capítulos` : "Conferindo capítulos…";
+      $("auto-eta").textContent = eta();
+    }
+    document.querySelectorAll("#auto-cycle li").forEach((li) => {
+      const order = ["fila", "atualizada", "conferencia", "espera"], i = order.indexOf(li.dataset.step), cur = order.indexOf(step);
+      li.className = !on || cur < 0 ? "" : i === cur ? "now" : i < cur ? "past" : "";
+      if (i === cur && on) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
+    });
+    $("auto-cycle").hidden = !on;
     const sub = $("auto-sub");
     sub.hidden = !on;
-    if (on) sub.textContent = [`+${autoInfo.added || 0} capítulo(s) desde que ligou`, `${autoInfo.works || 0} obra(s) conferidas`, autoInfo.updates ? `${autoInfo.updates} atualizada(s) esperando` : null].filter(Boolean).join(" · ");
+    if (on) {
+      const parts = [`${(autoInfo.added || 0).toLocaleString("pt-BR")} capítulo(s) em ${autoInfo.works || 0} obra(s) desde que ligou.`];
+      if (autoInfo.updates) parts.push(`${autoInfo.updates} obra(s) atualizada(s) esperando a vez.`);
+      sub.textContent = parts.join(" ");
+    }
     $("sender").classList.toggle("auto", on);
     $("q-send").hidden = busy() || !(Number($("n-queue").textContent) > 0);
+  }
+  /** Quanto falta da obra atual, pelo ritmo medido desde que ela começou. */
+  function eta() {
+    if (!workClock || !note.total || !note.done || note.done >= note.total) return "";
+    const doneHere = note.done - workClock.done, ms = Date.now() - workClock.at;
+    if (doneHere < 3 || ms < 60_000) return "";
+    const left = Math.round(((note.total - note.done) * ms) / doneHere / 60_000);
+    return left < 1 ? "termina já" : left < 60 ? `faltam ~${left} min` : `faltam ~${Math.floor(left / 60)} h ${String(left % 60).padStart(2, "0")}`;
   }
   async function startAuto(silent) {
     if (!NATIVE) { toast("O modo automático funciona no app do Android."); return; }
@@ -1076,7 +1198,8 @@
     if (busy()) { toast("Espere o envio atual terminar."); return; }
     state.auto.on = true; save();
     if (!silent) await askBattery();
-    $("log").innerHTML = ""; autoInfo = { idle: false, queue: autoInfo.queue, updates: 0, works: 0, added: 0 };
+    $("log").innerHTML = ""; state.auto.since = Date.now(); save();
+    autoInfo = { idle: false, scanning: false, queue: autoInfo.queue, updates: 0, works: 0, added: 0, since: state.auto.since, pick: null };
     const ok = await startNative({ type: "auto", discover: state.auto.discover, requests: state.auto.requests });
     if (!ok) { state.auto.on = false; save(); toast("O Android não deixou ligar o automático. Tente de novo."); }
     else { setStatus("Ligando…"); if (!silent) toast("Automático ligado. Pode minimizar o app."); }
@@ -1094,12 +1217,13 @@
     if (autoRunning()) toast("Vale da próxima vez que ligar o automático.");
   };
   $("auto-discover").onchange = optionChanged; $("auto-requests").onchange = optionChanged;
+  // A estimativa de tempo muda sozinha enquanto a obra é enviada.
+  setInterval(() => { if (autoRunning() && sendingId != null && !$("view-panel").hidden) $("auto-eta").textContent = eta(); }, 30_000);
 
   function openPanel() {
     current = { tab: "painel" }; pickGroup = null;
     setView("panel", "Estúdio", false); navCurrent("painel");
-    $("n-today").textContent = String(today().caps);
-    renderActivity(); renderAuto(); renderPanelQueue();
+    renderDays(); renderActivity(); renderAuto(); renderPanelQueue();
   }
   let panelLoading = false;
   async function renderPanelQueue() {
@@ -1108,35 +1232,43 @@
     try {
       const p = await freshPlan();
       const items = p.items || [];
+      queueAsked = items.filter((i) => i.priority > 0).length;
       setPanelNumbers((p.queue || []).length, Number(p.requestsWaiting) || 0);
       setRequestBadge(Number(p.requestsWaiting) || 0);
       const ul = $("panel-queue"); ul.innerHTML = "";
-      items.slice(0, 3).forEach((i) => {
-        marks.queued.add(i.id);
+      items.slice(0, 4).forEach((i, idx) => {
+        marks.queued.add(i.id); rememberCover(i.id, i.cover);
         const now = i.id === sendingId;
         const info = el("div", { className: "min0" },
           el("p", { className: "t", textContent: i.title || `Obra ${i.id}` }),
-          el("p", { className: "s", textContent: `${i.chapters_on_site} capítulo(s) no site` }),
+          el("p", { className: "s facts-inline" }, el("span", { textContent: `${i.chapters_on_site} no site` }), i.chapters_added ? el("span", { textContent: `+${i.chapters_added} nesta vez` }) : null),
           el("div", {}, now ? el("span", { className: "pill ok", textContent: "Enviando agora" }) : i.status === "running" ? el("span", { className: "pill hot", textContent: "Em andamento" }) : null,
             i.priority > 0 ? el("span", { className: "pill hot", textContent: `Pedida por ${readers(i.priority)}` }) : null));
-        const b = el("button", { type: "button", className: "site-row queue-open" }, i.cover ? el("img", { src: i.cover, alt: "", loading: "lazy" }) : el("div", { className: "ph" }), info);
+        const b = el("button", { type: "button", className: `site-row queue-open${now ? " is-now" : ""}` }, el("span", { className: "pos", textContent: String(idx + 1) }), coverImg(i.cover, i.title), info);
         b.onclick = () => go(`#/obra/${i.id}`);
         ul.append(el("li", {}, b));
       });
-      if (items.length > 3) ul.append(el("li", { className: "more-row" }, el("button", { type: "button", className: "link", textContent: `+ ${items.length - 3} obra(s) na fila`, onclick: () => go("#/fila") })));
+      $("panel-queue-all").textContent = items.length > 4 ? `Ver as ${items.length}` : "Ver fila";
       const e = $("panel-queue-empty"); e.textContent = "Fila vazia. Escolha obras em Explorar ou deixe o automático achar as novas."; e.hidden = items.length > 0;
     } catch (err) {
       const e = $("panel-queue-empty"); e.textContent = err.message; e.hidden = false;
     } finally { panelLoading = false; renderAuto(); }
+  }
+  /** Tipo de cada linha do histórico, para a cor da marca na Atividade. */
+  function activityKind(text) {
+    if (/recus|falha|erro|parou|sem resposta|não foi|manutenção/i.test(text)) return "warn";
+    if (/^pedido|pedido "/i.test(text)) return "req";
+    if (/\+\d+ capítulo|pronto:|criada no site/i.test(text)) return "ok";
+    return "";
   }
   function renderActivity() {
     let lines = [];
     try { lines = JSON.parse(localStorage.getItem(LOG_KEY) || "[]"); } catch (_) { lines = []; }
     const ol = $("panel-log"); ol.innerHTML = "";
     if (!lines.length) { ol.append(el("li", { className: "muted" }, el("span", { textContent: "Nada ainda. O que o app enviar aparece aqui." }))); return; }
-    lines.slice(0, 6).forEach((l) => {
-      const m = /^(\S+) (\S+) (.*)$/.exec(l);
-      ol.append(el("li", {}, el("time", { textContent: m ? m[2].slice(0, 5) : "" }), el("span", { textContent: redact(m ? m[3] : l) })));
+    lines.slice(0, 7).forEach((l) => {
+      const m = /^(\S+) (\S+) (.*)$/.exec(l), text = redact(m ? m[3] : l);
+      ol.append(el("li", { className: activityKind(text) }, el("time", { textContent: m ? m[2].slice(0, 5) : "" }), el("span", { textContent: text })));
     });
   }
   $("panel-history").onclick = () => $("open-history").onclick();
