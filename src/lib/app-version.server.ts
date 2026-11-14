@@ -31,6 +31,9 @@ export async function appVersionResponse(request: Request) {
       update_required: installed === null ? null : requiresAppUpdate(installed, minimum),
     }, { headers: { "Cache-Control": "no-store" } });
   } catch {
+    // Site visitors (download notice / app page) just see "no app" while the database is unavailable;
+    // the Android app keeps the 503 so its update check retries.
+    if (new URL(request.url).searchParams.get("site") === "1") return Response.json({ apk_download_url: "" }, { headers: { "Cache-Control": "no-store" } });
     return Response.json({ error: "Não foi possível consultar a atualização. Tente novamente." }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 }

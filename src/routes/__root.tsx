@@ -17,7 +17,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { SupportChat } from "@/components/SupportChat";
 import { supabase } from "@/integrations/supabase/client";
 import { verifyMaintenanceAdmin } from "@/lib/maintenance.functions";
-import { fetchMaintenanceStatus, maintenanceUnavailable } from "@/lib/maintenance-status";
+import { fetchMaintenanceStatus } from "@/lib/maintenance-status";
+import { isEmergencyPath } from "@/lib/emergency";
 import { maintenanceExemptPath } from "@/lib/maintenance-policy";
 import { SessionProvider } from "@/hooks/useAuth";
 import { ProfilesProvider } from "@/hooks/use-profiles";
@@ -25,6 +26,7 @@ import { ProfileGate } from "@/components/ProfilePicker";
 import { ClickSound } from "@/components/ClickSound";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 import { SiteFx } from "@/components/SiteFx";
+import { AppDownloadPrompt } from "@/components/AppDownloadPrompt";
 
 function NotFoundComponent() {
   return (
@@ -94,7 +96,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     if (typeof window === "undefined" || maintenanceExemptPath(location.pathname)) return;
     // Reuse a recent "site open" answer so page changes don't wait on a network check each time.
     if (Date.now() - lastOpenCheck < 30_000) return;
-    const status = await fetchMaintenanceStatus().catch(() => maintenanceUnavailable);
+    const status = await fetchMaintenanceStatus().catch(() => null);
+    // No answer: the database is likely down, so readers go to the emergency copy (it sends them back when it returns).
+    if (!status) throw redirect({ to: "/emergencia" });
     if (!status.enabled) { lastOpenCheck = Date.now(); return; }
     lastOpenCheck = 0;
     const access = await verifyMaintenanceAdmin().catch(() => ({ isAdmin: false }));
@@ -148,7 +152,7 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
-  const maintenancePage = useRouterState({ select: (s) => s.location.pathname === "/manutencao" });
+  const maintenancePage = useRouterState({ select: (s) => s.location.pathname === "/manutencao" || isEmergencyPath(s.location.pathname) });
 
   useEffect(() => {
     if (maintenancePage) return;
@@ -190,6 +194,7 @@ function RootComponent() {
       {maintenancePage ? null : <ProfileGate />}
       <Toaster position="top-center" />
       {maintenancePage ? null : <SupportChat />}
+      {maintenancePage ? null : <AppDownloadPrompt />}
       </ProfilesProvider>
       </SessionProvider>
     </QueryClientProvider>

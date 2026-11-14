@@ -11,7 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AppRouteImport } from './routes/app'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as EmergenciaRouteImport } from './routes/emergencia'
 import { Route as ExcluirContaRouteImport } from './routes/excluir-conta'
 import { Route as ManutencaoRouteImport } from './routes/manutencao'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
@@ -26,6 +28,7 @@ import { Route as AuthenticatedPerfisRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedReelsRouteImport } from './routes/_authenticated/reels'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiVersionRouteImport } from './routes/api/version'
+import { Route as EmergenciaIndexRouteImport } from './routes/emergencia.index'
 import { Route as ListasIndexRouteImport } from './routes/listas/index'
 import { Route as ListasIdRouteImport } from './routes/listas/$id'
 import { Route as MediocreIndexRouteImport } from './routes/mediocre.index'
@@ -47,9 +50,12 @@ import { Route as AuthenticatedAdminPedidosRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminSelosRouteImport } from './routes/_authenticated/admin/selos'
 import { Route as AuthenticatedAdminSuporteRouteImport } from './routes/_authenticated/admin/suporte'
 import { Route as ApiAdminClassificarObrasRouteImport } from './routes/api/admin/classificar-obras'
+import { Route as ApiPublicBackupExportRouteImport } from './routes/api/public/backup-export'
 import { Route as ApiPublicMaintenanceRouteImport } from './routes/api/public/maintenance'
 import { Route as ApiPublicMediocreIngestRouteImport } from './routes/api/public/mediocre-ingest'
 import { Route as ApiPublicVersionRouteImport } from './routes/api/public/version'
+import { Route as EmergenciaLerIdRouteImport } from './routes/emergencia.ler.$id'
+import { Route as EmergenciaObraSlugRouteImport } from './routes/emergencia.obra.$slug'
 import { Route as MediocreCapituloIdRouteImport } from './routes/mediocre.capitulo.$id'
 import { Route as MediocreObraIdRouteImport } from './routes/mediocre.obra.$id'
 import { Route as AuthenticatedObraSlugIndexRouteImport } from './routes/_authenticated/obra/$slug/index'
@@ -66,9 +72,19 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmergenciaRoute = EmergenciaRouteImport.update({
+  id: '/emergencia',
+  path: '/emergencia',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ExcluirContaRoute = ExcluirContaRouteImport.update({
@@ -140,6 +156,11 @@ const ApiVersionRoute = ApiVersionRouteImport.update({
   id: '/api/version',
   path: '/api/version',
   getParentRoute: () => rootRouteImport,
+} as any)
+const EmergenciaIndexRoute = EmergenciaIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => EmergenciaRoute,
 } as any)
 const ListasIndexRoute = ListasIndexRouteImport.update({
   id: '/listas/',
@@ -256,6 +277,11 @@ const ApiAdminClassificarObrasRoute =
     path: '/api/admin/classificar-obras',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicBackupExportRoute = ApiPublicBackupExportRouteImport.update({
+  id: '/api/public/backup-export',
+  path: '/api/public/backup-export',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicMaintenanceRoute = ApiPublicMaintenanceRouteImport.update({
   id: '/api/public/maintenance',
   path: '/api/public/maintenance',
@@ -270,6 +296,16 @@ const ApiPublicVersionRoute = ApiPublicVersionRouteImport.update({
   id: '/api/public/version',
   path: '/api/public/version',
   getParentRoute: () => rootRouteImport,
+} as any)
+const EmergenciaLerIdRoute = EmergenciaLerIdRouteImport.update({
+  id: '/ler/$id',
+  path: '/ler/$id',
+  getParentRoute: () => EmergenciaRoute,
+} as any)
+const EmergenciaObraSlugRoute = EmergenciaObraSlugRouteImport.update({
+  id: '/obra/$slug',
+  path: '/obra/$slug',
+  getParentRoute: () => EmergenciaRoute,
 } as any)
 const MediocreCapituloIdRoute = MediocreCapituloIdRouteImport.update({
   id: '/mediocre/capitulo/$id',
@@ -308,7 +344,9 @@ const ApiPublicJobsMediocreSyncRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
   '/auth': typeof AuthRoute
+  '/emergencia': typeof EmergenciaRouteWithChildren
   '/excluir-conta': typeof ExcluirContaRoute
   '/manutencao': typeof ManutencaoRoute
   '/privacidade': typeof PrivacidadeRoute
@@ -325,6 +363,7 @@ export interface FileRoutesByFullPath {
   '/api/version': typeof ApiVersionRoute
   '/listas/$id': typeof ListasIdRoute
   '/u/$username': typeof UUsernameRoute
+  '/emergencia/': typeof EmergenciaIndexRoute
   '/listas/': typeof ListasIndexRoute
   '/mediocre/': typeof MediocreIndexRoute
   '/admin/$id': typeof AuthenticatedAdminIdRoute
@@ -343,9 +382,12 @@ export interface FileRoutesByFullPath {
   '/admin/selos': typeof AuthenticatedAdminSelosRoute
   '/admin/suporte': typeof AuthenticatedAdminSuporteRoute
   '/api/admin/classificar-obras': typeof ApiAdminClassificarObrasRoute
+  '/api/public/backup-export': typeof ApiPublicBackupExportRoute
   '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
   '/api/public/mediocre-ingest': typeof ApiPublicMediocreIngestRoute
   '/api/public/version': typeof ApiPublicVersionRoute
+  '/emergencia/ler/$id': typeof EmergenciaLerIdRoute
+  '/emergencia/obra/$slug': typeof EmergenciaObraSlugRoute
   '/mediocre/capitulo/$id': typeof MediocreCapituloIdRoute
   '/mediocre/obra/$id': typeof MediocreObraIdRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -356,6 +398,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
   '/auth': typeof AuthRoute
   '/excluir-conta': typeof ExcluirContaRoute
   '/manutencao': typeof ManutencaoRoute
@@ -373,6 +416,7 @@ export interface FileRoutesByTo {
   '/api/version': typeof ApiVersionRoute
   '/listas/$id': typeof ListasIdRoute
   '/u/$username': typeof UUsernameRoute
+  '/emergencia': typeof EmergenciaIndexRoute
   '/listas': typeof ListasIndexRoute
   '/mediocre': typeof MediocreIndexRoute
   '/admin/$id': typeof AuthenticatedAdminIdRoute
@@ -391,9 +435,12 @@ export interface FileRoutesByTo {
   '/admin/selos': typeof AuthenticatedAdminSelosRoute
   '/admin/suporte': typeof AuthenticatedAdminSuporteRoute
   '/api/admin/classificar-obras': typeof ApiAdminClassificarObrasRoute
+  '/api/public/backup-export': typeof ApiPublicBackupExportRoute
   '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
   '/api/public/mediocre-ingest': typeof ApiPublicMediocreIngestRoute
   '/api/public/version': typeof ApiPublicVersionRoute
+  '/emergencia/ler/$id': typeof EmergenciaLerIdRoute
+  '/emergencia/obra/$slug': typeof EmergenciaObraSlugRoute
   '/mediocre/capitulo/$id': typeof MediocreCapituloIdRoute
   '/mediocre/obra/$id': typeof MediocreObraIdRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -406,7 +453,9 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/app': typeof AppRoute
   '/auth': typeof AuthRoute
+  '/emergencia': typeof EmergenciaRouteWithChildren
   '/excluir-conta': typeof ExcluirContaRoute
   '/manutencao': typeof ManutencaoRoute
   '/privacidade': typeof PrivacidadeRoute
@@ -423,6 +472,7 @@ export interface FileRoutesById {
   '/api/version': typeof ApiVersionRoute
   '/listas/$id': typeof ListasIdRoute
   '/u/$username': typeof UUsernameRoute
+  '/emergencia/': typeof EmergenciaIndexRoute
   '/listas/': typeof ListasIndexRoute
   '/mediocre/': typeof MediocreIndexRoute
   '/_authenticated/admin/$id': typeof AuthenticatedAdminIdRoute
@@ -441,9 +491,12 @@ export interface FileRoutesById {
   '/_authenticated/admin/selos': typeof AuthenticatedAdminSelosRoute
   '/_authenticated/admin/suporte': typeof AuthenticatedAdminSuporteRoute
   '/api/admin/classificar-obras': typeof ApiAdminClassificarObrasRoute
+  '/api/public/backup-export': typeof ApiPublicBackupExportRoute
   '/api/public/maintenance': typeof ApiPublicMaintenanceRoute
   '/api/public/mediocre-ingest': typeof ApiPublicMediocreIngestRoute
   '/api/public/version': typeof ApiPublicVersionRoute
+  '/emergencia/ler/$id': typeof EmergenciaLerIdRoute
+  '/emergencia/obra/$slug': typeof EmergenciaObraSlugRoute
   '/mediocre/capitulo/$id': typeof MediocreCapituloIdRoute
   '/mediocre/obra/$id': typeof MediocreObraIdRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -456,7 +509,9 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/app'
     | '/auth'
+    | '/emergencia'
     | '/excluir-conta'
     | '/manutencao'
     | '/privacidade'
@@ -473,6 +528,7 @@ export interface FileRouteTypes {
     | '/api/version'
     | '/listas/$id'
     | '/u/$username'
+    | '/emergencia/'
     | '/listas/'
     | '/mediocre/'
     | '/admin/$id'
@@ -491,9 +547,12 @@ export interface FileRouteTypes {
     | '/admin/selos'
     | '/admin/suporte'
     | '/api/admin/classificar-obras'
+    | '/api/public/backup-export'
     | '/api/public/maintenance'
     | '/api/public/mediocre-ingest'
     | '/api/public/version'
+    | '/emergencia/ler/$id'
+    | '/emergencia/obra/$slug'
     | '/mediocre/capitulo/$id'
     | '/mediocre/obra/$id'
     | '/admin/'
@@ -504,6 +563,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/app'
     | '/auth'
     | '/excluir-conta'
     | '/manutencao'
@@ -521,6 +581,7 @@ export interface FileRouteTypes {
     | '/api/version'
     | '/listas/$id'
     | '/u/$username'
+    | '/emergencia'
     | '/listas'
     | '/mediocre'
     | '/admin/$id'
@@ -539,9 +600,12 @@ export interface FileRouteTypes {
     | '/admin/selos'
     | '/admin/suporte'
     | '/api/admin/classificar-obras'
+    | '/api/public/backup-export'
     | '/api/public/maintenance'
     | '/api/public/mediocre-ingest'
     | '/api/public/version'
+    | '/emergencia/ler/$id'
+    | '/emergencia/obra/$slug'
     | '/mediocre/capitulo/$id'
     | '/mediocre/obra/$id'
     | '/admin'
@@ -553,7 +617,9 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/app'
     | '/auth'
+    | '/emergencia'
     | '/excluir-conta'
     | '/manutencao'
     | '/privacidade'
@@ -570,6 +636,7 @@ export interface FileRouteTypes {
     | '/api/version'
     | '/listas/$id'
     | '/u/$username'
+    | '/emergencia/'
     | '/listas/'
     | '/mediocre/'
     | '/_authenticated/admin/$id'
@@ -588,9 +655,12 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/selos'
     | '/_authenticated/admin/suporte'
     | '/api/admin/classificar-obras'
+    | '/api/public/backup-export'
     | '/api/public/maintenance'
     | '/api/public/mediocre-ingest'
     | '/api/public/version'
+    | '/emergencia/ler/$id'
+    | '/emergencia/obra/$slug'
     | '/mediocre/capitulo/$id'
     | '/mediocre/obra/$id'
     | '/_authenticated/admin/'
@@ -603,7 +673,9 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AppRoute: typeof AppRoute
   AuthRoute: typeof AuthRoute
+  EmergenciaRoute: typeof EmergenciaRouteWithChildren
   ExcluirContaRoute: typeof ExcluirContaRoute
   ManutencaoRoute: typeof ManutencaoRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
@@ -617,6 +689,7 @@ export interface RootRouteChildren {
   ListasIndexRoute: typeof ListasIndexRoute
   MediocreIndexRoute: typeof MediocreIndexRoute
   ApiAdminClassificarObrasRoute: typeof ApiAdminClassificarObrasRoute
+  ApiPublicBackupExportRoute: typeof ApiPublicBackupExportRoute
   ApiPublicMaintenanceRoute: typeof ApiPublicMaintenanceRoute
   ApiPublicMediocreIngestRoute: typeof ApiPublicMediocreIngestRoute
   ApiPublicVersionRoute: typeof ApiPublicVersionRoute
@@ -642,11 +715,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/emergencia': {
+      id: '/emergencia'
+      path: '/emergencia'
+      fullPath: '/emergencia'
+      preLoaderRoute: typeof EmergenciaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/excluir-conta': {
@@ -746,6 +833,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/version'
       preLoaderRoute: typeof ApiVersionRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/emergencia/': {
+      id: '/emergencia/'
+      path: '/'
+      fullPath: '/emergencia/'
+      preLoaderRoute: typeof EmergenciaIndexRouteImport
+      parentRoute: typeof EmergenciaRoute
     }
     '/listas/': {
       id: '/listas/'
@@ -894,6 +988,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminClassificarObrasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/backup-export': {
+      id: '/api/public/backup-export'
+      path: '/api/public/backup-export'
+      fullPath: '/api/public/backup-export'
+      preLoaderRoute: typeof ApiPublicBackupExportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/maintenance': {
       id: '/api/public/maintenance'
       path: '/api/public/maintenance'
@@ -914,6 +1015,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/version'
       preLoaderRoute: typeof ApiPublicVersionRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/emergencia/ler/$id': {
+      id: '/emergencia/ler/$id'
+      path: '/ler/$id'
+      fullPath: '/emergencia/ler/$id'
+      preLoaderRoute: typeof EmergenciaLerIdRouteImport
+      parentRoute: typeof EmergenciaRoute
+    }
+    '/emergencia/obra/$slug': {
+      id: '/emergencia/obra/$slug'
+      path: '/obra/$slug'
+      fullPath: '/emergencia/obra/$slug'
+      preLoaderRoute: typeof EmergenciaObraSlugRouteImport
+      parentRoute: typeof EmergenciaRoute
     }
     '/mediocre/capitulo/$id': {
       id: '/mediocre/capitulo/$id'
@@ -1017,10 +1132,28 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface EmergenciaRouteChildren {
+  EmergenciaIndexRoute: typeof EmergenciaIndexRoute
+  EmergenciaLerIdRoute: typeof EmergenciaLerIdRoute
+  EmergenciaObraSlugRoute: typeof EmergenciaObraSlugRoute
+}
+
+const EmergenciaRouteChildren: EmergenciaRouteChildren = {
+  EmergenciaIndexRoute: EmergenciaIndexRoute,
+  EmergenciaLerIdRoute: EmergenciaLerIdRoute,
+  EmergenciaObraSlugRoute: EmergenciaObraSlugRoute,
+}
+
+const EmergenciaRouteWithChildren = EmergenciaRoute._addFileChildren(
+  EmergenciaRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AppRoute: AppRoute,
   AuthRoute: AuthRoute,
+  EmergenciaRoute: EmergenciaRouteWithChildren,
   ExcluirContaRoute: ExcluirContaRoute,
   ManutencaoRoute: ManutencaoRoute,
   PrivacidadeRoute: PrivacidadeRoute,
@@ -1034,6 +1167,7 @@ const rootRouteChildren: RootRouteChildren = {
   ListasIndexRoute: ListasIndexRoute,
   MediocreIndexRoute: MediocreIndexRoute,
   ApiAdminClassificarObrasRoute: ApiAdminClassificarObrasRoute,
+  ApiPublicBackupExportRoute: ApiPublicBackupExportRoute,
   ApiPublicMaintenanceRoute: ApiPublicMaintenanceRoute,
   ApiPublicMediocreIngestRoute: ApiPublicMediocreIngestRoute,
   ApiPublicVersionRoute: ApiPublicVersionRoute,

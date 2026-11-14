@@ -1,0 +1,63 @@
+name: Cópia de emergência das obras
+
+# Guarda todas as obras e capítulos publicados no branch "copia-obras" deste repositório.
+# Quando o banco do site cai, o site lê essa cópia e as obras continuam no ar em /emergencia.
+# Segredos usados: CODIGO_ENVIO (o mesmo da automação MediocreScan) e, opcional, SITE.
+on:
+  schedule:
+    - cron: "41 * * * *" # a cada hora
+  workflow_dispatch:
+    inputs:
+      completa:
+        description: "Baixar todos os capítulos de novo (corrige capítulos editados)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: obras-copia
+  cancel-in-progress: false
+
+jobs:
+  copiar:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+          path: codigo
+      - name: Abrir a cópia atual
+        env:
+          REPO: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+        run: |
+          if git ls-remote --exit-code --heads "$REPO" copia-obras >/dev/null; then
+            git clone --depth 1 --branch copia-obras "$REPO" copia
+          else
+            mkdir copia && git -C copia init -b copia-obras && git -C copia remote add origin "$REPO"
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Copiar obras do site
+        id: copiar
+        env:
+          CODIGO_ENVIO: ${{ secrets.CODIGO_ENVIO }}
+          SITE: ${{ secrets.SITE }}
+          COMPLETA: ${{ github.event.inputs.completa }}
+          TEMPO_MAXIMO_MIN: "40"
+        run: node codigo/scripts/copia-obras.mjs copia/copia
+      - name: Salvar no branch copia-obras
+        if: steps.copiar.outputs.mudou == 'true'
+        working-directory: copia
+        run: |
+          # Um único commit por vez (sem histórico) para o repositório não crescer a cada hora.
+          git checkout --orphan nova
+          git add -A
+          git -c user.name="Better Mangá" -c user.email="copia@bettermanga.net" commit -q -m "Cópia de emergência $(date -u +%FT%TZ)"
+          git push -f origin nova:copia-obras
+      - name: Endereço da cópia
+        run: |
+          echo "Endereço para o site (COPIA_OBRAS_URL): https://raw.githubusercontent.com/${{ github.repository }}/copia-obras/copia" >> "$GITHUB_STEP_SUMMARY"

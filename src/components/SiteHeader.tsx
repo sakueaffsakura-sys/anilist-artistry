@@ -177,6 +177,7 @@ export function SiteFooter() {
             Falar com o suporte
           </Button>
           <Link to="/auth" className={link}>Entrar ou criar conta</Link>
+          <Link to="/app" className={link}>App Android</Link>
           <Link to="/privacidade" className={link}>Privacidade</Link>
           <Link to="/excluir-conta" className={link}>Excluir conta</Link>
         </div>
