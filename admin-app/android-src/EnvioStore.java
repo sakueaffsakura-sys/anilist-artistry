@@ -36,7 +36,7 @@ final class EnvioStore {
     private final ArrayDeque<String> recent = new ArrayDeque<>();
     private long seq;
     private int fileLines;
-    private String lastPick, lastStart, lastProgress, lastStatus;
+    private String lastSpeed, lastPick, lastStart, lastProgress, lastStatus;
 
     static synchronized EnvioStore get(Context context) {
         if (instance == null) instance = new EnvioStore(context.getApplicationContext());
@@ -83,7 +83,8 @@ final class EnvioStore {
         if (recent.size() > KEEP_EVENTS) recent.removeFirst();
         String type = String.valueOf(event.get("type"));
         if ("run-start".equals(type) || "chapters-start".equals(type)) lastPick = null;
-        if ("auto-pick".equals(type)) lastPick = line;
+        if ("speed".equals(type)) lastSpeed = line;
+        else if ("auto-pick".equals(type)) lastPick = line;
         else if ("work-start".equals(type) || "chapters-start".equals(type) || "run-start".equals(type)) { lastStart = line; lastProgress = null; lastStatus = null; }
         else if ("progress".equals(type)) lastProgress = line;
         else if (isStatus(type)) lastStatus = line;
@@ -146,7 +147,7 @@ final class EnvioStore {
         }
         b.append("],\"snapshot\":[");
         first = true;
-        for (String line : new String[] { lastPick, lastStart, lastProgress, lastStatus }) {
+        for (String line : new String[] { lastSpeed, lastPick, lastStart, lastProgress, lastStatus }) {
             if (line == null) continue;
             if (!first) b.append(',');
             first = false;
@@ -193,6 +194,15 @@ final class EnvioStore {
 
     synchronized void savePace(long api, long pair, long lock) {
         prefs.edit().putLong("paceApi", api).putLong("pacePair", pair).putLong("paceLock", lock).apply();
+    }
+
+    /** Velocidade aprendida no modo "Máxima" (intervalo entre pedidos, mínimo depois de recusa e até quando). */
+    synchronized void saveSpeed(long gap, long min, long minUntil) {
+        prefs.edit().putLong("speedGap", gap).putLong("speedMin", min).putLong("speedMinUntil", minUntil).apply();
+    }
+
+    long[] loadSpeed() {
+        return new long[] { prefs.getLong("speedGap", -1), prefs.getLong("speedMin", -1), prefs.getLong("speedMinUntil", -1) };
     }
 
     long[] loadPace() {

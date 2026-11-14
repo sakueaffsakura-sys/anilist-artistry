@@ -203,16 +203,21 @@ export async function ingestPlan(admin: Admin, syncLimit: number): Promise<{ que
  * Which of these MediocreScan IDs are already on the site, which are actively queued (waiting/running)
  * and which failed in the queue. Finished queue rows no longer count as "queued".
  */
-async function ingestCheck(admin: Admin, ids: number[]): Promise<{ imported: number[]; queued: number[]; failed: number[] }> {
-  if (!ids.length) return { imported: [], queued: [], failed: [] };
+async function ingestCheck(admin: Admin, ids: number[]): Promise<{ imported: number[]; queued: number[]; failed: number[]; latest: Record<string, number> }> {
+  if (!ids.length) return { imported: [], queued: [], failed: [], latest: {} };
   const [{ data: s }, { data: q }] = await Promise.all([
-    admin.from("series").select("source_mediocre_id").in("source_mediocre_id", ids),
+    admin.from("series").select("source_mediocre_id, latest_chapter_number").in("source_mediocre_id", ids),
     admin.from("mediocre_queue").select("obra_id, status").in("obra_id", ids),
   ]);
+  // Last published chapter of each work already on the site: the app only re-checks a work when the
+  // MediocreScan list shows a later one (saves one API request per up-to-date work).
+  const latest: Record<string, number> = {};
+  for (const r of s ?? []) if (r.latest_chapter_number != null) latest[String(r.source_mediocre_id)] = Number(r.latest_chapter_number);
   return {
     imported: (s ?? []).map((r) => Number(r.source_mediocre_id)),
     queued: (q ?? []).filter((r) => r.status === "running" || r.status === "waiting").map((r) => Number(r.obra_id)),
     failed: (q ?? []).filter((r) => r.status === "error").map((r) => Number(r.obra_id)),
+    latest,
   };
 }
 

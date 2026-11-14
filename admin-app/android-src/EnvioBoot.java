@@ -3,7 +3,6 @@ package __PKG__;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
 import java.util.Map;
 
 /**
@@ -20,9 +19,8 @@ public class EnvioBoot extends BroadcastReceiver {
         try {
             Map<String, Object> job = EnvioStore.get(context).loadJob();
             if (job == null || !"auto".equals(Json.str(job.get("type")))) return;
-            Intent i = new Intent(context, EnvioService.class).setAction(EnvioService.ACTION_RESUME);
-            if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(i);
-            else context.startService(i);
+            EnvioWatch.schedule(context);
+            EnvioWatch.wake(context);
         } catch (RuntimeException ignored) {
             // O Android não deixou: o automático volta quando o app for aberto.
         }

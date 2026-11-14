@@ -279,6 +279,15 @@
     <!-- Ajustes -->
     <div id="view-settings" class="view" hidden>
       <section class="set-group">
+        <h2 class="caption">Velocidade</h2>
+        <div class="segmented" role="tablist" aria-label="Velocidade do envio">
+          <button type="button" role="tab" data-speed="max" aria-selected="true">Máxima (até 15/min)</button>
+          <button type="button" role="tab" data-speed="safe" aria-selected="false">Segura (1/min)</button>
+        </div>
+        <p id="speed-hint" class="hint set-note"></p>
+      </section>
+
+      <section class="set-group">
         <h2 class="caption">Automático</h2>
         <ul class="switches">
           <li><div><strong>Obras novas primeiro com 10 capítulos</strong><span>Cada obra nova entra no site logo com os primeiros capítulos. O resto vem depois que as outras novas tiverem os delas. Obras pedidas por leitores vão sempre inteiras.</span></div>
@@ -292,7 +301,7 @@
           <li><div><strong>Só carregando</strong><span>Fora do carregador, o automático espera. Sem esta opção, ele espera só com a bateria abaixo de 15%.</span></div>
             <button type="button" role="switch" class="switch" data-auto="chargingOnly" aria-checked="false" aria-label="Só carregando"><span></span></button></li>
         </ul>
-        <p class="hint set-note">Mudou alguma coisa com o automático ligado? Ele religa sozinho com as opções novas. Se o celular reiniciar ou o app for atualizado, ele volta sozinho.</p>
+        <p class="hint set-note">O automático fica sempre ligado: liga sozinho quando há internet, quando o celular reinicia, quando o app é atualizado e se o Android fechar o envio (um vigia confere a cada 15 min). Só fica desligado se você desligar no Painel ou no Parar da notificação. Mudou alguma opção? Ele religa sozinho com ela.</p>
       </section>
 
       <section class="set-group">
