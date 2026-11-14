@@ -2,7 +2,7 @@ import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/r
 
 import { renderErrorPage } from "./lib/error-page";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
-import { MAINTENANCE_PUBLIC_FUNCTIONS, maintenanceExemptPath, canEnterMaintenance } from "@/lib/maintenance-policy";
+import { MAINTENANCE_PUBLIC_FUNCTIONS, maintenanceExemptPath, canEnterMaintenance, databaseDownTarget } from "@/lib/maintenance-policy";
 import { getCookie } from "@tanstack/react-start/server";
 
 // Function metadata is available here, not in request middleware.
@@ -10,7 +10,8 @@ const maintenanceFunctionMiddleware = createMiddleware({ type: "function" }).ser
   if (MAINTENANCE_PUBLIC_FUNCTIONS.includes(serverFnMeta.name)) return next();
   const { getRequestHeader } = await import("@tanstack/react-start/server");
   const { readMaintenance, verifiedMaintenanceAdmin } = await import("./lib/maintenance.server");
-  const settings = await readMaintenance(false);
+  const settings = await readMaintenance(false).catch(() => null);
+  if (!settings) throw new Error("O sistema está fora do ar no momento. Tente de novo em alguns minutos.");
   if (!settings.enabled) return next();
   const token = getRequestHeader("authorization")?.replace(/^Bearer /, "") || getCookie("bm-maintenance-session");
   if (await verifiedMaintenanceAdmin(token)) return next();
@@ -21,7 +22,12 @@ const maintenanceMiddleware = createMiddleware().server(async ({ next, request, 
   if (handlerType === "serverFn") return next();
   if (handlerType === "router" && maintenanceExemptPath(pathname)) return next();
   const { readMaintenance, verifiedMaintenanceAdmin } = await import("./lib/maintenance.server");
-  const settings = await readMaintenance(false);
+  const settings = await readMaintenance(false).catch(() => null);
+  if (!settings) {
+    // Database down: pages fall back to the emergency copy saved on GitHub; APIs answer 503.
+    if (databaseDownTarget(pathname) === "unavailable") return new Response("Sistema fora do ar.", { status: 503, headers: { "Retry-After": "120", "Cache-Control": "no-store" } });
+    return new Response(null, { status: 302, headers: { Location: "/emergencia", "Cache-Control": "no-store" } });
+  }
   if (!settings.enabled) return next();
   const token = request.headers.get("authorization")?.replace(/^Bearer /, "") || getCookie("bm-maintenance-session");
   if (canEnterMaintenance(settings.enabled, await verifiedMaintenanceAdmin(token))) return next();
