@@ -58,11 +58,12 @@ que não está bloqueado) e envia ao site pelo endpoint `/api/public/mediocre-in
   cada 30 min); `check` devolve `latest` (último capítulo publicado de cada obra no site) e a obra só é conferida se a
   MediocreScan mostra capítulo depois desse (sem números, usa a assinatura da lista). Ordem: pedidas/pela metade →
   atualizadas → primeira passada das novas → resto → conferência.
-- **Velocidade (Ajustes):** "Máxima" (padrão) começa com 12 s entre pedidos à API e acelera 15% a cada 8 pedidos aceitos
-  até 4 s (15 capítulos/min; lotes de 5 a cada 20 s). Na primeira recusa (429/403/IP bloqueado) dobra o intervalo e não
-  fica mais rápido que 1,5× o ritmo recusado por 6 h; a velocidade aprendida fica guardada (`speedGap`). "Segura" é o
-  ritmo antigo (1 pedido/min, 5 capítulos a cada 1 min 12 s). Sem o código dos capítulos na lista da obra, cada capítulo
-  custa 1 pedido à API, então o limite real é o que a MediocreScan aceitar.
+- **Ritmo (Ajustes → Velocidade), escolhido pelo dono:** "Ciclo de 15" (padrão) pega 5 capítulos, espera 33 s, pega mais
+  5, espera 33 s, pega mais 5 e, completados os 15, pausa 2 min (cerca de 15 capítulos a cada ~3 min 40 s, ~240 por
+  hora). Os quatro números (capítulos por lote até 5, espera entre lotes, lotes por ciclo, pausa) são editáveis e vão na
+  configuração do serviço (`config.cycle`); o ciclo continua entre obras e depois de reabrir. Dentro do lote os pedidos à
+  API saem a cada 2 s; fora do lote (obra, listas), a cada 10 s. Recusa da MediocreScan continua com as esperas
+  crescentes. "Segura" é o ritmo antigo (1 pedido/min, 5 capítulos a cada 1 min 12 s).
 - **Ajustes e Histórico** são telas: Ajustes tem as opções do automático, conta/chave/site e bateria; Histórico agrupa
   por dia com filtros (enviados, avisos, pedidos) e o resumo de hoje. "Enviadas hoje" no Painel mostra as capas
   (registros em `bm-estudio-envios`) e o ritmo em capítulos por hora. A fila mostra o total real (`queueTotal`) e

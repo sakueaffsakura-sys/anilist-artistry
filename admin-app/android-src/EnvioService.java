@@ -381,7 +381,7 @@ public class EnvioService extends Service {
                 break;
             case "api-wait":
                 countdownEnd = at + num(e, "ms");
-                text = "Próximo pedido à MediocreScan em " + clock(num(e, "ms")) + " (1 por minuto)";
+                text = "Próximo pedido à MediocreScan em " + clock(num(e, "ms")) + (num(e, "gapMs") >= 60_000 ? " (1 por minuto)" : "");
                 break;
             case "posting":
                 text = "Publicando " + num(e, "count") + " capítulo(s) no site…";
@@ -393,7 +393,9 @@ public class EnvioService extends Service {
                 break;
             case "waiting":
                 countdownEnd = at + num(e, "ms");
-                text = "Próximos 5 capítulos em " + clock(num(e, "ms"));
+                text = Json.truthy(e.get("cycle"))
+                    ? "Pausa do ciclo: próximos " + (num(e, "next") * Math.max(1, num(e, "batches"))) + " capítulos em " + clock(num(e, "ms"))
+                    : "Próximos " + (e.get("next") != null ? num(e, "next") : 5) + " capítulos em " + clock(num(e, "ms"));
                 break;
             case "pause":
                 countdownEnd = at + num(e, "ms");
