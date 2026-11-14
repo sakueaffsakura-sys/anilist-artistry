@@ -48,6 +48,14 @@ final class EnvioEngine {
     static final int AUTO_DISCOVER_MAX = 20;
     /** Falhas seguidas de uma obra antes de o automático deixá-la para depois. */
     static final int AUTO_MAX_FAILS = 2;
+    /** Depois desse tempo, uma obra deixada para depois por falhas volta a ser tentada. */
+    static final long AUTO_FAIL_FORGET_MS = 6 * 3600_000L;
+    /** Capítulos da primeira passada em obras novas (com a opção ligada): elas entram no site logo e o resto vem depois. */
+    static final int AUTO_FIRST_PASS = 10;
+    /** Bateria mínima (fora do carregador) para o automático continuar. */
+    static final int AUTO_MIN_BATTERY = 15;
+    /** De quanto em quanto tempo confere de novo uma condição que segurou o automático (Wi-Fi, carregador, bateria). */
+    static final long AUTO_HOLD_CHECK_MS = 30_000L;
     private static final Pattern UUID =Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
     private static final Pattern IP_BLOCK = Pattern.compile("ip\\s+bloquead|bloquead|blocked|banned", Pattern.CASE_INSENSITIVE);
 
@@ -104,6 +112,40 @@ final class EnvioEngine {
         void moved(String origin);
         /** Obra de índice `index` da lista terminou (para retomar da próxima se o app for fechado). */
         void workDone(int index);
+        /** Estado do aparelho para as condições do automático (null = não sabe; nada segura o envio). */
+        default Device device() { return null; }
+    }
+
+    /** Rede e bateria no momento. */
+    static final class Device {
+        boolean online = true;
+        boolean wifi = true;
+        boolean charging = true;
+        int battery = -1;
+    }
+
+    /** Opções do modo automático (escolhidas no app). */
+    static final class AutoOptions {
+        boolean discover = true;
+        boolean requests = true;
+        boolean wifiOnly = false;
+        boolean chargingOnly = false;
+        /** Capítulos da primeira passada em obras novas; 0 = envia cada obra inteira. */
+        int firstPass = AUTO_FIRST_PASS;
+
+        static AutoOptions from(Map<String, Object> job) {
+            AutoOptions o = new AutoOptions();
+            if (job == null) return o;
+            if (job.get("discover") != null) o.discover = Json.truthy(job.get("discover"));
+            if (job.get("requests") != null) o.requests = Json.truthy(job.get("requests"));
+            o.wifiOnly = Json.truthy(job.get("wifiOnly"));
+            o.chargingOnly = Json.truthy(job.get("chargingOnly"));
+            if (job.get("firstPass") != null) {
+                Long n = Json.whole(job.get("firstPass"));
+                o.firstPass = n == null ? 0 : (int) Math.max(0, Math.min(100, n));
+            }
+            return o;
+        }
     }
 
     static final class Session {
@@ -284,7 +326,7 @@ final class EnvioEngine {
         pause(ms);
     }
 
-    /** 1 min 12 s a cada 5 capítulos: conta do fim do último lote (ou da última pausa por recusa). */
+    /** 1 min 12 s a cada 5 capítulos: conta do começo do último lote (ou do fim da última pausa por recusa). */
     private void pairWait() {
         long mark = Math.max(lastPair, lastLockEnd);
         if (mark < 0) return;
@@ -642,6 +684,14 @@ final class EnvioEngine {
 
     /** Envia UMA obra inteira; se parar no meio, o site guarda onde parou e retoma esta obra primeiro. */
     private Outcome sendWork(long id, String name, int left) throws Soft {
+        return sendWork(id, name, left, 0);
+    }
+
+    /**
+     * `limit` > 0: envia só os primeiros `limit` capítulos que faltam e devolve a obra para o fim da fila
+     * (primeira passada do automático em obras novas); o resto vem quando as outras obras novas tiverem a delas.
+     */
+    private Outcome sendWork(long id, String name, int left, int limit) throws Soft {
         Outcome out = new Outcome();
         Object work = mediocre(true, "/obras/" + id);
         if (work == null) {
@@ -652,7 +702,10 @@ final class EnvioEngine {
         Map<String, Object> w = site(Json.map("action", "work", "obraId", id, "work", work, "publish", true));
         List<Long> pending = longs(w.get("pendingCapIds"));
         Long rem = Json.whole(w.get("remaining"));
-        long total = rem != null ? rem : pending.size();
+        long totalAll = rem != null ? rem : pending.size();
+        boolean limited = limit > 0 && pending.size() > limit;
+        if (limited) pending = new ArrayList<>(pending.subList(0, limit));
+        long total = limited ? pending.size() : totalAll;
         Entries entries = listEntries(work);
         Map<String, Object> wm = Json.obj(unwrap(work));
         String title = wm != null && Json.str(wm.get("obr_nome")) != null && !Json.str(wm.get("obr_nome")).isEmpty()
@@ -668,7 +721,9 @@ final class EnvioEngine {
         boolean failed = true;
         try {
             for (int i = 0; i < pending.size(); i += PER_SEND) {
+                holdIfNeeded();
                 pairWait();
+                long batchStart = clock.now();
                 List<Long> group = pending.subList(i, Math.min(pending.size(), i + PER_SEND));
                 emit("sending", "from", tried + 1, "to", tried + group.size(), "total", total);
                 List<Map<String, Object>> chapters = new ArrayList<>();
@@ -692,7 +747,9 @@ final class EnvioEngine {
                     skipped += count(r, "skipped");
                 }
                 synchronized (pace) {
-                    lastPair = clock.now(); // o próximo lote só sai 1 min 12 s depois deste terminar
+                    // No máximo 5 capítulos a cada 1 min 12 s, contados do começo do lote: quando buscar o lote já
+                    // levou mais que isso (1 pedido à API por minuto), o próximo sai na hora, sem espera extra.
+                    lastPair = batchStart;
                     savePace();
                 }
                 emit("progress", "id", id, "done", Math.min(tried, total), "total", total, "added", added, "skipped", skipped, "left", left);
@@ -700,15 +757,17 @@ final class EnvioEngine {
             failed = false;
         } finally {
             // Mesmo parando no meio, o site fica sabendo o que falta e retoma esta obra primeiro.
-            long remaining = Math.max(total - tried, 0);
+            long remaining = Math.max(totalAll - tried, 0);
             Map<String, Object> finish = Json.map("action", "finish", "obraId", id, "added", added, "remaining", remaining);
+            if (limited && !failed && !stop && remaining > 0) finish.put("defer", true);
             if (failed || stop) {
                 try { site(finish, true); } catch (Soft | RuntimeException ignored) { /* melhor esforço */ }
             } else {
                 site(finish);
             }
         }
-        emit("work-done", "id", id, "name", title, "added", added, "skipped", skipped, "left", Math.max(0, left - 1));
+        long later = limited ? Math.max(totalAll - tried, 0) : 0;
+        emit("work-done", "id", id, "name", title, "added", added, "skipped", skipped, "left", Math.max(0, left - 1), "later", later);
         out.added = added;
         return out;
     }
@@ -766,6 +825,7 @@ final class EnvioEngine {
             }
             for (int i = 0; i < todo.size(); i += PER_SEND) {
                 pairWait();
+                long batchStart = clock.now();
                 List<Long> group = todo.subList(i, Math.min(todo.size(), i + PER_SEND));
                 for (Long c : group) emit("chapter-state", "id", id, "capId", c, "state", "sending");
                 emit("sending", "from", i + 1, "to", i + group.size(), "total", todo.size());
@@ -793,7 +853,7 @@ final class EnvioEngine {
                     for (Map<String, Object> c : chapters) emit("chapter-state", "id", id, "capId", c.get("capId"), "state", sk > 0 ? "check" : "site");
                 }
                 synchronized (pace) {
-                    lastPair = clock.now();
+                    lastPair = batchStart;
                     savePace();
                 }
                 emit("progress", "id", id, "done", Math.min(i + group.size(), todo.size()), "total", todo.size(), "added", added, "skipped", skipped, "left", 1);
@@ -1011,37 +1071,97 @@ final class EnvioEngine {
         wake = false;
     }
 
+    /* Condições do automático (Wi-Fi, carregador, bateria): só valem com o automático ligado. */
+    private volatile AutoOptions autoOpts;
+
+    /** Motivo para segurar o automático agora, ou null para seguir. */
+    String holdReason(AutoOptions o) {
+        if (o == null) return null;
+        Device d;
+        try { d = host.device(); } catch (RuntimeException e) { d = null; }
+        if (d == null) return null;
+        if (!d.online) return "Sem internet";
+        if (o.wifiOnly && !d.wifi) return "Esperando o Wi-Fi";
+        if (o.chargingOnly && !d.charging) return "Esperando o carregador";
+        if (!d.charging && d.battery >= 0 && d.battery < AUTO_MIN_BATTERY) return "Bateria baixa (" + d.battery + "%)";
+        return null;
+    }
+
+    /** Segura o envio (entre lotes ou entre obras) até a condição voltar; avisa a tela de tempos em tempos. */
+    private void holdIfNeeded() {
+        AutoOptions o = autoOpts;
+        String why = holdReason(o);
+        if (why == null) return;
+        log(why + ": o automático espera e continua sozinho.");
+        long since = clock.now(), nextBeat = 0;
+        while (why != null) {
+            checkStop();
+            if (clock.now() >= nextBeat) {
+                emit("auto-hold", "reason", why, "since", since);
+                nextBeat = clock.now() + 5 * 60_000L;
+            }
+            pause(AUTO_HOLD_CHECK_MS);
+            String now = holdReason(o);
+            if (now != null && !now.equals(why)) nextBeat = 0;
+            why = now;
+        }
+        emit("resume");
+        log("Condições de volta: o automático continua.");
+    }
+
+    /** Obra deixada para depois por falhas seguidas (esquecida depois de 6 h). */
+    private boolean failedOut(Map<Long, long[]> fails, long id) {
+        long[] f = fails.get(id);
+        if (f == null) return false;
+        if (clock.now() - f[1] > AUTO_FAIL_FORGET_MS) { fails.remove(id); return false; }
+        return f[0] >= AUTO_MAX_FAILS;
+    }
+
+    void runAuto(boolean discover, boolean requests) {
+        AutoOptions o = new AutoOptions();
+        o.discover = discover;
+        o.requests = requests;
+        runAuto(o);
+    }
+
     /**
      * Modo automático: fica ligado e decide sozinho o que enviar, na ordem
-     * fila do site (pedidos de leitores primeiro) → obras do site atualizadas na MediocreScan → conferência das
-     * obras do site há mais tempo sem conferir. A cada ciclo também liga pedidos de leitores e (opcional) põe
-     * obras novas na fila. Sem nada para fazer, espera e olha de novo. A fila é relida depois de cada obra.
+     * fila do site (pedidos de leitores primeiro; com a primeira passada ligada, obras novas recebem os primeiros
+     * capítulos e voltam para o fim da fila, e só depois as outras recebem o resto) → obras do site atualizadas na
+     * MediocreScan → conferência das obras do site há mais tempo sem conferir. A cada ciclo também liga pedidos de
+     * leitores e (opcional) põe obras novas na fila. Sem nada para fazer, espera e olha de novo. A fila é relida
+     * depois de cada obra. Wi-Fi, carregador e bateria seguram o envio sem desligar o automático.
      */
-    void runAuto(boolean discover, boolean requests) {
+    void runAuto(AutoOptions opts) {
         running = true;
         locksInRow = 0;
+        autoOpts = opts;
         long totalAdded = 0;
         int done = 0;
-        Map<Long, Integer> fails = new HashMap<>();
+        Map<Long, long[]> fails = new HashMap<>();
         Map<Long, String> seen = new HashMap<>();
         Map<Long, String> updates = new LinkedHashMap<>();
         long nextScan = 0;
         int robin = 0;
+        boolean lastWasQueue = false;
         emit("run-start", "count", 0, "auto", true);
-        log("Modo automático ligado: fila do site, obras atualizadas" + (discover ? ", obras novas" : "") + (requests ? " e pedidos de leitores" : "") + ".");
+        log("Modo automático ligado: fila do site" + (opts.firstPass > 0 ? " (obras novas primeiro com " + opts.firstPass + " capítulos)" : "")
+            + ", obras atualizadas" + (opts.discover ? ", obras novas" : "") + (opts.requests ? " e pedidos de leitores" : "")
+            + (opts.wifiOnly ? "; só no Wi-Fi" : "") + (opts.chargingOnly ? "; só carregando" : "") + ".");
         try {
             for (;;) {
                 checkStop();
                 wake = false;
                 try {
+                holdIfNeeded();
                 if (clock.now() >= nextScan) {
                     nextScan = clock.now() + AUTO_CYCLE_MS;
                     robin = 0;
                     emit("auto-scan");
-                    if (requests) {
+                    if (opts.requests) {
                         try { autoRequests(); } catch (Soft e) { log("Pedidos: " + e.getMessage()); }
                     }
-                    try { scanLists(discover, seen, updates); } catch (Soft e) { log("Listas da MediocreScan: " + e.getMessage()); }
+                    try { scanLists(opts.discover, seen, updates); } catch (Soft e) { log("Listas da MediocreScan: " + e.getMessage()); }
                 }
                 Map<String, Object> plan;
                 try {
@@ -1052,54 +1172,85 @@ final class EnvioEngine {
                     continue;
                 }
                 List<Long> queue = longs(plan.get("queue"));
-                Map<Long, String> titles = new HashMap<>();
-                Map<Long, Long> priority = new HashMap<>();
+                Map<Long, Map<String, Object>> info = new HashMap<>();
                 List<Object> items = Json.arr(plan.get("items"));
                 if (items != null) for (Object io : items) {
                     Map<String, Object> im = Json.obj(io);
                     Long id = im == null ? null : Json.whole(im.get("id"));
-                    if (id != null) { titles.put(id, Json.str(im.get("title"))); priority.put(id, count(im, "priority")); }
+                    if (id != null) info.put(id, im);
                 }
+                List<Long> open = new ArrayList<>();
+                for (Long id : queue) if (!failedOut(fails, id)) open.add(id);
                 WorkRef next = null;
                 String source = "fila";
-                int queueLeft = 0;
-                for (Long id : queue) {
-                    if (fails.containsKey(id) && fails.get(id) >= AUTO_MAX_FAILS) continue;
-                    queueLeft++;
-                    if (next == null) next = new WorkRef(id, titles.get(id));
+                int limit = 0;
+                if (!open.isEmpty()) {
+                    // 1) obra pela metade (parou no meio) ou pedida por leitores: vai inteira, na ordem do site.
+                    Long pick = null;
+                    for (Long id : open) {
+                        Map<String, Object> im = info.get(id);
+                        boolean runningNow = im != null && "running".equals(Json.str(im.get("status")));
+                        if (count(im, "priority") > 0) { pick = id; break; }
+                        if (runningNow) {
+                            pick = id;
+                            long onSite = count(im, "chapters_on_site");
+                            if (opts.firstPass > 0 && onSite < opts.firstPass) limit = (int) (opts.firstPass - onSite);
+                            break;
+                        }
+                    }
+                    // 2) primeira passada: obra nova (ainda com poucos capítulos no site) recebe só os primeiros.
+                    if (pick == null && opts.firstPass > 0) {
+                        for (Long id : open) {
+                            Map<String, Object> im = info.get(id);
+                            long onSite = count(im, "chapters_on_site");
+                            if (onSite < opts.firstPass) { pick = id; limit = (int) (opts.firstPass - onSite); break; }
+                        }
+                    }
+                    // 3) o resto, inteiro, na ordem da fila.
+                    if (pick == null) pick = open.get(0);
+                    Map<String, Object> im = info.get(pick);
+                    next = new WorkRef(pick, im == null ? null : Json.str(im.get("title")));
+                }
+                // Fila grande: obras do site com capítulos novos não ficam esperando; alterna uma da fila, uma atualizada.
+                if (next != null && lastWasQueue && !updates.isEmpty() && count(info.get(next.id), "priority") == 0) {
+                    next = null;
+                    limit = 0;
                 }
                 if (next == null) {
                     for (Iterator<Map.Entry<Long, String>> it = updates.entrySet().iterator(); it.hasNext() && next == null;) {
                         Map.Entry<Long, String> u = it.next();
                         it.remove();
-                        if (!(fails.containsKey(u.getKey()) && fails.get(u.getKey()) >= AUTO_MAX_FAILS)) { next = new WorkRef(u.getKey(), u.getValue()); source = "atualizada"; }
+                        if (!failedOut(fails, u.getKey())) { next = new WorkRef(u.getKey(), u.getValue()); source = "atualizada"; }
                     }
                 }
                 if (next == null && robin < AUTO_ROUND_ROBIN) {
                     for (Long id : longs(plan.get("sync"))) {
-                        if (fails.containsKey(id) && fails.get(id) >= AUTO_MAX_FAILS) continue;
+                        if (failedOut(fails, id)) continue;
                         next = new WorkRef(id, null);
                         source = "conferencia";
                         robin++;
                         break;
                     }
                 }
-                emit("auto-plan", "queue", queueLeft, "requests", count(plan, "requestsWaiting"), "updates", updates.size(), "works", done, "added", totalAdded);
+                lastWasQueue = "fila".equals(source) && next != null;
+                emit("auto-plan", "queue", Math.max(open.size(), count(plan, "queueTotal")), "requests", count(plan, "requestsWaiting"), "updates", updates.size(), "works", done, "added", totalAdded);
                 if (next == null) {
                     idle(nextScan - clock.now(), done, totalAdded);
                     continue;
                 }
                 // Diz à tela de onde veio a obra (fila/pedido, atualizada na MediocreScan ou conferência de rotina).
-                emit("auto-pick", "id", next.id, "source", source, "priority", priority.containsKey(next.id) ? priority.get(next.id) : 0L);
+                Map<String, Object> pi = info.get(next.id);
+                emit("auto-pick", "id", next.id, "source", source, "priority", count(pi, "priority"), "limit", limit);
                 try {
-                    totalAdded += sendWork(next.id, next.title, Math.max(1, queueLeft + updates.size())).added;
+                    totalAdded += sendWork(next.id, next.title, Math.max(1, open.size() + updates.size()), limit).added;
                     done++;
                     fails.remove(next.id);
                 } catch (Soft e) {
-                    int n = (fails.containsKey(next.id) ? fails.get(next.id) : 0) + 1;
-                    fails.put(next.id, n);
+                    long[] f = fails.get(next.id);
+                    long n = (f == null ? 0 : f[0]) + 1;
+                    fails.put(next.id, new long[] { n, clock.now() });
                     log((next.title != null && !next.title.isEmpty() ? next.title : "Obra " + next.id) + ": " + e.getMessage()
-                        + (n >= AUTO_MAX_FAILS ? " O automático deixa esta obra para depois." : ""));
+                        + (n >= AUTO_MAX_FAILS ? " O automático deixa esta obra para depois (tenta de novo em 6 h)." : ""));
                 }
                 } catch (Retryable e) {
                     // Sem internet ou MediocreScan recusando: espera e tenta de novo, sem desligar o automático.
@@ -1115,6 +1266,7 @@ final class EnvioEngine {
         } catch (RuntimeException e) {
             emit("run-error", "message", "Erro inesperado no modo automático (" + e.getClass().getSimpleName() + "). Toque em Ligar para continuar.", "works", done, "added", totalAdded, "auto", true);
         } finally {
+            autoOpts = null;
             running = false;
         }
     }

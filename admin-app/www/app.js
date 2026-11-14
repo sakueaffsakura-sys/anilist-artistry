@@ -12,7 +12,7 @@
   const el = (tag, props, ...kids) => { const n = Object.assign(document.createElement(tag), props || {}); kids.forEach((k) => k != null && n.append(k)); return n; };
   const load = () => { try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch (_) { return {}; } };
   let state = Object.assign({ site: DEFAULT_SITE, token: "", session: null, font: 17 }, load());
-  state.auto = Object.assign({ on: false, discover: true, requests: true }, state.auto || {});
+  state.auto = Object.assign({ on: false, discover: true, requests: true, wifiOnly: false, chargingOnly: false, firstPass: 10 }, state.auto || {});
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (_) { /* sem armazenamento */ } };
   const host = (url) => { try { return new URL(url).host; } catch (_) { return url; } };
   /** 1234 → "1,2 mil" (mesmo jeito do site). */
@@ -277,6 +277,8 @@
     if (kind === "gerir" && /^[0-9a-f-]{36}$/i.test(id || "")) return openManage(id);
     if (kind === "site") return openSiteTab();
     if (kind === "pedidos") return openRequests();
+    if (kind === "ajustes") return openSettings();
+    if (kind === "historico") return openHistory();
     if (kind === "pedido" && id) return openPick(decodeURIComponent(id));
     // Endereços antigos (Recentes/Novas viraram filtros de Explorar).
     if (kind === "recentes" || kind === "novas") { chip.explorar = kind === "novas" ? "novas" : "atualizadas"; return openTab("explorar"); }
@@ -284,7 +286,7 @@
     openPanel();
   }
   function setView(v, title, back) {
-    ["panel", "list", "work", "reader", "site", "manage", "requests", "pick"].forEach((n) => { $(`view-${n}`).hidden = n !== v; });
+    ["panel", "list", "work", "reader", "site", "manage", "requests", "pick", "settings", "history"].forEach((n) => { $(`view-${n}`).hidden = n !== v; });
     document.body.classList.toggle("on-panel", v === "panel");
     $("page-title").textContent = title; $("back").hidden = !back; $("brand").hidden = Boolean(back);
     window.scrollTo(0, 0);
@@ -329,7 +331,7 @@
       let works = [], pageable = false;
       if (tab === "fila") {
         const p = await engine.plan(); lastRaw = p;
-        return renderQueue(p.items || []);
+        return renderQueue(p.items || [], Number(p.queueTotal) || 0);
       } else if (tab === "explorar" && chip.explorar === "listas") {
         const r = await engine.lists(); lastRaw = r.raw; return renderGroups(r.lists);
       } else if (tab === "explorar" && chip.explorar === "leitura") {
@@ -374,7 +376,7 @@
     refreshMarks(rows.map((w) => w.id)).then(updateSendAll);
   }
   /** Fila do site: capa, capítulos já no site e botão para tirar da fila (ex.: obra já finalizada). */
-  function renderQueue(items) {
+  function renderQueue(items, totalAll) {
     loading = false;
     rows = items.map((i) => ({ id: i.id, title: i.title || `Obra ${i.id}`, cover: i.cover }));
     items.forEach((i) => marks.queued.add(i.id));
@@ -382,14 +384,17 @@
     const asked = items.filter((i) => i.priority > 0).length, running = items.filter((i) => i.status === "running").length;
     $("list-meta").textContent = "";
     $("groups").append(el("div", { className: "queue-summary" },
-      el("div", {}, el("strong", { textContent: String(items.length) }), el("span", { textContent: "na fila" })),
+      el("div", {}, el("strong", { textContent: Math.max(items.length, totalAll || 0).toLocaleString("pt-BR") }), el("span", { textContent: "na fila" })),
       el("div", {}, el("strong", { textContent: String(asked) }), el("span", { textContent: "pedidas" })),
       el("div", {}, el("strong", { textContent: String(running) }), el("span", { textContent: "em envio" }))));
-    $("groups").append(el("p", { className: "list-meta" }, document.createTextNode(autoRunning() ? "O automático envia nesta ordem: pedidas por leitores primeiro." : "Enviadas nesta ordem: pedidas por leitores primeiro.")));
+    const known = items.reduce((n, i) => n + (i.chapters_remaining > 0 ? i.chapters_remaining : 0), 0), rate = ratePerHour();
+    const order = state.auto.firstPass > 0 ? `Ordem: pedidas por leitores, depois os primeiros ${state.auto.firstPass} capítulos de cada obra nova, depois o resto.` : "Ordem: pedidas por leitores primeiro, depois a ordem de chegada.";
+    const more = totalAll > items.length ? ` Mostrando as ${items.length} primeiras de ${totalAll.toLocaleString("pt-BR")}.` : "";
+    $("groups").append(el("p", { className: "list-meta" }, document.createTextNode(order + more + (known ? ` Faltam ${known.toLocaleString("pt-BR")} capítulos nas obras já começadas${rate ? ` (~${Math.max(1, Math.round(known / rate))} h no ritmo atual)` : ""}.` : ""))));
     const clear = el("button", { type: "button", className: "btn ghost small", textContent: "Esvaziar a fila" });
     clear.onclick = async () => {
       if (busy() && !autoRunning()) { toast("Pare o envio antes de mexer na fila."); return; }
-      if (!confirm(`Tirar as ${items.length} obras da fila? Elas e os capítulos já publicados continuam no site.`)) return;
+      if (!confirm(`Tirar as ${Math.max(items.length, totalAll || 0)} obras da fila? Elas e os capítulos já publicados continuam no site.`)) return;
       try { const r = await engine.queueClear(); items.forEach((i) => marks.queued.delete(i.id)); toast(`${r.removed} obra(s) tiradas da fila.`); checkQueueDot(); openTab("fila"); }
       catch (e) { toast(e.message); }
     };
@@ -398,7 +403,8 @@
       rememberCover(i.id, i.cover);
       const facts = el("p", { className: "s facts-inline" },
         el("span", { textContent: `${i.chapters_on_site} no site` }),
-        i.chapters_added ? el("span", { textContent: `+${i.chapters_added} nesta vez` }) : null);
+        i.chapters_added ? el("span", { textContent: `+${i.chapters_added} já enviados` }) : null,
+        i.chapters_remaining > 0 ? el("span", { className: "left", textContent: `faltam ${i.chapters_remaining}` }) : null);
       const info = el("div", { className: "min0" },
         el("p", { className: "t", textContent: i.title || `Obra ${i.id}` }), facts,
         el("div", {}, i.id === sendingId ? el("span", { className: "pill ok", textContent: "Enviando agora" }) : i.status === "running" ? el("span", { className: "pill hot", textContent: "Em andamento" }) : null,
@@ -968,14 +974,6 @@
   const AUTO_RESUME_MS = 15 * 60_000;
   const clearRun = () => { try { localStorage.removeItem(RUN_KEY); } catch (_) { /* ok */ } };
   function interruptedRun() { try { return JSON.parse(localStorage.getItem(RUN_KEY) || "null"); } catch (_) { return null; } }
-  $("open-history").onclick = () => {
-    let lines = [];
-    try { lines = JSON.parse(localStorage.getItem(LOG_KEY) || "[]"); } catch (_) { lines = []; }
-    $("settings").close();
-    $("json-title").textContent = "Histórico de envios";
-    $("json-body").textContent = lines.length ? redact(lines.join("\n")) : "Nenhum envio registrado ainda.";
-    $("json-dialog").showModal();
-  };
   function count(ms, render) { clearInterval(countdown); const end = Date.now() + ms; const tick = () => { const s = Math.max(0, Math.ceil((end - Date.now()) / 1000)); render(s); if (s <= 0) clearInterval(countdown); }; tick(); countdown = setInterval(tick, 1000); }
   /** Quanto falta de uma espera, descontando o tempo desde o evento (eventos lidos depois de reabrir). */
   const remaining = (e) => Math.max(0, (Number(e.ms) || 0) - (e.at ? Date.now() - e.at : 0));
@@ -991,8 +989,11 @@
           $("run-work").textContent = "Modo automático"; $("run-queue").textContent = "Ligado"; setBar(0, 0); setStatus("Olhando a fila do site…"); renderAuto(); break;
         }
         $("run-queue").textContent = `${e.count} obra(s) na vez`; if (typeof e.count === "number") queueLeft = e.count; break;
-      case "auto-scan": clearInterval(countdown); autoInfo.idle = false; autoInfo.scanning = true; setStatus("Olhando as listas da MediocreScan e os pedidos dos leitores…"); renderAuto(); break;
-      case "auto-pick": autoInfo.pick = { id: e.id, source: e.source, priority: Number(e.priority) || 0 }; autoInfo.idle = false; autoInfo.scanning = false; break;
+      case "auto-scan": clearInterval(countdown); autoInfo.idle = false; autoInfo.scanning = true; autoInfo.hold = null; setStatus("Olhando as listas da MediocreScan e os pedidos dos leitores…"); renderAuto(); break;
+      case "auto-pick": autoInfo.pick = { id: e.id, source: e.source, priority: Number(e.priority) || 0, limit: Number(e.limit) || 0 }; autoInfo.idle = false; autoInfo.scanning = false; autoInfo.hold = null; break;
+      case "auto-hold":
+        clearInterval(countdown); autoInfo.hold = e.reason; setStatus(holdText(e.reason), true); renderAuto();
+        break;
       case "auto-plan":
         autoInfo = Object.assign(autoInfo, { queue: e.queue, updates: e.updates, works: e.works, added: e.added, idle: false, scanning: false, since: autoInfo.since || state.auto.since || null });
         if (typeof e.requests === "number") setRequestBadge(e.requests);
@@ -1048,7 +1049,7 @@
         count(remaining(e), (s) => setStatus(`A MediocreScan recusou o pedido (${e.reason}). Tentativa ${e.count} de ${e.max}: tenta de novo em ${mmss(s)}.`, true));
         break;
       }
-      case "resume": clearInterval(countdown); setStatus("Continuando…"); break;
+      case "resume": clearInterval(countdown); autoInfo.hold = null; setStatus("Continuando…"); renderAuto(); break;
       case "chapters-start":
         note = { work: e.name, total: e.count, done: 0 };
         $("run-work").textContent = e.name; $("run-queue").textContent = `${e.count} capítulo(s) escolhido(s)`; setBar(0, e.count);
@@ -1058,18 +1059,22 @@
         if (work && work.id === e.id) { capState[e.capId] = e.state; renderChapters(); }
         break;
       case "chapters-done":
-        if (!quiet) addToday(e.added, at);
+        if (!quiet) { addToday(e.added, at); addRecord({ id: e.id, name: e.name, added: e.added }, at); }
         finishRun(`${e.name}: +${e.added} capítulo(s)${e.already ? `, ${e.already} já estavam no site` : ""}${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}.`, false, quiet, at);
         break;
       case "work-done":
         queueLeft = typeof e.left === "number" ? e.left : Math.max(0, queueLeft - 1); marks.imported.add(e.id); marks.queued.delete(e.id); repaint();
-        sendingId = null; if (!quiet) addToday(e.added, at);
+        sendingId = null; if (!quiet) { addToday(e.added, at); addRecord(e, at); }
         if (autoRunning() && !$("view-panel").hidden) renderPanelQueue();
-        note2(`${e.name}: ${e.note ? e.note : `+${e.added} capítulo(s)${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}`}.`);
+        note2(`${e.name}: ${e.note ? e.note : `+${e.added} capítulo(s)${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}${e.later ? `; faltam ${e.later}, que vêm depois das outras obras novas` : ""}`}.`);
         break;
       case "log": note2(e.text); break;
       case "run-done": finishRun(`Pronto: ${e.works} obra(s), ${e.added} capítulo(s) enviados.`, false, quiet, at); break;
       case "run-stopped":
+        if (e.auto && restartAuto) {
+          restartAuto = false; finishRun("Religando o automático com as opções novas…", false, true, at);
+          setTimeout(() => { if (!busy()) startAuto(true); }, 400); break;
+        }
         if (e.auto) { finishRun(`Automático desligado. ${e.added} capítulo(s) enviados desde que ligou.`, false, quiet, at); break; }
         finishRun(`Envio parado. ${e.added} capítulo(s) enviados. A obra atual continua de onde parou na próxima vez.`, false, quiet, at); break;
       case "run-error":
@@ -1134,6 +1139,38 @@
     week.forEach((x, i) => bars.append(el("span", { className: i === 6 ? "now" : "", title: `${x.d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit" })}: ${x.caps}` }, el("i", { style: `height:${Math.max(x.caps ? 12 : 4, Math.round((x.caps / max) * 100))}%` }))));
     bars.setAttribute("aria-label", `Capítulos por dia nos últimos 7 dias: ${week.map((x) => x.caps).join(", ")}`);
   }
+  /* Obras enviadas (com capa e capítulos), para "Enviadas hoje" e o ritmo por hora. */
+  const SENT_KEY = "bm-estudio-envios";
+  function records() { try { return JSON.parse(localStorage.getItem(SENT_KEY) || "[]") || []; } catch (_) { return []; } }
+  function addRecord(e, at) {
+    if (!e || !e.id) return;
+    const list = records();
+    list.unshift({ at: at || Date.now(), id: e.id, name: e.name || `Obra ${e.id}`, added: Number(e.added) || 0, later: Number(e.later) || 0, cover: covers.get(Number(e.id)) || null });
+    try { localStorage.setItem(SENT_KEY, JSON.stringify(list.slice(0, 150))); } catch (_) { /* ok */ }
+    if (!$("view-panel").hidden) renderSentToday();
+  }
+  /** Capítulos por hora nas últimas 3 h (pelo que este celular enviou), ou 0 sem dados suficientes. */
+  function ratePerHour() {
+    const since = Date.now() - 3 * 3600_000, recent = records().filter((r) => r.at >= since && r.added > 0);
+    if (!recent.length) return 0;
+    const first = Math.min(...recent.map((r) => r.at)), hours = Math.max(0.5, (Date.now() - first) / 3600_000 + 0.25);
+    return Math.round(recent.reduce((n, r) => n + r.added, 0) / hours);
+  }
+  function renderSentToday() {
+    const k = dayKey(), list = records().filter((r) => dayKey(r.at) === k);
+    // Uma capa por obra (somando os envios do dia).
+    const byWork = new Map();
+    list.forEach((r) => { const x = byWork.get(r.id) || Object.assign({}, r, { added: 0 }); x.added += r.added; x.cover = x.cover || r.cover; byWork.set(r.id, x); });
+    const shelf = $("sent-today"); shelf.innerHTML = "";
+    [...byWork.values()].slice(0, 20).forEach((r) => {
+      const b = el("button", { type: "button", className: "shelf-item", role: "listitem" },
+        el("div", { className: "cover" }, coverImg(r.cover || covers.get(Number(r.id)), r.name), el("span", { className: "mark ok", textContent: `+${r.added}` })),
+        el("p", { className: "name", textContent: r.name }));
+      b.onclick = () => go(`#/obra/${r.id}`);
+      shelf.append(b);
+    });
+    $("sent-today-box").hidden = !byWork.size;
+  }
   let queueAsked = 0;
   function setPanelNumbers(queue, requests) {
     if (typeof queue === "number") { $("n-queue").textContent = String(queue); $("queue-dot").hidden = queue <= 0; }
@@ -1141,30 +1178,38 @@
     $("n-queue-sub").textContent = queueAsked ? `${queueAsked} pedida${queueAsked === 1 ? "" : "s"} por leitores` : "obras esperando";
   }
   const AUTO_OFF_TEXT = "Ligue e deixe o celular carregando: o app envia a fila do site, busca capítulos novos das obras do site e atende pedidos sozinho.";
+  /** O que falta para o automático seguir, em uma frase. */
+  const holdText = (r) => /wi-?fi/i.test(r) ? "Nos dados móveis ele espera. Continua sozinho quando o Wi-Fi voltar."
+    : /carregador/i.test(r) ? "Continua sozinho quando o celular for para o carregador."
+    : /internet/i.test(r) ? "Continua sozinho quando a internet voltar."
+    : /bateria/i.test(r) ? "Continua sozinho no carregador ou com a bateria acima de 15%."
+    : "Continua sozinho quando der.";
   const PICK_TEXT = { fila: "Da fila do site", atualizada: "Ganhou capítulos na MediocreScan", conferencia: "Conferência de rotina" };
+  const pickText = (p) => p.priority > 0 ? `Pedida por ${readers(p.priority)}` : p.limit > 0 ? `Obra nova: primeiros ${p.limit} capítulos` : PICK_TEXT[p.source] || "";
   const hhmm = (t) => new Date(t).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   function renderAuto() {
     const on = autoRunning(), other = busy() && !on, sw = $("auto-toggle");
-    const sending = on && !autoInfo.idle && !autoInfo.scanning && sendingId != null;
-    const step = !on ? null : autoInfo.idle ? "espera" : sending ? (autoInfo.pick && autoInfo.pick.source) || "fila" : null;
-    $("auto-card").dataset.state = on ? (autoInfo.idle ? "idle" : "work") : other ? "busy" : "off";
+    const hold = on ? autoInfo.hold : null;
+    const sending = on && !hold && !autoInfo.idle && !autoInfo.scanning && sendingId != null;
+    const step = !on || hold ? null : autoInfo.idle ? "espera" : sending ? (autoInfo.pick && autoInfo.pick.source) || "fila" : null;
+    $("auto-card").dataset.state = on ? (hold ? "hold" : autoInfo.idle ? "idle" : "work") : other ? "busy" : "off";
     sw.setAttribute("aria-checked", String(on));
     sw.disabled = other || !NATIVE;
     $("auto-label").textContent = on ? (autoInfo.since ? `Automático ligado desde ${hhmm(autoInfo.since)}` : "Automático ligado") : "Modo automático";
     $("auto-title").textContent = !on ? (other ? "Outro envio rodando" : "Desligado")
-      : autoInfo.idle ? "Tudo em dia" : autoInfo.scanning ? "Procurando novidades" : sending ? "Enviando" : "Ligado";
+      : hold ? hold : autoInfo.idle ? "Tudo em dia" : autoInfo.scanning ? "Procurando novidades" : sending ? "Enviando" : "Ligado";
     if (!on) {
       const t = $("auto-text"); t.classList.remove("pause");
       t.textContent = !NATIVE ? "O modo automático funciona no app do Android (com o envio em segundo plano)." : other ? "Quando o envio atual terminar, você pode ligar o automático." : AUTO_OFF_TEXT;
     }
     // Obra que está indo agora: capa, de onde veio, capítulos e quanto falta.
-    $("auto-now").hidden = !sending;
-    if (sending) {
+    $("auto-now").hidden = !sending && !(hold && sendingId != null);
+    if (!$("auto-now").hidden) {
       const cov = $("auto-cover"), src = covers.get(Number(sendingId));
       cov.innerHTML = ""; cov.append(coverImg(src, note.work));
       $("auto-work").textContent = note.work || `Obra ${sendingId}`;
       const p = autoInfo.pick && autoInfo.pick.id === sendingId ? autoInfo.pick : null;
-      $("auto-why").textContent = p ? (p.priority > 0 ? `Pedida por ${readers(p.priority)}` : PICK_TEXT[p.source] || "") : "";
+      $("auto-why").textContent = p ? pickText(p) : "";
       $("auto-count").textContent = note.total ? `${(note.done || 0).toLocaleString("pt-BR")} de ${note.total.toLocaleString("pt-BR")} capítulos` : "Conferindo capítulos…";
       $("auto-eta").textContent = eta();
     }
@@ -1182,6 +1227,8 @@
       sub.textContent = parts.join(" ");
     }
     $("sender").classList.toggle("auto", on);
+    const rate = ratePerHour();
+    $("auto-rate").textContent = on && rate ? `~${rate} capítulos por hora` : "";
     $("q-send").hidden = busy() || !(Number($("n-queue").textContent) > 0);
   }
   /** Quanto falta da obra atual, pelo ritmo medido desde que ela começou. */
@@ -1200,7 +1247,8 @@
     if (!silent) await askBattery();
     $("log").innerHTML = ""; state.auto.since = Date.now(); save();
     autoInfo = { idle: false, scanning: false, queue: autoInfo.queue, updates: 0, works: 0, added: 0, since: state.auto.since, pick: null };
-    const ok = await startNative({ type: "auto", discover: state.auto.discover, requests: state.auto.requests });
+    const a = state.auto;
+    const ok = await startNative({ type: "auto", discover: a.discover, requests: a.requests, wifiOnly: a.wifiOnly, chargingOnly: a.chargingOnly, firstPass: a.firstPass });
     if (!ok) { state.auto.on = false; save(); toast("O Android não deixou ligar o automático. Tente de novo."); }
     else { setStatus("Ligando…"); if (!silent) toast("Automático ligado. Pode minimizar o app."); }
     renderAuto();
@@ -1211,19 +1259,13 @@
     setStatus("Desligando depois do passo atual…"); renderAuto();
   }
   $("auto-toggle").onclick = () => { if (autoRunning()) stopAuto(); else startAuto(false); };
-  $("auto-discover").checked = state.auto.discover; $("auto-requests").checked = state.auto.requests;
-  const optionChanged = () => {
-    state.auto.discover = $("auto-discover").checked; state.auto.requests = $("auto-requests").checked; save();
-    if (autoRunning()) toast("Vale da próxima vez que ligar o automático.");
-  };
-  $("auto-discover").onchange = optionChanged; $("auto-requests").onchange = optionChanged;
   // A estimativa de tempo muda sozinha enquanto a obra é enviada.
   setInterval(() => { if (autoRunning() && sendingId != null && !$("view-panel").hidden) $("auto-eta").textContent = eta(); }, 30_000);
 
   function openPanel() {
     current = { tab: "painel" }; pickGroup = null;
     setView("panel", "Estúdio", false); navCurrent("painel");
-    renderDays(); renderActivity(); renderAuto(); renderPanelQueue();
+    renderDays(); renderSentToday(); renderActivity(); renderAuto(); renderPanelQueue();
   }
   let panelLoading = false;
   async function renderPanelQueue() {
@@ -1233,7 +1275,7 @@
       const p = await freshPlan();
       const items = p.items || [];
       queueAsked = items.filter((i) => i.priority > 0).length;
-      setPanelNumbers((p.queue || []).length, Number(p.requestsWaiting) || 0);
+      setPanelNumbers(Number(p.queueTotal) || (p.queue || []).length, Number(p.requestsWaiting) || 0);
       setRequestBadge(Number(p.requestsWaiting) || 0);
       const ul = $("panel-queue"); ul.innerHTML = "";
       items.slice(0, 4).forEach((i, idx) => {
@@ -1241,14 +1283,15 @@
         const now = i.id === sendingId;
         const info = el("div", { className: "min0" },
           el("p", { className: "t", textContent: i.title || `Obra ${i.id}` }),
-          el("p", { className: "s facts-inline" }, el("span", { textContent: `${i.chapters_on_site} no site` }), i.chapters_added ? el("span", { textContent: `+${i.chapters_added} nesta vez` }) : null),
+          el("p", { className: "s facts-inline" }, el("span", { textContent: `${i.chapters_on_site} no site` }), i.chapters_remaining > 0 ? el("span", { className: "left", textContent: `faltam ${i.chapters_remaining}` }) : null),
           el("div", {}, now ? el("span", { className: "pill ok", textContent: "Enviando agora" }) : i.status === "running" ? el("span", { className: "pill hot", textContent: "Em andamento" }) : null,
             i.priority > 0 ? el("span", { className: "pill hot", textContent: `Pedida por ${readers(i.priority)}` }) : null));
         const b = el("button", { type: "button", className: `site-row queue-open${now ? " is-now" : ""}` }, el("span", { className: "pos", textContent: String(idx + 1) }), coverImg(i.cover, i.title), info);
         b.onclick = () => go(`#/obra/${i.id}`);
         ul.append(el("li", {}, b));
       });
-      $("panel-queue-all").textContent = items.length > 4 ? `Ver as ${items.length}` : "Ver fila";
+      const total = Number(p.queueTotal) || items.length;
+      $("panel-queue-all").textContent = total > 4 ? `Ver as ${total.toLocaleString("pt-BR")}` : "Ver fila";
       const e = $("panel-queue-empty"); e.textContent = "Fila vazia. Escolha obras em Explorar ou deixe o automático achar as novas."; e.hidden = items.length > 0;
     } catch (err) {
       const e = $("panel-queue-empty"); e.textContent = err.message; e.hidden = false;
@@ -1271,7 +1314,6 @@
       ol.append(el("li", { className: activityKind(text) }, el("time", { textContent: m ? m[2].slice(0, 5) : "" }), el("span", { textContent: text })));
     });
   }
-  $("panel-history").onclick = () => $("open-history").onclick();
   $("q-send").onclick = async () => {
     try {
       const p = await engine.plan();
@@ -1283,6 +1325,58 @@
     } catch (e) { toast(e.message); }
   };
 
+  /* ---------- histórico ---------- */
+  const HIST_CHIPS = [["", "Tudo"], ["ok", "Enviados"], ["warn", "Avisos"], ["req", "Pedidos"]];
+  let histFilter = "";
+  function logLines() { try { return JSON.parse(localStorage.getItem(LOG_KEY) || "[]") || []; } catch (_) { return []; } }
+  function openHistory() {
+    current = { tab: "historico" }; pickGroup = null;
+    setView("history", "Histórico", true); navCurrent("");
+    $("hist-chips").innerHTML = "";
+    HIST_CHIPS.forEach(([k, label]) => {
+      const b = el("button", { type: "button", textContent: label }); b.setAttribute("role", "tab"); b.setAttribute("aria-selected", String(histFilter === k));
+      b.onclick = () => { histFilter = k; openHistory(); }; $("hist-chips").append(b);
+    });
+    renderHistory();
+  }
+  function renderHistory() {
+    const lines = logLines().map((l) => { const m = /^(\S+) (\S+) (.*)$/.exec(l); const text = redact(m ? m[3] : l); return { day: m ? m[1] : "", time: m ? m[2].slice(0, 5) : "", text, kind: activityKind(text) }; });
+    // Resumo de hoje (pelos registros de envio, que têm os números certos).
+    const k = dayKey(), today = records().filter((r) => dayKey(r.at) === k);
+    const warns = lines.filter((l) => l.day === new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) && l.kind === "warn").length;
+    $("hist-summary").innerHTML = "";
+    $("hist-summary").append(
+      el("div", {}, el("strong", { textContent: today.reduce((n, r) => n + r.added, 0).toLocaleString("pt-BR") }), el("span", { textContent: "capítulos hoje" })),
+      el("div", {}, el("strong", { textContent: String(new Set(today.map((r) => r.id)).size) }), el("span", { textContent: "obras hoje" })),
+      el("div", {}, el("strong", { textContent: String(warns) }), el("span", { textContent: "avisos hoje" })));
+    const shown = lines.filter((l) => !histFilter || l.kind === histFilter);
+    const box = $("hist-list"); box.innerHTML = "";
+    $("hist-empty").hidden = shown.length > 0;
+    const todayKey = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    const yKey = y.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    let day = null, ol = null;
+    shown.slice(0, 300).forEach((l) => {
+      if (l.day !== day) {
+        day = l.day;
+        const count = shown.filter((x) => x.day === day).length;
+        box.append(el("div", { className: "section-head" }, el("h2", { className: "caption", textContent: day === todayKey ? "Hoje" : day === yKey ? "Ontem" : day }), el("span", { className: "muted", textContent: `${count} registro${count === 1 ? "" : "s"}` })));
+        ol = el("ol", { className: "activity" }); box.append(ol);
+      }
+      ol.append(el("li", { className: l.kind }, el("time", { textContent: l.time }), el("span", { textContent: l.text })));
+    });
+  }
+  $("hist-copy").onclick = async () => {
+    const text = redact(logLines().join("\n"));
+    try { await navigator.clipboard.writeText(text); toast("Histórico copiado."); }
+    catch (_) { $("json-title").textContent = "Histórico de envios"; $("json-body").textContent = text || "Vazio."; $("json-dialog").showModal(); }
+  };
+  $("hist-clear").onclick = () => {
+    if (!confirm("Apagar o histórico guardado neste celular? Os envios e o site não mudam.")) return;
+    try { localStorage.removeItem(LOG_KEY); } catch (_) { /* ok */ }
+    renderHistory(); renderActivity(); toast("Histórico apagado.");
+  };
+
   /* ---------- chave e configurações ---------- */
   $("form-token-inline").onsubmit = (e) => {
     e.preventDefault();
@@ -1290,21 +1384,41 @@
     if (v.length < 20) { toast("Essa chave parece curta demais."); return; }
     state.token = v; save(); $("token-card").hidden = true; $("token-inline").value = ""; toast("Chave salva."); route();
   };
-  $("open-settings").onclick = () => {
+  $("open-settings").onclick = () => go("#/ajustes");
+  function openSettings() {
+    current = { tab: "ajustes" }; pickGroup = null;
+    setView("settings", "Ajustes", true); navCurrent("");
     $("token").value = state.token; $("site-url-2").value = state.site;
     $("account").textContent = state.session && state.session.mode === "email" ? `Conectado como ${state.session.email}.` : "Conectado com código do painel.";
-    $("app-version").textContent = `Versão do app: ${window.BM_VERSION || "teste"} · 5 capítulos a cada 1 min 12 s · ${NATIVE ? "envio nativo (continua com o app fechado)" : "envio pela tela"}.`;
+    $("app-version").textContent = `Versão ${window.BM_VERSION || "de teste"}. Envio ${NATIVE ? "nativo: continua com o app fechado" : "pela tela"}; no máximo 5 capítulos a cada 1 min 12 s e 1 pedido por minuto à API.`;
     $("open-battery").hidden = $("battery-hint").hidden = !NATIVE;
-    $("settings").showModal();
-  };
+    renderAutoSwitches();
+  }
+  function renderAutoSwitches() {
+    document.querySelectorAll("[data-auto]").forEach((sw) => {
+      const k = sw.dataset.auto, on = k === "firstPass" ? state.auto.firstPass > 0 : Boolean(state.auto[k]);
+      sw.setAttribute("aria-checked", String(on));
+    });
+  }
+  let restartAuto = false;
+  document.querySelectorAll("[data-auto]").forEach((sw) => {
+    sw.onclick = () => {
+      const k = sw.dataset.auto;
+      if (k === "firstPass") state.auto.firstPass = state.auto.firstPass > 0 ? 0 : 10; else state.auto[k] = !state.auto[k];
+      save(); renderAutoSwitches();
+      // Com o automático ligado, religa com as opções novas (ele termina o passo atual antes).
+      if (autoRunning() && NATIVE) { restartAuto = true; Native.stopJob().catch(() => {}); toast("Aplicando: o automático religa com as opções novas."); }
+    };
+  });
   $("open-battery").onclick = () => { if (Native) Native.openAppSettings().catch(() => toast("Abra Configurações → Aplicativos → BM Estúdio → Bateria.")); };
-  $("form-settings").onsubmit = () => {
+  $("form-settings").onsubmit = (e) => {
+    e.preventDefault();
     state.token = $("token").value.trim(); state.site = normalizeSite($("site-url-2").value) || DEFAULT_SITE;
-    save(); $("token-card").hidden = Boolean(state.token); $("who").textContent = whoText(); toast("Configurações salvas."); route();
+    save(); $("token-card").hidden = Boolean(state.token); $("who").textContent = whoText(); toast("Ajustes salvos.");
   };
   $("logout").onclick = () => {
     if (busy()) { toast("Pare o envio antes de sair."); return; }
-    state.session = null; save(); $("settings").close(); $("password").value = ""; $("code").value = ""; show("login");
+    state.session = null; save(); $("password").value = ""; $("code").value = ""; show("login");
   };
 
   /** Um pedido de "plan" serve o painel, o aviso da fila e o contador de pedidos ao mesmo tempo. */
@@ -1319,7 +1433,7 @@
   async function checkQueueDot() {
     try {
       const p = await freshPlan();
-      setPanelNumbers((p.queue || []).length, Number(p.requestsWaiting) || 0);
+      setPanelNumbers(Number(p.queueTotal) || (p.queue || []).length, Number(p.requestsWaiting) || 0);
       setRequestBadge(Number(p.requestsWaiting) || 0);
       renderAuto();
     } catch (_) { /* sem aviso */ }

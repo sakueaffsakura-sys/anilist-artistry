@@ -7,8 +7,14 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.wifi.WifiManager;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
@@ -31,6 +37,8 @@ public class EnvioService extends Service {
     static final String ACTION_UPDATE = "estudio.UPDATE";
     static final String ACTION_STOP = "estudio.STOP_REQUEST";
     static final String ACTION_JOB = "estudio.JOB";
+    /** Celular ligou de novo ou o app foi atualizado: retoma o automático guardado (EnvioBoot). */
+    static final String ACTION_RESUME = "estudio.RESUME";
     private static final String CHANNEL = "envio";
     private static final String CHANNEL_DONE = "envio-fim";
     private static final int NOTIFICATION_ID = 7310;
@@ -92,6 +100,11 @@ public class EnvioService extends Service {
             // O Android recriou o serviço depois de encerrar o app: continua o envio guardado.
             if (engineAlive()) return START_STICKY;
             if (resumeSaved()) return START_STICKY;
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+        if (ACTION_RESUME.equals(action)) {
+            if (engineAlive() || resumeSaved()) return START_STICKY;
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -166,12 +179,14 @@ public class EnvioService extends Service {
         Map<String, Object> job = store.loadJob();
         Map<String, Object> config = store.loadConfig();
         if (job == null || config == null) return false;
-        if (System.currentTimeMillis() - store.beat() > RESUME_MAX_AGE_MS) {
+        // O automático volta sempre (mesmo depois de horas com o celular desligado); envios comuns só se recentes.
+        boolean auto = "auto".equals(Json.str(job.get("type")));
+        if (!auto && System.currentTimeMillis() - store.beat() > RESUME_MAX_AGE_MS) {
             store.clearJob();
             return false;
         }
-        if (!goForeground(build("Continuando o envio…", "O Android reiniciou o app; o envio continua de onde parou.", -1, 0, 0, false))) return false;
-        emitLocal("log", "text", "O Android reiniciou o app durante o envio. Continuando de onde parou…");
+        if (!goForeground(build(auto ? "Modo automático" : "Continuando o envio…", auto ? "Religando o automático…" : "O Android reiniciou o app; o envio continua de onde parou.", -1, 0, 0, false))) return false;
+        emitLocal("log", "text", auto ? "O automático foi religado sozinho (celular reiniciado, app atualizado ou fechado pelo Android)." : "O Android reiniciou o app durante o envio. Continuando de onde parou…");
         launch(job, config);
         return true;
     }
@@ -220,7 +235,7 @@ public class EnvioService extends Service {
                 if (id == null) throw new IllegalArgumentException("obra");
                 e.runChapters(id, Json.str(job.get("title")), caps);
             } else if ("auto".equals(type)) {
-                e.runAuto(job.get("discover") == null || Json.truthy(job.get("discover")), job.get("requests") == null || Json.truthy(job.get("requests")));
+                e.runAuto(EnvioEngine.AutoOptions.from(job));
             } else {
                 emitLocal("run-error", "message", "Tipo de envio desconhecido.", "works", 0, "added", 0);
             }
@@ -239,6 +254,7 @@ public class EnvioService extends Service {
         @Override public void saveSession(EnvioEngine.Session s) { store.saveSession(s.toMap()); }
         @Override public void moved(String origin) { store.saveSite(origin); }
         @Override public void workDone(int index) { store.advanceJob(index + 1); }
+        @Override public EnvioEngine.Device device() { return readDevice(); }
     };
 
     private void emitLocal(String type, Object... kv) {
@@ -247,8 +263,42 @@ public class EnvioService extends Service {
         onEvent(e);
     }
 
+    /** Rede e bateria agora, para as condições do automático (só no Wi-Fi, só carregando, bateria baixa). */
+    private EnvioEngine.Device readDevice() {
+        EnvioEngine.Device d = new EnvioEngine.Device();
+        try {
+            Intent b = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            if (b != null) {
+                int level = b.getIntExtra(BatteryManager.EXTRA_LEVEL, -1), scale = b.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+                d.battery = level >= 0 && scale > 0 ? level * 100 / scale : -1;
+                d.charging = b.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0;
+            }
+        } catch (RuntimeException ignored) { /* sem dados de bateria: não segura */ }
+        try {
+            ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+            if (cm != null && Build.VERSION.SDK_INT >= 23) {
+                Network n = cm.getActiveNetwork();
+                NetworkCapabilities c = n == null ? null : cm.getNetworkCapabilities(n);
+                d.online = c != null && c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+                d.wifi = c != null && (c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || c.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET));
+            }
+        } catch (RuntimeException ignored) { /* sem permissão ou sem dados: não segura */ }
+        return d;
+    }
+
+    /** Capítulos enviados hoje por este celular (para a notificação do automático). */
+    private long addToday(long added) {
+        SharedPreferences p = getSharedPreferences("estudio-dia", MODE_PRIVATE);
+        String day = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT).format(new java.util.Date());
+        long n = (day.equals(p.getString("day", "")) ? p.getLong("added", 0) : 0) + Math.max(0, added);
+        p.edit().putString("day", day).putLong("added", n).apply();
+        return n;
+    }
+
     private void onEvent(Map<String, Object> e) {
         long at = System.currentTimeMillis();
+        String kind = String.valueOf(e.get("type"));
+        if ("work-done".equals(kind) || "chapters-done".equals(kind)) addToday(num(e, "added"));
         String line = store.append(e, at);
         try { updateNotification(e, at); } catch (RuntimeException ignored) { /* a notificação nunca para o envio */ }
         Listener l = listener;
@@ -285,8 +335,14 @@ public class EnvioService extends Service {
                 done = 0;
                 total = 0;
                 countdownEnd = at + num(e, "ms");
-                text = "Tudo em dia · +" + num(e, "added") + " capítulo(s) desde que ligou. Olha de novo em " + clock(num(e, "ms"));
+                text = "Tudo em dia. Hoje: " + addToday(0) + " capítulo(s). Olha de novo em " + clock(num(e, "ms"));
                 if (wakeLock != null) { try { wakeLock.acquire(WAKE_MS); } catch (RuntimeException ignored) { /* ok */ } }
+                break;
+            case "auto-hold":
+                workName = "Modo automático";
+                done = 0;
+                total = 0;
+                text = e.get("reason") + ". Continua sozinho quando der.";
                 break;
             case "work-start": {
                 workName = String.valueOf(e.get("name"));
@@ -337,7 +393,7 @@ public class EnvioService extends Service {
                 text = "Continuando…";
                 break;
             case "work-done":
-                text = "Concluída: +" + num(e, "added") + " capítulo(s)";
+                text = "Concluída: +" + num(e, "added") + " capítulo(s)" + (num(e, "later") > 0 ? " (o resto vem depois)" : "") + ". Hoje: " + addToday(0);
                 break;
             case "run-done":
                 endTitle = "Envio concluído";
