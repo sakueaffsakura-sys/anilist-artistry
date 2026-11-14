@@ -134,6 +134,8 @@ const perms = [
   "android.permission.POST_NOTIFICATIONS",
   "android.permission.WAKE_LOCK",
   "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+  "android.permission.ACCESS_NETWORK_STATE",
+  "android.permission.RECEIVE_BOOT_COMPLETED",
 ].filter((p) => !m.includes(`"${p}"`)).map((p) => `    <uses-permission android:name="${p}" />`).join("\n");
 if (perms) m = m.replace(/<\/manifest>\s*$/, `${perms}\n</manifest>\n`);
 if (!m.includes(".EnvioService")) {
@@ -142,7 +144,18 @@ if (!m.includes(".EnvioService")) {
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Envio contínuo de capítulos ao site, escolhido pelo usuário, com notificação e botão Parar." />
         </service>\n    </application>`);
 }
+if (!m.includes(".EnvioBoot")) {
+  // Religa o automático depois de reiniciar o celular ou atualizar o app (só se ele estava ligado).
+  m = m.replace("</application>", `        <receiver android:name=".EnvioBoot" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>\n    </application>`);
+}
 writeFileSync(manifestPath, m);
 
 if (!m.includes("FOREGROUND_SERVICE_SPECIAL_USE") || !m.includes("specialUse")) throw new Error("Manifesto sem o serviço de uso especial");
+if (!m.includes(".EnvioBoot") || !m.includes("RECEIVE_BOOT_COMPLETED")) throw new Error("Manifesto sem o religamento do automático");
 console.log(`Android ajustado: versão 1.${build}, motor de envio nativo em primeiro plano.`);

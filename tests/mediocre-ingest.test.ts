@@ -40,6 +40,8 @@ describe("ingest", () => {
     expect(parseIngestBody({ action: "finish", obraId: 3, added: 2, remaining: 0 })).toEqual({ action: "finish", obraId: 3, added: 2, remaining: 0 });
     expect(() => parseIngestBody({ action: "finish", obraId: 3, added: -1, remaining: 0 })).toThrow();
     expect(() => parseIngestBody({ action: "finish", obraId: 3, added: 1 })).toThrow();
+    expect(parseIngestBody({ action: "finish", obraId: 3, added: 10, remaining: 40, defer: true })).toEqual({ action: "finish", obraId: 3, added: 10, remaining: 40, defer: true });
+    expect(parseIngestBody({ action: "finish", obraId: 3, added: 10, remaining: 40, defer: "sim" })).toEqual({ action: "finish", obraId: 3, added: 10, remaining: 40 });
   });
   test("check and enqueue validate ids and sizes", () => {
     expect(parseIngestBody({ action: "check", ids: [3, 3, 4] })).toEqual({ action: "check", ids: [3, 4] });

@@ -9,7 +9,9 @@ que não está bloqueado) e envia ao site pelo endpoint `/api/public/mediocre-in
 - **Pedidos à API:** durante o envio, no máximo 1 pedido por minuto a `api.mediocretoons.net` (as páginas no
   CDN não contam). Quando a lista de capítulos da obra já traz o UUID, o app vai direto às páginas sem pedir o
   capítulo à API.
-- **Ritmo:** uma obra por vez até o último capítulo, 5 capítulos por envio, 1 min 12 s de espera antes dos próximos 5.
+- **Ritmo:** uma obra por vez até o último capítulo, 5 capítulos por envio, no máximo 5 capítulos a cada 1 min 12 s
+  contados do começo do lote (quando buscar o lote pela API já levou mais que isso, o próximo sai sem espera extra;
+  antes contava do fim do lote e perdia ~20% do tempo).
   Quando a MediocreScan recusa (403/429), espera 1, 2, 5, 10 e depois 15 min entre tentativas (até 12 seguidas).
   Falha de conexão é tentada de novo com esperas crescentes (8 vezes, ~22 min) em vez de pular o capítulo; cada
   pedido tem tempo máximo (45 s na MediocreScan, 2 min no site). Uma página recusada isolada no CDN fica para
@@ -41,6 +43,17 @@ que não está bloqueado) e envia ao site pelo endpoint `/api/public/mediocre-in
   hoje e um gráfico dos últimos 7 dias (contados no celular em `bm-estudio-dias`). A obra mostra fatos (formato,
   status, capítulos, último, ID) e a barra de capítulos no site; a fila é numerada; "No site" mostra capítulos,
   leituras e nota; pedidos mostram quantos leitores pediram e as observações como balões de fala.
+- **Automático, mais esperto:** com "Obras novas primeiro com 10 capítulos" (ligado por padrão), obras novas da fila
+  recebem os primeiros 10 capítulos e voltam para o fim da fila (`finish` com `defer`), para o catálogo crescer
+  rápido; pedidas por leitores e obras pela metade vão inteiras; quando todas as novas têm os 10, o resto vem na
+  ordem da fila. Com fila grande, alterna uma obra da fila e uma obra do site atualizada na MediocreScan. Condições
+  (Ajustes): só no Wi-Fi, só carregando; sempre espera sem internet ou com bateria abaixo de 15% fora do carregador
+  (`auto-hold`), entre lotes e entre obras, sem desligar. Obras que falham 2 vezes ficam 6 h de lado. Mudar opção com
+  ele ligado religa sozinho. `EnvioBoot` religa o automático guardado quando o celular reinicia ou o APK é atualizado.
+- **Ajustes e Histórico** são telas: Ajustes tem as opções do automático, conta/chave/site e bateria; Histórico agrupa
+  por dia com filtros (enviados, avisos, pedidos) e o resumo de hoje. "Enviadas hoje" no Painel mostra as capas
+  (registros em `bm-estudio-envios`) e o ritmo em capítulos por hora. A fila mostra o total real (`queueTotal`) e
+  quantos capítulos faltam nas obras já começadas.
 - **Abas:** Painel, Explorar (Destaques, Atualizadas, Novas, Com IA, Para você, Listas, Leitura da MediocreScan),
   Buscar, Fila e No site. Pedidos dos leitores e configurações ficam no topo.
 

@@ -27,7 +27,7 @@ export type IngestBody =
   | { action: "enqueue"; items: { obraId: number; title: string | null }[] }
   | { action: "work"; obraId: number; work: unknown; publish: boolean }
   | { action: "chapters"; obraId: number; chapters: { capId: number; meta: unknown; content: unknown }[] }
-  | { action: "finish"; obraId: number; added: number; remaining: number }
+  | { action: "finish"; obraId: number; added: number; remaining: number; defer?: true }
   | { action: "chapter_status"; obraId: number }
   | { action: "queue_remove"; obraIds: number[] }
   | { action: "queue_clear" }
@@ -140,7 +140,8 @@ export function parseIngestBody(v: unknown): IngestBody {
     return { action: "chapters", obraId, chapters };
   }
   if (o.action === "finish") {
-    return { action: "finish", obraId, added: count(o.added, "Total adicionado"), remaining: count(o.remaining, "Total restante") };
+    // defer: the device sent only the first chapters of a new work; it goes back to the end of the line.
+    return { action: "finish", obraId, added: count(o.added, "Total adicionado"), remaining: count(o.remaining, "Total restante"), ...(o.defer === true ? { defer: true as const } : {}) };
   }
   throw new Error("Ação desconhecida.");
 }
@@ -159,16 +160,18 @@ export function suppliedGetter(api: Record<string, unknown>, cdn: unknown): Medi
  * first, then the rest in order) and the published works checked least recently. Queued works are
  * reserved so the site's own queue tick does not copy the same chapters at the same time.
  */
-type PlanItem = { id: number; title: string | null; status: string; cover: string | null; slug: string | null; chapters_on_site: number; chapters_added: number; updated_at: string; priority: number };
+type PlanItem = { id: number; title: string | null; status: string; cover: string | null; slug: string | null; chapters_on_site: number; chapters_added: number; chapters_remaining: number | null; updated_at: string; priority: number };
 /** Ordem da fila: a obra em andamento, depois as pedidas por leitores (mais pedidos primeiro), depois a ordem de chegada. */
 export function queueOrder<T extends { status: string; priority?: number | null; created_at: string }>(rows: T[]): T[] {
   return [...rows].sort((a, b) => (a.status === "running" ? 0 : 1) - (b.status === "running" ? 0 : 1) || (b.priority ?? 0) - (a.priority ?? 0) || a.created_at.localeCompare(b.created_at));
 }
-export async function ingestPlan(admin: Admin, syncLimit: number): Promise<{ queue: number[]; items: PlanItem[]; sync: number[]; requestsWaiting: number }> {
-  const { data: q } = await admin.from("mediocre_queue").select("obra_id, status, title, chapters_added, updated_at, created_at, priority").in("status", ["running", "waiting"]).order("priority", { ascending: false }).order("created_at").limit(50);
+export async function ingestPlan(admin: Admin, syncLimit: number): Promise<{ queue: number[]; items: PlanItem[]; sync: number[]; requestsWaiting: number; queueTotal: number }> {
+  const { data: q } = await admin.from("mediocre_queue").select("obra_id, status, title, chapters_added, chapters_remaining, updated_at, created_at, priority").in("status", ["running", "waiting"]).order("priority", { ascending: false }).order("created_at").limit(50);
   const rows = queueOrder(q ?? []);
   // Pedidos de leitores ainda sem obra escolhida: o app mostra o número para o admin atender.
   const { count: requestsWaiting } = await admin.from("work_requests").select("id", { count: "exact", head: true }).eq("status", "pending").is("mediocre_id", null);
+  // The list above stops at 50; the app shows the real size of the line.
+  const { count: queueTotal } = await admin.from("mediocre_queue").select("id", { count: "exact", head: true }).in("status", ["running", "waiting"]);
   const queue = rows.map((r) => Number(r.obra_id)).filter((n) => Number.isSafeInteger(n) && n > 0);
   // Capa e capítulos que a obra já tem no site, para a fila do app mostrar e ajudar a limpar.
   const { data: ss } = queue.length
@@ -177,14 +180,23 @@ export async function ingestPlan(admin: Admin, syncLimit: number): Promise<{ que
   const bySource = new Map((ss ?? []).map((r) => [Number(r.source_mediocre_id), r as { cover_url: string | null; slug: string; title: string; chapter_count_total: number }]));
   const items: PlanItem[] = rows.filter((r) => queue.includes(Number(r.obra_id))).map((r) => {
     const sr = bySource.get(Number(r.obra_id));
-    return { id: Number(r.obra_id), title: r.title ?? sr?.title ?? null, status: r.status, cover: sr?.cover_url ?? null, slug: sr?.slug ?? null, chapters_on_site: sr?.chapter_count_total ?? 0, chapters_added: r.chapters_added, updated_at: r.updated_at, priority: r.priority ?? 0 };
+    return { id: Number(r.obra_id), title: r.title ?? sr?.title ?? null, status: r.status, cover: sr?.cover_url ?? null, slug: sr?.slug ?? null, chapters_on_site: sr?.chapter_count_total ?? 0, chapters_added: r.chapters_added, chapters_remaining: r.chapters_remaining ?? null, updated_at: r.updated_at, priority: r.priority ?? 0 };
   });
   if (queue.length) await admin.from("mediocre_queue").update({ next_run_at: reserveUntil() }).in("obra_id", queue).in("status", ["running", "waiting"]);
-  if (!syncLimit) return { queue, items, sync: [], requestsWaiting: requestsWaiting ?? 0 };
+  if (!syncLimit) return { queue, items, sync: [], requestsWaiting: requestsWaiting ?? 0, queueTotal: queueTotal ?? queue.length };
+  // Rotation: ongoing works first (they are the ones that get new chapters); finished works only once a week.
   const { data: s } = await admin.from("series").select("source_mediocre_id")
-    .not("source_mediocre_id", "is", null).order("mediocre_synced_at", { ascending: true, nullsFirst: true }).limit(syncLimit);
-  const sync = (s ?? []).map((r) => Number(r.source_mediocre_id)).filter((n) => Number.isSafeInteger(n) && n > 0 && !queue.includes(n));
-  return { queue, items, sync, requestsWaiting: requestsWaiting ?? 0 };
+    .not("source_mediocre_id", "is", null).neq("status", "Completo").order("mediocre_synced_at", { ascending: true, nullsFirst: true }).limit(syncLimit);
+  let picked = s ?? [];
+  if (picked.length < syncLimit) {
+    const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    const { data: f } = await admin.from("series").select("source_mediocre_id")
+      .not("source_mediocre_id", "is", null).eq("status", "Completo").or(`mediocre_synced_at.is.null,mediocre_synced_at.lt.${weekAgo}`)
+      .order("mediocre_synced_at", { ascending: true, nullsFirst: true }).limit(syncLimit - picked.length);
+    picked = picked.concat(f ?? []);
+  }
+  const sync = picked.map((r) => Number(r.source_mediocre_id)).filter((n) => Number.isSafeInteger(n) && n > 0 && !queue.includes(n));
+  return { queue, items, sync, requestsWaiting: requestsWaiting ?? 0, queueTotal: queueTotal ?? queue.length };
 }
 
 /**
@@ -208,7 +220,7 @@ async function ingestCheck(admin: Admin, ids: number[]): Promise<{ imported: num
  * Records the runner's result: marks the work as checked and moves its queue item forward.
  * An unfinished work (time ran out mid-way) stays "running" so the next run resumes it before any other.
  */
-async function finishIngest(admin: Admin, body: { obraId: number; added: number; remaining: number }, createdBy: string) {
+async function finishIngest(admin: Admin, body: { obraId: number; added: number; remaining: number; defer?: true }, createdBy: string) {
   const now = new Date().toISOString();
   const done = body.remaining === 0;
   await admin.from("series").update({ mediocre_synced_at: now }).eq("source_mediocre_id", body.obraId);
@@ -220,8 +232,11 @@ async function finishIngest(admin: Admin, body: { obraId: number; added: number;
     await admin.from("mediocre_queue").insert({ obra_id: body.obraId, created_by: createdBy, status: "running", chapters_added: body.added, chapters_remaining: body.remaining, next_run_at: reserveUntil() });
     return;
   }
+  // Deferred (first chapters of a new work sent): back to the end of the line so the next new work goes first.
+  const defer = !done && body.defer === true;
   await admin.from("mediocre_queue").update({
-    status: done ? "done" : "running",
+    status: done ? "done" : defer ? "waiting" : "running",
+    ...(defer ? { created_at: now } : {}),
     chapters_added: item.chapters_added + body.added,
     chapters_remaining: body.remaining,
     attempts: 0,

@@ -109,18 +109,10 @@
         </ol>
         <p id="auto-sub" class="auto-sub" hidden></p>
 
-        <details class="auto-options">
-          <summary>Como funciona e opções</summary>
-          <dl class="cycle-help">
-            <div><dt>Fila</dt><dd>Obras da fila do site, com as pedidas por leitores na frente.</dd></div>
-            <div><dt>Atualizadas</dt><dd>Obras que já estão no site e ganharam capítulos na MediocreScan.</dd></div>
-            <div><dt>Conferência</dt><dd>Até 4 obras do site por vez, das que estão há mais tempo sem conferir.</dd></div>
-            <div><dt>Espera</dt><dd>Sem nada para enviar, espera 20 min e olha de novo.</dd></div>
-          </dl>
-          <label class="check"><input type="checkbox" id="auto-discover" /><span>Pôr na fila as obras novas da MediocreScan</span></label>
-          <label class="check"><input type="checkbox" id="auto-requests" /><span>Atender pedidos quando só uma obra tem o mesmo nome</span></label>
-          <p class="hint">Sem internet ou com a MediocreScan recusando, o automático espera e tenta de novo sozinho.</p>
-        </details>
+        <div class="auto-foot">
+          <button type="button" class="link" data-go="#/ajustes">Ajustes</button>
+          <span id="auto-rate" class="auto-rate"></span>
+        </div>
       </section>
 
       <div class="stats">
@@ -139,6 +131,14 @@
         </div>
       </div>
 
+      <div id="sent-today-box" hidden>
+        <div class="section-head">
+          <h2 class="caption">Enviadas hoje</h2>
+          <button type="button" class="link" data-go="#/historico">Histórico</button>
+        </div>
+        <div id="sent-today" class="shelf" role="list"></div>
+      </div>
+
       <div class="section-head">
         <h2 class="caption">Próximas da fila</h2>
         <button type="button" class="link" data-go="#/fila" id="panel-queue-all">Ver fila</button>
@@ -152,7 +152,7 @@
 
       <div class="section-head">
         <h2 class="caption">Atividade</h2>
-        <button id="panel-history" type="button" class="link">Histórico</button>
+        <button id="panel-history" type="button" class="link" data-go="#/historico">Ver tudo</button>
       </div>
       <ol id="panel-log" class="activity"></ol>
     </div>
@@ -276,6 +276,60 @@
       </div>
     </article>
 
+    <!-- Ajustes -->
+    <div id="view-settings" class="view" hidden>
+      <section class="set-group">
+        <h2 class="caption">Automático</h2>
+        <ul class="switches">
+          <li><div><strong>Obras novas primeiro com 10 capítulos</strong><span>Cada obra nova entra no site logo com os primeiros capítulos. O resto vem depois que as outras novas tiverem os delas. Obras pedidas por leitores vão sempre inteiras.</span></div>
+            <button type="button" role="switch" class="switch" data-auto="firstPass" aria-checked="false" aria-label="Obras novas primeiro com 10 capítulos"><span></span></button></li>
+          <li><div><strong>Pôr obras novas na fila</strong><span>A cada 20 min, as obras novas e atualizadas da MediocreScan que ainda não estão no site entram na fila.</span></div>
+            <button type="button" role="switch" class="switch" data-auto="discover" aria-checked="false" aria-label="Pôr obras novas na fila"><span></span></button></li>
+          <li><div><strong>Atender pedidos sozinho</strong><span>Liga o pedido do leitor quando só uma obra da MediocreScan tem exatamente o mesmo nome.</span></div>
+            <button type="button" role="switch" class="switch" data-auto="requests" aria-checked="false" aria-label="Atender pedidos sozinho"><span></span></button></li>
+          <li><div><strong>Só no Wi-Fi</strong><span>Nos dados móveis, o automático espera o Wi-Fi voltar.</span></div>
+            <button type="button" role="switch" class="switch" data-auto="wifiOnly" aria-checked="false" aria-label="Só no Wi-Fi"><span></span></button></li>
+          <li><div><strong>Só carregando</strong><span>Fora do carregador, o automático espera. Sem esta opção, ele espera só com a bateria abaixo de 15%.</span></div>
+            <button type="button" role="switch" class="switch" data-auto="chargingOnly" aria-checked="false" aria-label="Só carregando"><span></span></button></li>
+        </ul>
+        <p class="hint set-note">Mudou alguma coisa com o automático ligado? Ele religa sozinho com as opções novas. Se o celular reiniciar ou o app for atualizado, ele volta sozinho.</p>
+      </section>
+
+      <section class="set-group">
+        <h2 class="caption">Conta e chave</h2>
+        <form id="form-settings" class="stack card">
+          <label>Chave da MediocreScan<input id="token" type="password" autocomplete="off" /></label>
+          <p class="hint">Fica guardada só neste celular e vai somente para a MediocreScan.</p>
+          <label>Endereço do site<input id="site-url-2" inputmode="url" spellcheck="false" /></label>
+          <p id="account" class="hint"></p>
+          <button type="submit" class="btn primary">Salvar</button>
+        </form>
+      </section>
+
+      <section class="set-group">
+        <h2 class="caption">Celular</h2>
+        <div class="card stack">
+          <button type="button" class="btn ghost" id="open-battery" hidden>Bateria do app (para o envio não parar)</button>
+          <p id="battery-hint" class="hint" hidden>Samsung: em Bateria, escolha <strong>Sem restrições</strong>. Em Configurações → Bateria → Limites de uso em segundo plano, tire o BM Estúdio de "Apps em suspensão".</p>
+          <button type="button" class="btn ghost" id="open-history" data-go="#/historico">Histórico de envios</button>
+          <p id="app-version" class="hint"></p>
+        </div>
+      </section>
+      <button type="button" class="btn danger wide" id="logout">Sair da conta</button>
+    </div>
+
+    <!-- Histórico -->
+    <div id="view-history" class="view" hidden>
+      <div id="hist-chips" class="chips" role="tablist"></div>
+      <div id="hist-summary" class="queue-summary"></div>
+      <div id="hist-list"></div>
+      <p id="hist-empty" class="empty" hidden>Nada por aqui ainda.</p>
+      <div class="row hist-tools">
+        <button id="hist-copy" type="button" class="btn ghost small">Copiar texto</button>
+        <button id="hist-clear" type="button" class="btn ghost small">Limpar histórico</button>
+      </div>
+    </div>
+
     <!-- Leitor -->
     <article id="view-reader" class="view reader" hidden>
       <div class="reader-tools">
@@ -337,25 +391,6 @@
       </div>
     </div>
     <pre id="json-body" class="json"></pre>
-  </dialog>
-
-  <!-- Configurações -->
-  <dialog id="settings">
-    <form method="dialog" class="stack" id="form-settings">
-      <h2>Configurações</h2>
-      <label>Chave da MediocreScan<input id="token" type="password" autocomplete="off" /></label>
-      <p class="hint">Fica guardada só neste celular e vai somente para a MediocreScan.</p>
-      <label>Endereço do site<input id="site-url-2" inputmode="url" spellcheck="false" /></label>
-      <p id="account" class="hint"></p>
-      <p id="app-version" class="hint"></p>
-      <button type="button" class="btn ghost" id="open-history">Histórico de envios</button>
-      <button type="button" class="btn ghost" id="open-battery" hidden>Bateria do app (para o envio não parar)</button>
-      <p id="battery-hint" class="hint" hidden>Samsung: em Bateria, escolha <strong>Sem restrições</strong>. Em Configurações → Bateria → Limites de uso em segundo plano, tire o BM Estúdio de "Apps em suspensão".</p>
-      <div class="row end">
-        <button type="button" class="btn ghost" id="logout">Sair da conta</button>
-        <button type="submit" class="btn primary">Salvar</button>
-      </div>
-    </form>
   </dialog>
 
   <div id="toast" class="toast" role="status" hidden></div>
