@@ -35,6 +35,7 @@
 - Reader pages (`ReaderPage`) reserve 70vh until loaded so native lazy loading only fetches pages near the reader, show a retry on error, and the next chapter's data and first pages are prefetched once the reader passes half of the chapter.
 
 - Use RLS reads and server APK signing; minimum-only edits preserve files and publication.
+- Android update contract (`/api/public/version`): legacy fields stay as they are (old APKs read `update_required` and `apk_download_url`); since app 2.87 the response also has `update_available`, `released_at` and `changes` (at most `APP_CHANGES_LIMIT` published releases newer than `version_code`, newest first). Releases saved without "Exigir esta versão" show an optional "Nova versão disponível" card in sideloaded apps; Play Store installs are sent to the Play Store instead.
 - Follow docs/MIGRATIONS.md; never auto-run unjournaled SQL containing pending changes.
 
 - Classification uses admin RLS/CAS approval, independently delivered parallel groups and paged review rendering. AI streams with lease/pause; manual AniList search loads on selection and requires identity choice, no AI credits or inferred age.

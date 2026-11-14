@@ -14,6 +14,21 @@ export function requiresAppUpdate(installed: number, minimum: number) {
   return installed < minimum;
 }
 
+/** Há uma versão publicada mais nova que a instalada: o app mostra o aviso opcional "Nova versão disponível". */
+export function hasAppUpdate(installed: number, latest: number) {
+  return latest > installed;
+}
+
+/** Quantas versões, no máximo, o app recebe para o "O que mudou desde a sua versão". */
+export const APP_CHANGES_LIMIT = 5;
+
+/** As versões publicadas depois da instalada, da mais nova para a mais antiga. */
+export function releasesSince<T extends { version_code: number }>(rows: readonly T[], installed: number, limit = APP_CHANGES_LIMIT): T[] {
+  return rows.filter((row) => row.version_code > installed)
+    .sort((a, b) => b.version_code - a.version_code)
+    .slice(0, Math.max(0, limit));
+}
+
 export const appMinimumSchema = z.object({
   version_code: z.number().int().positive().max(2147483647),
   minimum_version_code: z.number().int().positive().max(2147483647),

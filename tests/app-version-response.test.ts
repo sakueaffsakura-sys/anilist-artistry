@@ -1,9 +1,9 @@
 import { beforeEach, expect, mock, test } from "bun:test";
 
-const release = { version_code: 217, version_name: "2.17", minimum_version_code: 217, apk_path: "releases/test.apk", notes: "" };
+const release = { version_code: 217, version_name: "2.17", minimum_version_code: 217, apk_path: "releases/test.apk", notes: "", created_at: "2026-11-14T12:00:00+00:00" };
 const signedCalls: Array<[string, number]> = [];
 let publicStorageCalls = 0;
-let rows = [release];
+let rows: Array<typeof release> = [release];
 let queryError: { message: string } | null = null;
 let signingError: { message: string } | null = null;
 beforeEach(() => {
@@ -64,7 +64,8 @@ test("no published releases returns an empty update contract without signing", a
   expect(response.status).toBe(200);
   expect(response.headers.get("Cache-Control")).toBe("no-store");
   expect(await response.json()).toEqual({ min_apk_version: 0, latest_apk_version: 0,
-    version_name: "", apk_download_url: "", notes: "", update_required: null });
+    version_name: "", apk_download_url: "", notes: "", update_required: null,
+    update_available: null, released_at: "", changes: [] });
   expect(signedCalls).toHaveLength(0);
 });
 
@@ -86,4 +87,27 @@ test("APK signing failure returns 503 rather than a broken update URL", async ()
   expect(response.headers.get("Cache-Control")).toBe("no-store");
   expect(await response.text()).not.toContain("internal signing failure");
   expect(signedCalls).toEqual([["releases/test.apk", 3600]]);
+});
+test("optional update: older app sees update_available and the releases since its version, newest first", async () => {
+  rows = [
+    { ...release, version_code: 219, version_name: "2.19", minimum_version_code: 200, notes: "Molduras animadas", created_at: "2026-11-14T15:00:00+00:00" },
+    { ...release, version_code: 218, version_name: "2.18", minimum_version_code: 200, notes: "Correções", created_at: "2026-11-10T15:00:00+00:00" },
+    { ...release, version_code: 217, minimum_version_code: 200 },
+  ];
+  const { appVersionResponse } = await import("../src/lib/app-version.server");
+  const body = await (await appVersionResponse(new Request("https://example.test/api/public/version?version_code=217"))).json();
+  expect(body.update_required).toBe(false);
+  expect(body.update_available).toBe(true);
+  expect(body.latest_apk_version).toBe(219);
+  expect(body.released_at).toBe("2026-11-14T15:00:00+00:00");
+  expect(body.changes).toEqual([
+    { version_code: 219, version_name: "2.19", notes: "Molduras animadas", released_at: "2026-11-14T15:00:00+00:00" },
+    { version_code: 218, version_name: "2.18", notes: "Correções", released_at: "2026-11-10T15:00:00+00:00" },
+  ]);
+  const current = await (await appVersionResponse(new Request("https://example.test/api/public/version?version_code=219"))).json();
+  expect(current.update_available).toBe(false);
+  expect(current.changes).toEqual([]);
+  const anonymous = await (await appVersionResponse(new Request("https://example.test/api/public/version"))).json();
+  expect(anonymous.update_available).toBeNull();
+  expect(anonymous.changes).toEqual([]);
 });
