@@ -66,7 +66,7 @@ function workId(v: unknown): number {
 
 /** Validates the helper payload shape; throws a readable message on anything unexpected. */
 export function parseIngestBody(v: unknown): IngestBody {
-  const o = v as { obraId?: unknown; action?: unknown; work?: unknown; chapters?: unknown; publish?: unknown; syncLimit?: unknown; added?: unknown; remaining?: unknown; ids?: unknown; items?: unknown; filter?: unknown; q?: unknown; page?: unknown; seriesId?: unknown; chapterId?: unknown; patch?: unknown; published?: unknown; confirm?: unknown; note?: unknown; title?: unknown } | null;
+  const o = v as { obraId?: unknown; action?: unknown; work?: unknown; chapters?: unknown; publish?: unknown; syncLimit?: unknown; added?: unknown; remaining?: unknown; ids?: unknown; items?: unknown; filter?: unknown; q?: unknown; page?: unknown; seriesId?: unknown; chapterId?: unknown; patch?: unknown; published?: unknown; confirm?: unknown; note?: unknown; title?: unknown; defer?: unknown } | null;
   if (!o || typeof o !== "object") throw new Error("Corpo inválido.");
   if (o.action === "site_list") {
     const filter = (["todas", "publicadas", "rascunhos", "mediocre"] as const).find((f) => f === o.filter) ?? "todas";
