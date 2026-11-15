@@ -58,6 +58,19 @@ que não está bloqueado) e envia ao site pelo endpoint `/api/public/mediocre-in
   cada 30 min); `check` devolve `latest` (último capítulo publicado de cada obra no site) e a obra só é conferida se a
   MediocreScan mostra capítulo depois desse (sem números, usa a assinatura da lista). Ordem: pedidas/pela metade →
   atualizadas → primeira passada das novas → resto → conferência.
+- **Revisão das obras do site (1.50, pedida pelo dono):** ao ligar o automático, antes da fila, ele lista as obras do
+  site vindas da MediocreScan (`site_list`, filtro "mediocre", páginas de 30), tira as que estão na fila (`check.queued`;
+  a fila cuida delas logo depois) e confere cada uma com `sendWork` (1 pedido à API por obra; manda os capítulos que
+  faltam). Ordem: as que ainda saem antes das "Completo", as mais lidas primeiro; obra que a lista "atualizadas" já
+  mostrou com capítulo novo passa na frente. O andamento fica guardado no celular (`EnvioStore` "review") a cada obra:
+  revisão cortada (app fechado, celular desligado, opção mudada) continua de onde parou se começou há menos de 12 h.
+  Uma revisão terminada há menos de 1 h não se repete ao religar; abrir o app com o automático rodando pede uma
+  (`Estudio.reviewJob`, a tela pede no máximo a cada 30 min) e o botão "Revisar obras" do Painel força. Ligado direto,
+  revisa de novo a cada 12 h, e a conferência de rotina fica parada nas 6 h depois de uma revisão. Eventos:
+  `review-scan`, `review-start` {total, done, queued, resumed}, `review-progress` {done, total, news, added},
+  `review-done` {checked, news, added, failed}, `review-skip`; `auto-pick` traz `review`/`reviewTotal`. Na revisão,
+  obra conferida sem capítulo novo não entra na atividade nem em "Hoje". Opção em Ajustes: "Revisar as obras do site
+  ao ligar" (`review`, ligada por padrão).
 - **Ritmo (Ajustes → Velocidade), escolhido pelo dono:** "Ciclo de 15" (padrão) pega 5 capítulos, espera 33 s, pega mais
   5, espera 33 s, pega mais 5 e, completados os 15, pausa 2 min (cerca de 15 capítulos a cada ~3 min 40 s, ~240 por
   hora). Os quatro números (capítulos por lote até 5, espera entre lotes, lotes por ciclo, pausa) são editáveis e vão na

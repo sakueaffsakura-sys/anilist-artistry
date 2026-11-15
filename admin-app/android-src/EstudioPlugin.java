@@ -83,6 +83,14 @@ public class EstudioPlugin extends Plugin {
         call.resolve(r);
     }
 
+    /** Modo automático ligado: revisa as obras do site (force = agora; sem force, só se a última foi há mais de 1 h). */
+    @PluginMethod
+    public void reviewJob(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("ok", EnvioService.reviewJob(Boolean.TRUE.equals(call.getBoolean("force", false))));
+        call.resolve(r);
+    }
+
     /** Modo automático ligado: acorda da espera porque há obras novas na fila. */
     @PluginMethod
     public void wakeJob(PluginCall call) {
