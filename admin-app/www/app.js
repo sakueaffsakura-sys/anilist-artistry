@@ -12,7 +12,8 @@
   const el = (tag, props, ...kids) => { const n = Object.assign(document.createElement(tag), props || {}); kids.forEach((k) => k != null && n.append(k)); return n; };
   const load = () => { try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch (_) { return {}; } };
   let state = Object.assign({ site: DEFAULT_SITE, token: "", session: null, font: 17 }, load());
-  state.auto = Object.assign({ on: true, discover: true, requests: true, wifiOnly: false, chargingOnly: false, firstPass: 10 }, state.auto || {});
+  // review: ao ligar (e a cada 12 h) o automático revisa as obras do site e manda os capítulos novos antes da fila.
+  state.auto = Object.assign({ on: true, review: true, discover: true, requests: true, wifiOnly: false, chargingOnly: false, firstPass: 10 }, state.auto || {});
   // Versão 2: o automático fica sempre ligado (liga sozinho com internet); só desliga se o admin desligar.
   if (!state.auto.v || state.auto.v < 2) { state.auto.on = true; state.auto.v = 2; }
   // Ritmo: "cycle" (padrão: 5 capítulos, 33 s, mais 5, 33 s, mais 5, pausa de 2 min) ou "safe" (1 pedido por minuto).
@@ -190,7 +191,7 @@
     catch (e) { nativeRunning = false; jobType = null; renderAuto(); log(`Envio em segundo plano indisponível (${e && e.message ? e.message : e}). Enviando pela tela.`); return false; }
   }
   if (NATIVE && Native.addListener) { try { Native.addListener("engine", onNativeLive); } catch (_) { /* sem eventos ao vivo: a tela busca ao voltar */ } }
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && state.session) syncNative(); });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && state.session) syncNative().then(() => askReview(false)); });
   // Rede de segurança: se algum evento ao vivo se perder, a tela confere o andamento a cada 30 s.
   setInterval(() => { if (nativeRunning && document.visibilityState === "visible") syncNative(); }, 30_000);
   /** Pede uma vez para o Android não "economizar bateria" no app, senão o envio para com a tela apagada. */
@@ -991,12 +992,33 @@
         if (e.auto) {
           if (!quiet || !state.auto.since) { state.auto.since = at; save(); }
           autoInfo.since = state.auto.since;
+          if (!quiet) autoInfo.review = null;
           $("run-work").textContent = "Modo automático"; $("run-queue").textContent = "Ligado"; setBar(0, 0); setStatus("Olhando a fila do site…"); renderAuto(); break;
         }
         $("run-queue").textContent = `${e.count} obra(s) na vez`; if (typeof e.count === "number") queueLeft = e.count; break;
       case "auto-scan": clearInterval(countdown); autoInfo.idle = false; autoInfo.scanning = true; autoInfo.hold = null; setStatus("Olhando as listas da MediocreScan e os pedidos dos leitores…"); renderAuto(); break;
       case "speed": autoInfo.perHour = Number(e.perHour) || 0; autoInfo.fast = e.fast !== false; renderAuto(); break;
-      case "auto-pick": autoInfo.pick = { id: e.id, source: e.source, priority: Number(e.priority) || 0, limit: Number(e.limit) || 0 }; autoInfo.idle = false; autoInfo.scanning = false; autoInfo.hold = null; break;
+      case "auto-pick": autoInfo.pick = { id: e.id, source: e.source, priority: Number(e.priority) || 0, limit: Number(e.limit) || 0, review: Number(e.review) || 0, reviewTotal: Number(e.reviewTotal) || 0 }; autoInfo.idle = false; autoInfo.scanning = false; autoInfo.hold = null; break;
+      // Revisão das obras do site (ao ligar, ao abrir o app e a cada 12 h): confere cada obra e manda os capítulos novos.
+      case "review-scan":
+        clearInterval(countdown); autoInfo.idle = false; autoInfo.scanning = false; autoInfo.hold = null;
+        autoInfo.review = { done: 0, total: 0, news: 0, added: 0, queued: 0, listing: true };
+        setStatus("Listando as obras que já estão no site…"); renderAuto(); break;
+      case "review-start":
+        autoInfo.review = { done: Number(e.done) || 0, total: Number(e.total) || 0, news: Number(e.news) || 0, added: Number(e.added) || 0, queued: Number(e.queued) || 0 };
+        autoInfo.idle = false; autoInfo.scanning = false; autoInfo.hold = null;
+        if (!autoInfo.review.total) autoInfo.review = null;
+        else setStatus(e.resumed ? `Continuando a revisão: ${e.done} de ${e.total} obras já conferidas.` : `Revisando ${e.total} obra(s) do site em busca de capítulos novos.`);
+        renderAuto(); break;
+      case "review-progress":
+        autoInfo.review = Object.assign(autoInfo.review || { queued: 0 }, { done: Number(e.done) || 0, total: Number(e.total) || 0, news: Number(e.news) || 0, added: Number(e.added) || 0, listing: false });
+        renderAuto(); break;
+      case "review-done":
+        autoInfo.review = null; autoInfo.lastReview = { at, checked: Number(e.checked) || 0, news: Number(e.news) || 0, added: Number(e.added) || 0 };
+        renderAuto(); break;
+      case "review-skip":
+        if (!autoInfo.lastReview && e.finishedAt) autoInfo.lastReview = { at: Number(e.finishedAt) };
+        renderAuto(); break;
       case "auto-hold":
         clearInterval(countdown); autoInfo.hold = e.reason; setStatus(holdText(e.reason), true); renderAuto();
         break;
@@ -1019,8 +1041,9 @@
         native.update(e.name, `${e.total} capítulo(s) para enviar · ${queueLeft} obra(s) na vez`, 0, e.total);
         setBar(0, e.total); $("run-work").textContent = autoRunning() ? `Automático · ${e.name}` : e.name;
         $("run-queue").textContent = `${queueLeft} obra(s) na vez · ${e.total} capítulo(s) nesta`;
-        note2(`${e.name}: ${e.created ? "criada no site" : "já estava no site"}, ${e.total} capítulo(s) para enviar.`);
-        if (!e.total) setStatus("Nenhum capítulo novo.");
+        // Na revisão, obra sem capítulo novo não vai para a atividade (seriam dezenas de linhas iguais).
+        if (!(autoInfo.review && !e.total)) note2(`${e.name}: ${e.created ? "criada no site" : "já estava no site"}, ${e.total} capítulo(s) para enviar.`);
+        if (!e.total) setStatus(autoInfo.review && autoInfo.review.total ? `Revisão ${Math.min(autoInfo.review.total, autoInfo.review.done + 1)} de ${autoInfo.review.total}: ${e.name} está em dia.` : "Nenhum capítulo novo.");
         break;
       case "sending":
         fetchNote = ""; beatRun(); clearInterval(countdown); setStatus(`Enviando capítulos ${e.from}${e.to > e.from ? ` a ${e.to}` : ""} de ${e.total}…`);
@@ -1075,9 +1098,10 @@
         break;
       case "work-done":
         queueLeft = typeof e.left === "number" ? e.left : Math.max(0, queueLeft - 1); marks.imported.add(e.id); marks.queued.delete(e.id); repaint();
-        sendingId = null; if (!quiet) { addToday(e.added, at); addRecord(e, at); }
-        if (autoRunning() && !$("view-panel").hidden) renderPanelQueue();
-        note2(`${e.name}: ${e.note ? e.note : `+${e.added} capítulo(s)${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}${e.later ? `; faltam ${e.later}, que vêm depois das outras obras novas` : ""}`}.`);
+        // No automático, obra conferida sem capítulo novo não conta em "Hoje" nem em "Enviadas hoje".
+        sendingId = null; if (!quiet && (Number(e.added) > 0 || !autoRunning())) { addToday(e.added, at); addRecord(e, at); }
+        if (autoRunning() && !$("view-panel").hidden && !autoInfo.review) renderPanelQueue();
+        if (!(autoInfo.review && !Number(e.added) && !e.note && !e.skipped)) note2(`${e.name}: ${e.note ? e.note : `+${e.added} capítulo(s)${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}${e.later ? `; faltam ${e.later}, que vêm depois das outras obras novas` : ""}`}.`);
         break;
       case "log": note2(e.text); break;
       case "run-done": finishRun(`Pronto: ${e.works} obra(s), ${e.added} capítulo(s) enviados.`, false, quiet, at); break;
@@ -1117,7 +1141,8 @@
 
   /* ---------- painel e modo automático ---------- */
   // step: etapa do ciclo (fila, atualizada, conferencia, espera); pick: de onde veio a obra atual.
-  let autoInfo = { idle: false, scanning: false, queue: null, updates: 0, works: 0, added: 0, since: null, pick: null };
+  // review: revisão das obras do site em andamento { done, total, news, added, queued }; lastReview: a última terminada.
+  let autoInfo = { idle: false, scanning: false, queue: null, updates: 0, works: 0, added: 0, since: null, pick: null, review: null, lastReview: null };
   let workClock = null; // { id, at, done } para estimar quanto falta da obra atual
 
   /* Capítulos enviados por dia (contados neste celular), para "Hoje" e "7 dias". */
@@ -1192,7 +1217,7 @@
     if (typeof requests === "number") $("n-requests").textContent = String(requests);
     $("n-queue-sub").textContent = queueAsked ? `${queueAsked} pedida${queueAsked === 1 ? "" : "s"} por leitores` : "obras esperando";
   }
-  const AUTO_OFF_TEXT = "Você desligou o automático. Ligado, ele fica sempre ativo: liga sozinho com internet, envia a fila do site, atualiza as obras que ganharam capítulos e atende pedidos.";
+  const AUTO_OFF_TEXT = "Você desligou o automático. Ligado, ele fica sempre ativo: liga sozinho com internet, revisa as obras do site atrás de capítulos novos, envia a fila, atualiza as obras que ganharam capítulos e atende pedidos.";
   /** O que falta para o automático seguir, em uma frase. */
   const holdText = (r) => /wi-?fi/i.test(r) ? "Nos dados móveis ele espera. Continua sozinho quando o Wi-Fi voltar."
     : /carregador/i.test(r) ? "Continua sozinho quando o celular for para o carregador."
@@ -1200,20 +1225,28 @@
     : /bateria/i.test(r) ? "Continua sozinho no carregador ou com a bateria acima de 15%."
     : /^precisa de você/i.test(r) ? `${r.replace(/^precisa de você:\s*/i, "")} Corrija em Ajustes; o automático tenta de novo a cada 30 min.`
     : "Continua sozinho quando der.";
-  const PICK_TEXT = { fila: "Da fila do site", atualizada: "Ganhou capítulos na MediocreScan", conferencia: "Conferência de rotina" };
-  const pickText = (p) => p.priority > 0 ? `Pedida por ${readers(p.priority)}` : p.limit > 0 ? `Obra nova: primeiros ${p.limit} capítulos` : PICK_TEXT[p.source] || "";
+  const PICK_TEXT = { fila: "Da fila do site", atualizada: "Ganhou capítulos na MediocreScan", conferencia: "Conferência de rotina", revisao: "Revisão das obras do site" };
+  const pickText = (p) => p.priority > 0 ? `Pedida por ${readers(p.priority)}`
+    : p.limit > 0 ? `Obra nova: primeiros ${p.limit} capítulos`
+    : p.review > 0 && p.source === "atualizada" ? `Revisão ${p.review} de ${p.reviewTotal}: ganhou capítulos`
+    : p.review > 0 ? `Revisão: obra ${p.review} de ${p.reviewTotal}` : PICK_TEXT[p.source] || "";
+  const plural = (n, one, many) => `${n.toLocaleString("pt-BR")} ${n === 1 ? one : many}`;
   const hhmm = (t) => new Date(t).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   function renderAuto() {
     const on = autoRunning(), other = busy() && !on, sw = $("auto-toggle");
     const hold = on ? autoInfo.hold : null;
     const sending = on && !hold && !autoInfo.idle && !autoInfo.scanning && sendingId != null;
-    const step = !on || hold ? null : autoInfo.idle ? "espera" : sending ? (autoInfo.pick && autoInfo.pick.source) || "fila" : null;
+    const rv = on ? autoInfo.review : null;
+    // Revisão e conferência de rotina são a mesma etapa na faixa: olhar as obras que já estão no site.
+    const pickStep = (autoInfo.pick && autoInfo.pick.source) || "fila";
+    const step = !on || hold ? null : rv ? "revisao" : autoInfo.idle ? "espera" : sending ? (pickStep === "conferencia" ? "revisao" : pickStep) : null;
     $("auto-card").dataset.state = on ? (hold ? "hold" : autoInfo.idle ? "idle" : "work") : other ? "busy" : "off";
     sw.setAttribute("aria-checked", String(on));
     sw.disabled = other || !NATIVE;
     $("auto-label").textContent = on ? (autoInfo.since ? `Automático ligado desde ${hhmm(autoInfo.since)}` : "Automático ligado") : "Modo automático";
     $("auto-title").textContent = !on ? (other ? "Outro envio rodando" : "Desligado")
-      : hold ? (/^precisa de você/i.test(hold) ? "Precisa de você" : hold) : autoInfo.idle ? "Tudo em dia" : autoInfo.scanning ? "Procurando novidades" : sending ? "Enviando" : "Ligado";
+      : hold ? (/^precisa de você/i.test(hold) ? "Precisa de você" : hold) : rv ? (rv.listing ? "Listando as obras do site" : "Revisando as obras do site")
+      : autoInfo.idle ? "Tudo em dia" : autoInfo.scanning ? "Procurando novidades" : sending ? "Enviando" : "Ligado";
     if (!on) {
       const t = $("auto-text"); t.classList.remove("pause");
       t.textContent = !NATIVE ? "O modo automático funciona no app do Android (com o envio em segundo plano)." : other ? "Quando o envio atual terminar, você pode ligar o automático." : AUTO_OFF_TEXT;
@@ -1226,20 +1259,36 @@
       $("auto-work").textContent = note.work || `Obra ${sendingId}`;
       const p = autoInfo.pick && autoInfo.pick.id === sendingId ? autoInfo.pick : null;
       $("auto-why").textContent = p ? pickText(p) : "";
-      $("auto-count").textContent = note.total ? `${(note.done || 0).toLocaleString("pt-BR")} de ${note.total.toLocaleString("pt-BR")} capítulos` : "Conferindo capítulos…";
+      $("auto-count").textContent = note.total ? `${(note.done || 0).toLocaleString("pt-BR")} de ${note.total.toLocaleString("pt-BR")} capítulos` : rv ? "Conferindo se tem capítulo novo…" : "Conferindo capítulos…";
       $("auto-eta").textContent = eta();
     }
+    // Revisão das obras do site: quantas já foram conferidas e quantas tinham capítulo novo.
+    $("auto-review").hidden = !rv || hold != null;
+    if (rv && !hold) {
+      const pct = rv.total ? Math.round((rv.done / rv.total) * 100) : 0;
+      $("rv-count").textContent = rv.listing ? "listando…" : `${rv.done.toLocaleString("pt-BR")} de ${plural(rv.total, "obra", "obras")}`;
+      const bar = $("rv-bar"); bar.firstElementChild.style.width = `${rv.done > 0 ? Math.max(2, pct) : 0}%`; bar.setAttribute("aria-valuenow", String(pct));
+      $("rv-sub").textContent = rv.listing ? "Lendo a lista das obras que já estão no site."
+        : [rv.news ? `${plural(rv.news, "obra com capítulo novo", "obras com capítulos novos")} (+${plural(rv.added, "capítulo", "capítulos")})` : "Nenhuma com capítulo novo até agora",
+          rv.queued ? `as ${rv.queued} da fila vão depois` : ""].filter(Boolean).join(" · ") + ".";
+    }
+    $("auto-review-now").hidden = !on || Boolean(rv) || !NATIVE;
     document.querySelectorAll("#auto-cycle li").forEach((li) => {
-      const order = ["fila", "atualizada", "conferencia", "espera"], i = order.indexOf(li.dataset.step), cur = order.indexOf(step);
+      const order = ["revisao", "fila", "atualizada", "espera"], i = order.indexOf(li.dataset.step), cur = order.indexOf(step);
       li.className = !on || cur < 0 ? "" : i === cur ? "now" : i < cur ? "past" : "";
       if (i === cur && on) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
     });
     $("auto-cycle").hidden = !on;
     const sub = $("auto-sub");
-    sub.hidden = !on;
-    if (on) {
+    // Durante a revisão, o quadro dela já mostra o andamento.
+    sub.hidden = !on || Boolean(rv);
+    if (on && !rv) {
       const parts = [`${(autoInfo.added || 0).toLocaleString("pt-BR")} capítulo(s) em ${autoInfo.works || 0} obra(s) desde que ligou.`];
       if (autoInfo.updates) parts.push(`${autoInfo.updates} obra(s) atualizada(s) esperando a vez.`);
+      const lr = autoInfo.lastReview;
+      if (!rv && lr && lr.at) parts.push(typeof lr.checked === "number"
+        ? `Última revisão às ${hhmm(lr.at)}: ${plural(lr.checked, "obra", "obras")}, ${lr.news ? `${lr.news} com capítulos novos (+${lr.added})` : "todas em dia"}.`
+        : `Última revisão às ${hhmm(lr.at)}.`);
       sub.textContent = parts.join(" ");
     }
     $("sender").classList.toggle("auto", on);
@@ -1265,7 +1314,7 @@
     $("log").innerHTML = ""; state.auto.since = Date.now(); save();
     autoInfo = { idle: false, scanning: false, queue: autoInfo.queue, updates: 0, works: 0, added: 0, since: state.auto.since, pick: null };
     const a = state.auto;
-    const ok = await startNative({ type: "auto", discover: a.discover, requests: a.requests, wifiOnly: a.wifiOnly, chargingOnly: a.chargingOnly, firstPass: a.firstPass });
+    const ok = await startNative({ type: "auto", review: a.review !== false, discover: a.discover, requests: a.requests, wifiOnly: a.wifiOnly, chargingOnly: a.chargingOnly, firstPass: a.firstPass });
     if (!ok) { state.auto.on = false; save(); toast("O Android não deixou ligar o automático. Tente de novo."); }
     else { setStatus("Ligando…"); if (!silent) toast("Automático ligado. Pode minimizar o app."); }
     renderAuto();
@@ -1276,6 +1325,22 @@
     setStatus("Desligando depois do passo atual…"); renderAuto();
   }
   $("auto-toggle").onclick = () => { if (autoRunning()) stopAuto(); else startAuto(false); };
+  /**
+   * Revisão das obras do site com o automático já rodando: ao abrir o app (o serviço só revisa se a última foi há mais
+   * de 1 h) ou no botão "Revisar obras" (força, depois da obra atual).
+   */
+  let reviewAskedAt = 0;
+  function askReview(force) {
+    if (!NATIVE || !autoRunning() || typeof Native.reviewJob !== "function") return;
+    if (!force && Date.now() - reviewAskedAt < 30 * 60_000) return;
+    reviewAskedAt = Date.now();
+    Native.reviewJob({ force: Boolean(force) }).catch(() => {});
+  }
+  $("auto-review-now").onclick = () => {
+    if (!autoRunning()) return;
+    askReview(true);
+    toast("A revisão das obras do site começa depois da obra atual.");
+  };
   // A estimativa de tempo muda sozinha enquanto a obra é enviada.
   setInterval(() => { if (autoRunning() && sendingId != null && !$("view-panel").hidden) $("auto-eta").textContent = eta(); }, 30_000);
 
@@ -1550,7 +1615,8 @@
     show("main"); $("who").textContent = whoText(); $("token-card").hidden = Boolean(state.token);
     if (!location.hash || location.hash === "#/inicio") location.hash = "#/painel"; else route();
     checkQueueDot();
-    if (NATIVE) syncNative().then((r) => { if (!nativeRunning) checkResume(r); }); else checkResume();
+    // Abrir o app com o automático rodando também pede a revisão das obras do site (se a última foi há mais de 1 h).
+    if (NATIVE) syncNative().then((r) => { if (!nativeRunning) checkResume(r); else askReview(false); }); else checkResume();
   }
   if (state.session) enterMain(); else show("login");
   // Renova a sessão antes de vencer (durante um envio nativo quem renova é o serviço).

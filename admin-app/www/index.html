@@ -89,7 +89,7 @@
           <button id="auto-toggle" type="button" role="switch" class="switch big" aria-checked="false" aria-label="Modo automático"><span></span></button>
         </div>
         <h2 id="auto-title">Desligado</h2>
-        <p id="auto-text" class="auto-text">Ligue e deixe o celular carregando: o app envia a fila do site, busca capítulos novos das obras do site e atende pedidos sozinho.</p>
+        <p id="auto-text" class="auto-text">Ligue e deixe o celular carregando: o app revisa as obras do site atrás de capítulos novos, envia a fila e atende pedidos sozinho.</p>
 
         <div id="auto-now" class="auto-now" hidden>
           <div id="auto-cover" class="auto-cover" aria-hidden="true"></div>
@@ -101,16 +101,25 @@
           </div>
         </div>
 
+        <div id="auto-review" class="auto-review" hidden>
+          <p class="rv-line"><strong>Revisão do site</strong><span id="rv-count"></span></p>
+          <div id="rv-bar" class="bar ok" role="progressbar" aria-label="Obras do site conferidas" aria-valuemin="0" aria-valuemax="100"><span></span></div>
+          <p id="rv-sub" class="rv-sub"></p>
+        </div>
+
         <ol id="auto-cycle" class="cycle" aria-label="Ordem do automático">
+          <li data-step="revisao"><span>Revisão</span></li>
           <li data-step="fila"><span>Fila</span></li>
           <li data-step="atualizada"><span>Atualizadas</span></li>
-          <li data-step="conferencia"><span>Conferência</span></li>
           <li data-step="espera"><span>Espera</span></li>
         </ol>
         <p id="auto-sub" class="auto-sub" hidden></p>
 
         <div class="auto-foot">
-          <button type="button" class="link" data-go="#/ajustes">Ajustes</button>
+          <span class="foot-links">
+            <button type="button" class="link" data-go="#/ajustes">Ajustes</button>
+            <button id="auto-review-now" type="button" class="link" hidden>Revisar obras</button>
+          </span>
           <span id="auto-rate" class="auto-rate"></span>
         </div>
       </section>
@@ -297,6 +306,8 @@
       <section class="set-group">
         <h2 class="caption">Automático</h2>
         <ul class="switches">
+          <li><div><strong>Revisar as obras do site ao ligar</strong><span>Antes da fila, confere cada obra que já está no site e envia os capítulos novos. Também ao abrir o app (se a última foi há mais de 1 h) e sozinho a cada 12 h.</span></div>
+            <button type="button" role="switch" class="switch" data-auto="review" aria-checked="false" aria-label="Revisar as obras do site ao ligar"><span></span></button></li>
           <li><div><strong>Obras novas primeiro com 10 capítulos</strong><span>Cada obra nova entra no site logo com os primeiros capítulos. O resto vem depois que as outras novas tiverem os delas. Obras pedidas por leitores vão sempre inteiras.</span></div>
             <button type="button" role="switch" class="switch" data-auto="firstPass" aria-checked="false" aria-label="Obras novas primeiro com 10 capítulos"><span></span></button></li>
           <li><div><strong>Pôr obras novas na fila</strong><span>A cada 20 min, as obras novas e atualizadas da MediocreScan que ainda não estão no site entram na fila.</span></div>

@@ -36,7 +36,7 @@ final class EnvioStore {
     private final ArrayDeque<String> recent = new ArrayDeque<>();
     private long seq;
     private int fileLines;
-    private String lastSpeed, lastPick, lastStart, lastProgress, lastStatus;
+    private String lastSpeed, lastReview, lastPick, lastStart, lastProgress, lastStatus;
 
     static synchronized EnvioStore get(Context context) {
         if (instance == null) instance = new EnvioStore(context.getApplicationContext());
@@ -84,6 +84,7 @@ final class EnvioStore {
         String type = String.valueOf(event.get("type"));
         if ("run-start".equals(type) || "chapters-start".equals(type)) lastPick = null;
         if ("speed".equals(type)) lastSpeed = line;
+        else if (type.startsWith("review-") && !"review-scan".equals(type)) lastReview = line;
         else if ("auto-pick".equals(type)) lastPick = line;
         else if ("work-start".equals(type) || "chapters-start".equals(type) || "run-start".equals(type)) { lastStart = line; lastProgress = null; lastStatus = null; }
         else if ("progress".equals(type)) lastProgress = line;
@@ -96,7 +97,7 @@ final class EnvioStore {
     private static boolean isStatus(String type) {
         switch (type) {
             case "sending": case "fetching": case "posting": case "waiting": case "api-wait":
-            case "pause": case "net-retry": case "resume": case "auto-idle": case "auto-scan": case "auto-plan": case "auto-hold":
+            case "pause": case "net-retry": case "resume": case "auto-idle": case "auto-scan": case "auto-plan": case "auto-hold": case "review-scan":
                 return true;
             default:
                 return false;
@@ -147,7 +148,7 @@ final class EnvioStore {
         }
         b.append("],\"snapshot\":[");
         first = true;
-        for (String line : new String[] { lastSpeed, lastPick, lastStart, lastProgress, lastStatus }) {
+        for (String line : new String[] { lastSpeed, lastReview, lastPick, lastStart, lastProgress, lastStatus }) {
             if (line == null) continue;
             if (!first) b.append(',');
             first = false;
@@ -203,6 +204,16 @@ final class EnvioStore {
 
     long[] loadSpeed() {
         return new long[] { prefs.getLong("speedGap", -1), prefs.getLong("speedMin", -1), prefs.getLong("speedMinUntil", -1) };
+    }
+
+    /** Revisão das obras do site: a em andamento (para continuar de onde parou) ou a última terminada. */
+    synchronized void saveReview(Map<String, Object> review) {
+        if (review == null) prefs.edit().remove("review").apply();
+        else prefs.edit().putString("review", Json.stringify(review)).apply();
+    }
+
+    synchronized Map<String, Object> loadReview() {
+        try { return Json.obj(Json.parse(prefs.getString("review", "null"))); } catch (Json.ParseError e) { return null; }
     }
 
     long[] loadPace() {

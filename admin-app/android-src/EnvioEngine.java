@@ -2,6 +2,8 @@ package __PKG__;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -73,6 +75,21 @@ final class EnvioEngine {
     static final int AUTO_MIN_BATTERY = 15;
     /** De quanto em quanto tempo confere de novo uma condição que segurou o automático (Wi-Fi, carregador, bateria). */
     static final long AUTO_HOLD_CHECK_MS = 30_000L;
+
+    /*
+     * Revisão das obras do site (escolhida pelo dono): ao ligar o automático, antes da fila, confere cada obra que já
+     * está no site e manda os capítulos novos. Custa 1 pedido à API por obra (mais os capítulos novos).
+     */
+    /** Uma revisão terminada há menos disso não se repete ao religar (abrir o app de novo, mudar uma opção). */
+    static final long REVIEW_SKIP_MS = 60 * 60_000L;
+    /** Com o automático ligado direto, revisa tudo de novo a cada 12 h. */
+    static final long REVIEW_EVERY_MS = 12 * 3600_000L;
+    /** Revisão cortada no meio (app fechado, celular desligado) continua de onde parou se começou há menos disso. */
+    static final long REVIEW_RESUME_MS = 12 * 3600_000L;
+    /** Espera antes de tentar de novo quando o site não devolve a lista de obras. */
+    static final long REVIEW_RETRY_MS = 10 * 60_000L;
+    /** Páginas da lista de obras do site (30 por página) lidas no máximo. */
+    static final int REVIEW_MAX_PAGES = 50;
     private static final Pattern UUID =Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
     private static final Pattern IP_BLOCK = Pattern.compile("ip\\s+bloquead|bloquead|blocked|banned", Pattern.CASE_INSENSITIVE);
 
@@ -133,6 +150,9 @@ final class EnvioEngine {
         default Device device() { return null; }
         /** Guarda a velocidade aprendida (intervalo atual, intervalo mínimo e até quando ele vale). */
         default void saveSpeed(long gap, long min, long minUntil) { }
+        /** Revisão das obras do site em andamento ou a última feita (para continuar depois de o app fechar). */
+        default Map<String, Object> loadReview() { return null; }
+        default void saveReview(Map<String, Object> review) { }
     }
 
     /** Rede e bateria no momento. */
@@ -151,10 +171,13 @@ final class EnvioEngine {
         boolean chargingOnly = false;
         /** Capítulos da primeira passada em obras novas; 0 = envia cada obra inteira. */
         int firstPass = AUTO_FIRST_PASS;
+        /** Ao ligar (e a cada 12 h), revisa as obras do site antes da fila. */
+        boolean review = true;
 
         static AutoOptions from(Map<String, Object> job) {
             AutoOptions o = new AutoOptions();
             if (job == null) return o;
+            if (job.get("review") != null) o.review = Json.truthy(job.get("review"));
             if (job.get("discover") != null) o.discover = Json.truthy(job.get("discover"));
             if (job.get("requests") != null) o.requests = Json.truthy(job.get("requests"));
             o.wifiOnly = Json.truthy(job.get("wifiOnly"));
@@ -268,6 +291,49 @@ final class EnvioEngine {
         WorkRef(long id, String title) { this.id = id; this.title = title; }
     }
 
+    /** Revisão das obras do site: as que faltam conferir e o que já deu (guardada no celular a cada obra). */
+    static final class Review {
+        long startedAt, finishedAt, added;
+        int total, checked, news, failed, queued;
+        final List<WorkRef> left = new ArrayList<>();
+
+        Map<String, Object> toMap() {
+            List<Object> l = new ArrayList<>();
+            for (WorkRef w : left) l.add(Json.map("id", w.id, "title", w.title));
+            return Json.map("startedAt", startedAt, "finishedAt", finishedAt, "total", total, "checked", checked,
+                "news", news, "failed", failed, "queued", queued, "added", added, "left", l);
+        }
+
+        static Review from(Map<String, Object> m) {
+            if (m == null) return null;
+            Review r = new Review();
+            r.startedAt = count(m, "startedAt");
+            r.finishedAt = count(m, "finishedAt");
+            r.added = count(m, "added");
+            r.total = (int) count(m, "total");
+            r.checked = (int) count(m, "checked");
+            r.news = (int) count(m, "news");
+            r.failed = (int) count(m, "failed");
+            r.queued = (int) count(m, "queued");
+            List<Object> l = Json.arr(m.get("left"));
+            if (l != null) for (Object o : l) {
+                Map<String, Object> w = Json.obj(o);
+                Long id = w == null ? null : Json.whole(w.get("id"));
+                if (id != null && id > 0) r.left.add(new WorkRef(id, Json.str(w.get("title"))));
+            }
+            return r;
+        }
+
+        WorkRef find(long id) {
+            for (WorkRef w : left) if (w.id == id) return w;
+            return null;
+        }
+
+        void remove(long id) {
+            for (Iterator<WorkRef> it = left.iterator(); it.hasNext();) if (it.next().id == id) it.remove();
+        }
+    }
+
     private static final class Entries {
         final Map<Long, Map<String, Object>> map = new LinkedHashMap<>();
         Long obrId;
@@ -362,6 +428,23 @@ final class EnvioEngine {
 
     /** Modo automático: acorda da espera (o admin pôs obras na fila pelo app). */
     void wake() { wake = true; }
+
+    /* Revisão das obras do site (só no automático). */
+    private Review review;
+    private long reviewFinishedAt, reviewRetryAt;
+    /** Fim da última revisão que conferiu alguma obra (a conferência de rotina descansa nas 6 h seguintes). */
+    private long reviewCoveredAt;
+    private volatile boolean reviewWanted, reviewForce;
+
+    /**
+     * Pede uma revisão das obras do site: ao abrir o app (vale se a última foi há mais de 1 h) ou no botão
+     * "Revisar agora" (`force`, revisa mesmo que tenha acabado de revisar). Acorda o automático se ele estiver esperando.
+     */
+    void requestReview(boolean force) {
+        if (force) reviewForce = true;
+        reviewWanted = true;
+        wake = true;
+    }
 
     /** Sessão renovada pelo app enquanto o envio roda. */
     void updateSession(Session s) {
@@ -1234,7 +1317,7 @@ final class EnvioEngine {
             catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new Stopped(); }
         }
         checkStop();
-        if (wake) log("Obras novas na fila: o automático voltou a enviar.");
+        if (wake && !reviewWanted) log("Obras novas na fila: o automático voltou a enviar.");
         wake = false;
     }
 
@@ -1284,6 +1367,146 @@ final class EnvioEngine {
         return f[0] >= AUTO_MAX_FAILS;
     }
 
+    private void saveReview(Review r) {
+        try { host.saveReview(r == null ? null : r.toMap()); } catch (RuntimeException ignored) { /* só não continua depois */ }
+    }
+
+    /**
+     * Lista as obras do site vindas da MediocreScan (páginas de 30) e monta a revisão: primeiro as que ainda saem
+     * (em andamento, hiato...), depois as completas; dentro de cada grupo, as mais lidas primeiro. As que estão na
+     * fila do site ficam de fora: a fila já cuida delas logo depois da revisão.
+     */
+    private Review startReview() throws Soft {
+        emit("review-scan");
+        List<Map<String, Object>> rows = new ArrayList<>();
+        Set<Long> ids = new LinkedHashSet<>();
+        for (int page = 1; page <= REVIEW_MAX_PAGES; page++) {
+            checkStop();
+            Map<String, Object> r = site(Json.map("action", "site_list", "filter", "mediocre", "q", "", "page", page));
+            List<Object> items = Json.arr(r.get("items"));
+            if (items == null || items.isEmpty()) break;
+            for (Object o : items) {
+                Map<String, Object> m = Json.obj(o);
+                Long id = m == null ? null : Json.whole(m.get("source_mediocre_id"));
+                if (id != null && id > 0 && ids.add(id)) rows.add(m);
+            }
+            long total = count(r, "total"), size = count(r, "pageSize");
+            if (size <= 0) size = 30;
+            if (items.size() < size || (total > 0 && (long) page * size >= total)) break;
+        }
+        Set<Long> queued = new HashSet<>();
+        List<Long> all = new ArrayList<>(ids);
+        for (int i = 0; i < all.size(); i += 100) {
+            checkStop();
+            Map<String, Object> r = site(Json.map("action", "check", "ids", new ArrayList<>(all.subList(i, Math.min(all.size(), i + 100)))));
+            queued.addAll(longs(r.get("queued")));
+        }
+        Collections.sort(rows, new Comparator<Map<String, Object>>() {
+            @Override
+            public int compare(Map<String, Object> a, Map<String, Object> b) {
+                int ca = "Completo".equalsIgnoreCase(Json.str(a.get("status"))) ? 1 : 0;
+                int cb = "Completo".equalsIgnoreCase(Json.str(b.get("status"))) ? 1 : 0;
+                if (ca != cb) return ca - cb;
+                return Long.compare(count(b, "views"), count(a, "views"));
+            }
+        });
+        Review rv = new Review();
+        rv.startedAt = clock.now();
+        for (Map<String, Object> m : rows) {
+            long id = Json.whole(m.get("source_mediocre_id"));
+            if (queued.contains(id)) { rv.queued++; continue; }
+            rv.left.add(new WorkRef(id, Json.str(m.get("title"))));
+        }
+        rv.total = rv.left.size();
+        return rv;
+    }
+
+    /** Começa a revisão se foi pedida (ao ligar, ao abrir o app, no botão) ou se já passaram 12 h da última. */
+    private void maybeStartReview(AutoOptions opts) {
+        if (review != null) return;
+        long now = clock.now();
+        boolean due = opts.review && reviewFinishedAt > 0 && now - reviewFinishedAt >= REVIEW_EVERY_MS;
+        if (!(reviewWanted || due) || now < reviewRetryAt) return;
+        boolean force = reviewForce;
+        if (!force && !opts.review) { reviewWanted = false; return; }
+        if (!force && !due && reviewFinishedAt > 0 && now - reviewFinishedAt < REVIEW_SKIP_MS) {
+            reviewWanted = false;
+            long ago = (now - reviewFinishedAt) / 60_000L;
+            log("As obras do site foram revisadas há " + (ago < 1 ? "menos de 1 min" : ago + " min") + ": a próxima revisão vem sozinha em "
+                + Math.max(1, (REVIEW_EVERY_MS - (now - reviewFinishedAt) + 1_800_000L) / 3_600_000L) + " h. Para revisar agora, toque em Revisar obras.");
+            emit("review-skip", "finishedAt", reviewFinishedAt, "nextMs", REVIEW_EVERY_MS - (now - reviewFinishedAt));
+            return;
+        }
+        Review rv;
+        try {
+            rv = startReview();
+        } catch (Soft e) {
+            log("Revisão das obras do site: " + e.getMessage() + " Tenta de novo em 10 min.");
+            reviewRetryAt = now + REVIEW_RETRY_MS;
+            return;
+        }
+        reviewWanted = false;
+        reviewForce = false;
+        review = rv;
+        saveReview(rv);
+        if (rv.left.isEmpty()) log("Revisão das obras do site: nenhuma obra para conferir agora" + (rv.queued > 0 ? " (as " + rv.queued + " do site estão na fila)" : "") + ".");
+        else log("Revisão das obras do site: " + rv.total + " obra(s) para conferir" + (rv.queued > 0 ? " (" + rv.queued + " já estão na fila e vão depois)" : "")
+            + ". Primeiro as que ainda saem, as mais lidas antes. Depois vem a fila.");
+        emit("review-start", "total", rv.total, "done", 0, "news", 0, "added", 0, "queued", rv.queued, "resumed", false);
+        if (rv.left.isEmpty()) finishReview();
+    }
+
+    /**
+     * Um passo da revisão: a próxima obra do site. As que a lista da MediocreScan já mostrou com capítulo novo passam
+     * na frente. Erro numa obra não para a revisão (anota e segue); sem internet a obra fica para a próxima tentativa.
+     */
+    private Outcome reviewStep(Map<Long, long[]> fails, Map<Long, String> updates) {
+        Review rv = review;
+        WorkRef w = null;
+        String source = "revisao";
+        for (Iterator<Map.Entry<Long, String>> it = updates.entrySet().iterator(); it.hasNext() && w == null;) {
+            Map.Entry<Long, String> u = it.next();
+            WorkRef in = rv.find(u.getKey());
+            if (in != null) { it.remove(); w = in; source = "atualizada"; }
+        }
+        if (w == null) w = rv.left.get(0);
+        emit("auto-pick", "id", w.id, "source", source, "priority", 0, "limit", 0, "review", rv.checked + 1, "reviewTotal", rv.total);
+        Outcome out = null;
+        try {
+            out = sendWork(w.id, w.title, rv.left.size(), 0);
+            rv.added += out.added;
+            if (out.added > 0) rv.news++;
+            fails.remove(w.id);
+        } catch (Soft e) {
+            rv.failed++;
+            long[] f = fails.get(w.id);
+            fails.put(w.id, new long[] { (f == null ? 0 : f[0]) + 1, clock.now() });
+            log((w.title != null && !w.title.isEmpty() ? w.title : "Obra " + w.id) + ": " + e.getMessage() + " A revisão segue para a próxima.");
+        }
+        rv.remove(w.id);
+        rv.checked++;
+        saveReview(rv);
+        emit("review-progress", "done", rv.checked, "total", rv.total, "news", rv.news, "added", rv.added, "failed", rv.failed,
+            "id", w.id, "name", w.title, "workAdded", out == null ? 0 : out.added);
+        if (rv.left.isEmpty()) finishReview();
+        return out;
+    }
+
+    private void finishReview() {
+        Review rv = review;
+        if (rv == null) return;
+        rv.finishedAt = clock.now();
+        reviewFinishedAt = rv.finishedAt;
+        if (rv.checked > 0) reviewCoveredAt = rv.finishedAt;
+        review = null;
+        saveReview(rv);
+        if (rv.checked > 0) log("Revisão concluída: " + rv.checked + " obra(s) do site conferida(s), "
+            + (rv.news == 0 ? "nenhuma com capítulo novo" : rv.news + " com capítulos novos (+" + rv.added + " capítulos)")
+            + (rv.failed > 0 ? ", " + rv.failed + " com erro" : "") + ". Agora a fila; a próxima revisão vem em 12 h.");
+        emit("review-done", "checked", rv.checked, "total", rv.total, "news", rv.news, "added", rv.added, "failed", rv.failed,
+            "ms", rv.finishedAt - rv.startedAt, "nextMs", REVIEW_EVERY_MS);
+    }
+
     void runAuto(boolean discover, boolean requests) {
         AutoOptions o = new AutoOptions();
         o.discover = discover;
@@ -1293,7 +1516,8 @@ final class EnvioEngine {
 
     /**
      * Modo automático: fica ligado e decide sozinho o que enviar, na ordem
-     * fila do site (pedidos de leitores primeiro; com a primeira passada ligada, obras novas recebem os primeiros
+     * revisão das obras do site (ao ligar, ao abrir o app e a cada 12 h: confere cada obra já enviada e manda os
+     * capítulos novos; uma revisão cortada continua de onde parou) → fila do site (pedidos de leitores primeiro; com a primeira passada ligada, obras novas recebem os primeiros
      * capítulos e voltam para o fim da fila, e só depois as outras recebem o resto) → obras do site atualizadas na
      * MediocreScan → conferência das obras do site há mais tempo sem conferir. A cada ciclo também liga pedidos de
      * leitores e (opcional) põe obras novas na fila. Sem nada para fazer, espera e olha de novo. A fila é relida
@@ -1312,7 +1536,25 @@ final class EnvioEngine {
         int robin = 0;
         emit("run-start", "count", 0, "auto", true);
         emitSpeed();
-        log("Modo automático ligado: fila do site" + (opts.firstPass > 0 ? " (obras novas primeiro com " + opts.firstPass + " capítulos)" : "")
+        // Revisão: continua a que foi cortada no meio; senão pede uma (vale se a última acabou há mais de 1 h).
+        review = null;
+        reviewFinishedAt = 0;
+        reviewCoveredAt = 0;
+        reviewRetryAt = 0;
+        Review saved = null;
+        try { saved = Review.from(host.loadReview()); } catch (RuntimeException ignored) { /* sem revisão guardada */ }
+        if (saved != null && saved.finishedAt > 0) {
+            reviewFinishedAt = saved.finishedAt;
+            if (saved.checked > 0) reviewCoveredAt = saved.finishedAt;
+        }
+        if (opts.review && saved != null && saved.finishedAt == 0 && !saved.left.isEmpty() && clock.now() - saved.startedAt < REVIEW_RESUME_MS) {
+            review = saved;
+            log("Continuando a revisão das obras do site: " + saved.checked + " de " + saved.total + " já conferidas.");
+            emit("review-start", "total", saved.total, "done", saved.checked, "news", saved.news, "added", saved.added, "queued", saved.queued, "resumed", true);
+        } else if (opts.review) {
+            reviewWanted = true;
+        }
+        log("Modo automático ligado: " + (opts.review ? "revisão das obras do site, " : "") + "fila do site" + (opts.firstPass > 0 ? " (obras novas primeiro com " + opts.firstPass + " capítulos)" : "")
             + ", obras atualizadas" + (opts.discover ? ", obras novas" : "") + (opts.requests ? " e pedidos de leitores" : "")
             + (opts.wifiOnly ? "; só no Wi-Fi" : "") + (opts.chargingOnly ? "; só carregando" : "") + ".");
         try {
@@ -1331,6 +1573,14 @@ final class EnvioEngine {
                         try { autoRequests(); } catch (Soft e) { log("Pedidos: " + e.getMessage()); }
                     }
                     try { scanLists(full && opts.discover, seen, updates); } catch (Soft e) { log("Listas da MediocreScan: " + e.getMessage()); }
+                }
+                // Revisão das obras do site: vem antes da fila (ao ligar, ao abrir o app e a cada 12 h).
+                maybeStartReview(opts);
+                if (review != null) {
+                    Outcome o = reviewStep(fails, updates);
+                    // "Obras" do automático = obras que receberam capítulos (conferida em dia não conta).
+                    if (o != null && o.added > 0) { totalAdded += o.added; done++; }
+                    continue;
                 }
                 Map<String, Object> plan;
                 try {
@@ -1397,7 +1647,9 @@ final class EnvioEngine {
                         if (!failedOut(fails, u.getKey())) { next = new WorkRef(u.getKey(), u.getValue()); source = "atualizada"; }
                     }
                 }
-                if (next == null && robin < AUTO_ROUND_ROBIN) {
+                // Conferência de rotina: desnecessária nas 6 h depois de uma revisão completa.
+                boolean reviewedRecently = reviewCoveredAt > 0 && clock.now() - reviewCoveredAt < REVIEW_EVERY_MS / 2;
+                if (next == null && robin < AUTO_ROUND_ROBIN && !reviewedRecently) {
                     for (Long id : longs(plan.get("sync"))) {
                         if (failedOut(fails, id)) continue;
                         next = new WorkRef(id, null);

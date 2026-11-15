@@ -69,6 +69,8 @@ public class EnvioService extends Service {
     // Estado da notificação.
     private String workName = "Enviando obras";
     private long done = 0, total = 0;
+    /** Revisão das obras do site em andamento (para a notificação): obras conferidas e total; total 0 = sem revisão. */
+    private long reviewDone = 0, reviewTotal = 0;
     private String endTitle, endText;
 
     @Override
@@ -267,6 +269,8 @@ public class EnvioService extends Service {
         @Override public void workDone(int index) { store.advanceJob(index + 1); }
         @Override public EnvioEngine.Device device() { return readDevice(); }
         @Override public void saveSpeed(long gap, long min, long minUntil) { store.saveSpeed(gap, min, minUntil); }
+        @Override public Map<String, Object> loadReview() { return store.loadReview(); }
+        @Override public void saveReview(Map<String, Object> review) { store.saveReview(review); }
     };
 
     private void emitLocal(String type, Object... kv) {
@@ -335,6 +339,8 @@ public class EnvioService extends Service {
         long countdownEnd = 0;
         switch (type) {
             case "run-start":
+                reviewDone = 0;
+                reviewTotal = 0;
                 if (Json.truthy(e.get("auto"))) { workName = "Modo automático"; text = "Ligado: olhando a fila do site…"; }
                 else text = num(e, "count") + " obra(s) na vez";
                 break;
@@ -344,6 +350,34 @@ public class EnvioService extends Service {
                 break;
             case "speed":
                 return;
+            case "review-scan":
+                workName = "Revisão das obras do site";
+                text = "Listando as obras que já estão no site…";
+                break;
+            case "review-start":
+                reviewTotal = num(e, "total");
+                reviewDone = num(e, "done");
+                workName = "Revisão das obras do site";
+                done = reviewDone;
+                total = reviewTotal;
+                text = reviewTotal + " obra(s) para conferir" + (reviewDone > 0 ? " · " + reviewDone + " já conferidas" : "") + ". Depois vem a fila.";
+                break;
+            case "review-progress":
+                reviewDone = num(e, "done");
+                reviewTotal = num(e, "total");
+                workName = "Revisão das obras do site";
+                done = reviewDone;
+                total = reviewTotal;
+                text = reviewDone + " de " + reviewTotal + " obras conferidas · " + num(e, "news") + " com capítulos novos (+" + num(e, "added") + ")";
+                break;
+            case "review-done":
+                reviewDone = 0;
+                reviewTotal = 0;
+                workName = "Modo automático";
+                done = 0;
+                total = 0;
+                text = "Revisão concluída: " + num(e, "checked") + " obra(s), " + num(e, "news") + " com capítulos novos (+" + num(e, "added") + "). Agora a fila.";
+                break;
             case "auto-idle":
                 workName = "Modo automático";
                 done = 0;
@@ -363,7 +397,12 @@ public class EnvioService extends Service {
                 total = num(e, "total");
                 done = 0;
                 long left = num(e, "left");
-                text = total + " capítulo(s) para enviar" + (left > 1 ? " · mais " + (left - 1) + " obra(s) depois" : "");
+                if (reviewTotal > 0) {
+                    // Revisão: a barra mostra as obras conferidas; o texto diz se esta tem capítulo novo.
+                    text = "Revisão " + Math.min(reviewTotal, reviewDone + 1) + " de " + reviewTotal + ": "
+                        + (total > 0 ? total + " capítulo(s) novo(s)" : "sem capítulo novo");
+                    if (total == 0) { done = reviewDone; total = reviewTotal; }
+                } else text = total + " capítulo(s) para enviar" + (left > 1 ? " · mais " + (left - 1) + " obra(s) depois" : "");
                 if (wakeLock != null) { try { wakeLock.acquire(WAKE_MS); } catch (RuntimeException ignored) { /* ok */ } }
                 break;
             }
@@ -574,6 +613,14 @@ public class EnvioService extends Service {
         EnvioService s = current;
         if (s == null || !s.engineAlive()) return false;
         s.engine.wake();
+        return true;
+    }
+
+    /** Automático rodando: revisa as obras do site (`force`: agora; senão só se a última foi há mais de 1 h). */
+    static boolean reviewJob(boolean force) {
+        EnvioService s = current;
+        if (s == null || !s.engineAlive()) return false;
+        s.engine.requestReview(force);
         return true;
     }
 
