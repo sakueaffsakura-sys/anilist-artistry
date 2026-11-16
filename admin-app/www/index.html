@@ -101,6 +101,12 @@
           </div>
         </div>
 
+        <div id="auto-wheel" class="auto-wheel" hidden>
+          <p class="wh-line"><strong id="wh-title">Rodízio</strong><span id="wh-count"></span></p>
+          <ol id="wh-list" class="wh-list"></ol>
+          <button id="wh-more" type="button" class="link" hidden>Ver todas</button>
+        </div>
+
         <div id="auto-review" class="auto-review" hidden>
           <p class="rv-line"><strong>Revisão do site</strong><span id="rv-count"></span></p>
           <div id="rv-bar" class="bar ok" role="progressbar" aria-label="Obras do site conferidas" aria-valuemin="0" aria-valuemax="100"><span></span></div>
@@ -304,11 +310,21 @@
       </section>
 
       <section class="set-group">
+        <h2 class="caption">Várias obras ao mesmo tempo</h2>
+        <div id="wheel-box" class="cycle-box card">
+          <label>Obras ao mesmo tempo<input id="wh-works" type="number" inputmode="numeric" min="1" max="30" /></label>
+          <label>Capítulos para cada obra<input id="wh-per" type="number" inputmode="numeric" min="0" max="1000" /></label>
+          <button id="wh-reset" type="button" class="link">Voltar ao padrão</button>
+        </div>
+        <p id="wheel-hint" class="hint set-note"></p>
+      </section>
+
+      <section class="set-group">
         <h2 class="caption">Automático</h2>
         <ul class="switches">
           <li><div><strong>Revisar as obras do site ao ligar</strong><span>Antes da fila, confere cada obra que já está no site e envia os capítulos novos. Também ao abrir o app (se a última foi há mais de 1 h) e sozinho a cada 12 h.</span></div>
             <button type="button" role="switch" class="switch" data-auto="review" aria-checked="false" aria-label="Revisar as obras do site ao ligar"><span></span></button></li>
-          <li><div><strong>Obras novas primeiro com 10 capítulos</strong><span>Cada obra nova entra no site logo com os primeiros capítulos. O resto vem depois que as outras novas tiverem os delas. Obras pedidas por leitores vão sempre inteiras.</span></div>
+          <li id="sw-firstpass"><div><strong>Obras novas primeiro com 10 capítulos</strong><span>Cada obra nova entra no site logo com os primeiros capítulos. O resto vem depois que as outras novas tiverem os delas. Obras pedidas por leitores vão sempre inteiras.</span></div>
             <button type="button" role="switch" class="switch" data-auto="firstPass" aria-checked="false" aria-label="Obras novas primeiro com 10 capítulos"><span></span></button></li>
           <li><div><strong>Pôr obras novas na fila</strong><span>A cada 20 min, as obras novas e atualizadas da MediocreScan que ainda não estão no site entram na fila.</span></div>
             <button type="button" role="switch" class="switch" data-auto="discover" aria-checked="false" aria-label="Pôr obras novas na fila"><span></span></button></li>
@@ -409,6 +425,26 @@
   </section>
 
   <!-- JSON -->
+  <dialog id="focus-dialog" aria-labelledby="fd-title">
+    <h2 id="fd-title">Enviar agora</h2>
+    <p id="fd-name" class="fd-name"></p>
+    <p class="fd-text">Ela passa na frente da revisão, do rodízio e da fila e recebe os lotes inteiros. Depois o automático continua de onde estava.</p>
+    <p id="fd-label" class="fd-label">Quantos capítulos</p>
+    <div id="fd-chips" class="fd-chips" role="radiogroup" aria-labelledby="fd-label">
+      <button type="button" role="radio" data-ch="0" aria-checked="true">Todos</button>
+      <button type="button" role="radio" data-ch="10" aria-checked="false">10</button>
+      <button type="button" role="radio" data-ch="30" aria-checked="false">30</button>
+      <button type="button" role="radio" data-ch="50" aria-checked="false">50</button>
+    </div>
+    <label class="fd-other">Outro número<input id="fd-num" type="number" inputmode="numeric" min="1" max="5000" placeholder="ex.: 25" /></label>
+    <p id="fd-hint" class="fd-hint"></p>
+    <div class="row fd-actions">
+      <button id="fd-go" type="button" class="btn primary">Enviar agora</button>
+      <button id="fd-cancel" type="button" class="btn ghost">Cancelar</button>
+    </div>
+    <button id="fd-queue" type="button" class="link fd-queue">Só pôr no fim da fila</button>
+  </dialog>
+
   <dialog id="json-dialog" class="sheet">
     <div class="sheet-head">
       <h2 id="json-title">JSON</h2>

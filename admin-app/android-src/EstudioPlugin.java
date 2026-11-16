@@ -91,6 +91,17 @@ public class EstudioPlugin extends Plugin {
         call.resolve(r);
     }
 
+    /** Modo automático ligado: a obra escolhida vai na frente (chapters 0 = todos). ok=false se ele não está rodando. */
+    @PluginMethod
+    public void focusJob(PluginCall call) {
+        Long id = call.getLong("id");
+        JSObject r = new JSObject();
+        if (id == null || id <= 0) { call.reject("Obra inválida."); return; }
+        Integer ch = call.getInt("chapters", 0);
+        r.put("ok", EnvioService.focusJob(id, call.getString("title"), ch == null ? 0 : Math.max(0, ch)));
+        call.resolve(r);
+    }
+
     /** Modo automático ligado: acorda da espera porque há obras novas na fila. */
     @PluginMethod
     public void wakeJob(PluginCall call) {

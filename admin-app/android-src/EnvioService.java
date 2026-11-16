@@ -416,7 +416,39 @@ public class EnvioService extends Service {
                 text = total + " capítulo(s) escolhido(s)";
                 break;
             case "sending":
-                text = "Enviando capítulos " + num(e, "from") + " a " + num(e, "to") + " de " + num(e, "total");
+                text = e.get("works") != null && num(e, "works") > 1
+                    ? "Baixando " + num(e, "total") + " capítulos de " + num(e, "works") + " obras"
+                    : "Enviando capítulos " + num(e, "from") + " a " + num(e, "to") + " de " + num(e, "total");
+                break;
+            case "wheel": {
+                List<Object> slots = Json.arr(e.get("slots"));
+                int n = slots == null ? 0 : slots.size();
+                if (n == 0) return;
+                long got = 0, want = 0;
+                String focusName = null;
+                for (Object o : slots) {
+                    Map<String, Object> m = Json.obj(o);
+                    if (m == null) continue;
+                    got += num(m, "got");
+                    want += num(m, "total");
+                    if (m != null && Json.truthy(m.get("focus"))) focusName = String.valueOf(m.get("name"));
+                }
+                workName = focusName != null ? "Escolhida: " + focusName : n + " obra(s) ao mesmo tempo";
+                done = got;
+                total = want;
+                return;
+            }
+            case "wheel-lote":
+                text = "Lote de " + num(e, "batch") + " capítulos em " + num(e, "works") + " obra(s) · +" + num(e, "added")
+                    + " · " + clock(num(e, "batchMs")) + ". Hoje: " + addToday(0);
+                break;
+            case "focus-start":
+                workName = "Escolhida: " + e.get("name");
+                text = (num(e, "chapters") > 0 ? num(e, "chapters") + " capítulos" : "Todos os capítulos que faltam") + " na frente de tudo";
+                break;
+            case "focus-done":
+                workName = "Modo automático";
+                text = e.get("name") + ": +" + num(e, "added") + " capítulo(s). O automático continua.";
                 break;
             case "fetching":
                 text = "Baixando capítulo " + num(e, "pos") + " de " + num(e, "total");
@@ -617,6 +649,17 @@ public class EnvioService extends Service {
         EnvioService s = current;
         if (s == null || !s.engineAlive()) return false;
         s.engine.wake();
+        return true;
+    }
+
+    /**
+     * Automático rodando: a obra escolhida passa na frente de tudo e recebe `chapters` capítulos (0 = todos).
+     * Devolve false se o automático não está rodando (a tela liga o automático já com a obra escolhida).
+     */
+    static boolean focusJob(long id, String title, int chapters) {
+        EnvioService s = current;
+        if (s == null || !s.engineAlive() || !s.engine.autoRunning()) return false;
+        s.engine.requestFocus(id, title, chapters);
         return true;
     }
 

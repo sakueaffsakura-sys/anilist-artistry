@@ -13,7 +13,8 @@
   const load = () => { try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch (_) { return {}; } };
   let state = Object.assign({ site: DEFAULT_SITE, token: "", session: null, font: 17 }, load());
   // review: ao ligar (e a cada 12 h) o automático revisa as obras do site e manda os capítulos novos antes da fila.
-  state.auto = Object.assign({ on: true, review: true, discover: true, requests: true, wifiOnly: false, chargingOnly: false, firstPass: 10 }, state.auto || {});
+  // works/perWork: rodízio (pedido do dono em 16/11) — 15 obras ao mesmo tempo, 10 capítulos para cada uma por vez.
+  state.auto = Object.assign({ on: true, review: true, discover: true, requests: true, wifiOnly: false, chargingOnly: false, firstPass: 10, works: 15, perWork: 10 }, state.auto || {});
   // Versão 2: o automático fica sempre ligado (liga sozinho com internet); só desliga se o admin desligar.
   if (!state.auto.v || state.auto.v < 2) { state.auto.on = true; state.auto.v = 2; }
   // Ritmo: "cycle" (padrão: lote de 15 capítulos e pausa de 2 min) ou "safe" (1 pedido por minuto).
@@ -386,6 +387,15 @@
     refreshMarks(rows.map((w) => w.id)).then(updateSendAll);
   }
   /** Fila do site: capa, capítulos já no site e botão para tirar da fila (ex.: obra já finalizada). */
+  /** Selo da obra na fila: escolhida, no rodízio, enviando agora ou em andamento. */
+  function workPill(i) {
+    const id = Number(i.id), slots = autoRunning() && autoInfo.wheel ? autoInfo.wheel.slots : [];
+    const slot = slots.find((x) => Number(x.id) === id);
+    if (slot && slot.focus) return el("span", { className: "pill ok", textContent: "Escolhida: indo agora" });
+    if (slot) return el("span", { className: "pill ok", textContent: `No rodízio: ${slot.got}/${slot.total}` });
+    if (id === sendingId) return el("span", { className: "pill ok", textContent: "Enviando agora" });
+    return i.status === "running" ? el("span", { className: "pill hot", textContent: "Em andamento" }) : null;
+  }
   function renderQueue(items, totalAll) {
     loading = false;
     rows = items.map((i) => ({ id: i.id, title: i.title || `Obra ${i.id}`, cover: i.cover }));
@@ -398,7 +408,10 @@
       el("div", {}, el("strong", { textContent: String(asked) }), el("span", { textContent: "pedidas" })),
       el("div", {}, el("strong", { textContent: String(running) }), el("span", { textContent: "em envio" }))));
     const known = items.reduce((n, i) => n + (i.chapters_remaining > 0 ? i.chapters_remaining : 0), 0), rate = ratePerHour();
-    const order = `Ordem do automático: pedidas por leitores, depois obras do site que ganharam capítulos na MediocreScan, depois ${state.auto.firstPass > 0 ? `os primeiros ${state.auto.firstPass} capítulos de cada obra nova e então o resto` : "a ordem de chegada"}.`;
+    const a = state.auto;
+    const order = a.works > 1
+      ? `Ordem do automático: ${a.works} obras ao mesmo tempo${a.perWork > 0 ? `, ${a.perWork} capítulos para cada uma por vez` : ""}. Entram primeiro as pedidas por leitores e as obras do site que ganharam capítulos, depois a ordem da fila. "Agora" manda uma obra na frente de tudo.`
+      : `Ordem do automático: pedidas por leitores, depois obras do site que ganharam capítulos na MediocreScan, depois ${a.firstPass > 0 ? `os primeiros ${a.firstPass} capítulos de cada obra nova e então o resto` : "a ordem de chegada"}.`;
     const more = totalAll > items.length ? ` Mostrando as ${items.length} primeiras de ${totalAll.toLocaleString("pt-BR")}.` : "";
     $("groups").append(el("p", { className: "list-meta" }, document.createTextNode(order + more + (known ? ` Faltam ${known.toLocaleString("pt-BR")} capítulos nas obras já começadas${rate ? ` (~${Math.max(1, Math.round(known / rate))} h no ritmo atual)` : ""}.` : ""))));
     const clear = el("button", { type: "button", className: "btn ghost small", textContent: "Esvaziar a fila" });
@@ -417,8 +430,7 @@
         i.chapters_remaining > 0 ? el("span", { className: "left", textContent: `faltam ${i.chapters_remaining}` }) : null);
       const info = el("div", { className: "min0" },
         el("p", { className: "t", textContent: i.title || `Obra ${i.id}` }), facts,
-        el("div", {}, i.id === sendingId ? el("span", { className: "pill ok", textContent: "Enviando agora" }) : i.status === "running" ? el("span", { className: "pill hot", textContent: "Em andamento" }) : null,
-          i.priority > 0 ? el("span", { className: "pill hot", textContent: `Pedida por ${i.priority} leitor${i.priority === 1 ? "" : "es"}` }) : null));
+        el("div", {}, workPill(i), i.priority > 0 ? el("span", { className: "pill hot", textContent: `Pedida por ${i.priority} leitor${i.priority === 1 ? "" : "es"}` }) : null));
       const open = el("button", { type: "button", className: "site-row queue-open" }, el("span", { className: "pos", textContent: String(idx + 1) }), coverImg(i.cover, i.title), info);
       open.onclick = () => go(`#/obra/${i.id}`);
       const remove = el("button", { type: "button", className: "chip-btn del", textContent: "Tirar", title: "Tirar da fila", ariaLabel: `Tirar ${i.title || `obra ${i.id}`} da fila` });
@@ -428,7 +440,10 @@
         try { await engine.queueRemove([i.id]); marks.queued.delete(i.id); toast(`"${i.title || i.id}" saiu da fila.`); checkQueueDot(); openTab("fila"); }
         catch (e) { toast(e.message); remove.disabled = false; }
       };
-      ul.append(el("li", { className: "queue-item" }, open, remove));
+      const now = el("button", { type: "button", className: "chip-btn now", textContent: "Agora", title: "Enviar agora", ariaLabel: `Enviar ${i.title || `obra ${i.id}`} agora` });
+      now.hidden = !NATIVE;
+      now.onclick = () => openFocus({ id: Number(i.id), title: i.title || `Obra ${i.id}`, left: Number(i.chapters_remaining) > 0 ? Number(i.chapters_remaining) : 0, list: null });
+      ul.append(el("li", { className: "queue-item" }, open, el("div", { className: "q-acts" }, now, remove)));
     });
     $("groups").append(ul, el("div", { className: "queue-tools" }, clear));
     updateSendAll();
@@ -570,8 +585,10 @@
     const s = statusOf(work.id), b = $("w-publish");
     // Com o automático ligado, o botão põe a obra na fila e ele envia logo depois da atual.
     b.disabled = busy() && !autoRunning();
-    b.textContent = autoRunning() ? (s === "queue" ? "Já está na fila" : "Pôr na fila do automático") : s === "ok" ? "Enviar o que falta" : s === "queue" ? "Continuar envio" : "Publicar no site";
-    if (autoRunning() && s === "queue") b.disabled = true;
+    // Com o automático ligado: "Enviar agora" escolhe esta obra (e quantos capítulos) para ir na frente de tudo.
+    const chosen = autoInfo.focus && autoInfo.focus.id === Number(work.id);
+    b.textContent = autoRunning() ? (chosen ? "Indo agora, na frente" : "Enviar agora") : s === "ok" ? "Enviar o que falta" : s === "queue" ? "Continuar envio" : "Publicar no site";
+    if (autoRunning() && chosen) b.disabled = true;
     $("w-manage").hidden = s === "new";
     const total = work.chapters.length, have = work.chapters.filter(onSite).length;
     const fresh = s === "new" && !have, pct = total ? Math.round((have / total) * 100) : 0;
@@ -583,7 +600,59 @@
       ? "Esta obra ainda não está no Better Mangá. Publique tudo ou envie capítulos soltos pelo botão de cada um."
       : have < total ? `Faltam ${total - have}. Os que já estão no site não são enviados de novo.` : "Está em dia com a MediocreScan.";
   }
-  $("w-publish").onclick = () => { if (work) startRun([work]); };
+  $("w-publish").onclick = () => {
+    if (!work) return;
+    if (autoRunning()) {
+      const total = work.chapters.length, have = work.chapters.filter(onSite).length;
+      openFocus({ id: Number(work.id), title: work.name || work.title || `Obra ${work.id}`, left: Math.max(0, total - have), list: [work] });
+    } else startRun([work]);
+  };
+
+  /* ---------- Enviar agora: uma obra escolhida na frente de tudo ---------- */
+  let focusTarget = null, focusChoice = 0;
+  function openFocus(t) {
+    focusTarget = t; focusChoice = 0;
+    $("fd-name").textContent = t.title;
+    $("fd-num").value = "";
+    renderFocusChoice();
+    const d = $("focus-dialog");
+    if (typeof d.showModal === "function") d.showModal(); else d.setAttribute("open", "");
+  }
+  function closeFocus() { const d = $("focus-dialog"); if (typeof d.close === "function") d.close(); else d.removeAttribute("open"); }
+  function renderFocusChoice() {
+    const typed = Math.round(Number($("fd-num").value));
+    const n = $("fd-num").value !== "" && typed > 0 ? Math.min(5000, typed) : focusChoice;
+    document.querySelectorAll("#fd-chips [data-ch]").forEach((b) => b.setAttribute("aria-checked", String($("fd-num").value === "" && Number(b.dataset.ch) === focusChoice)));
+    const left = focusTarget && focusTarget.left > 0 ? focusTarget.left : 0;
+    const lote = state.speed === "safe" ? 5 : state.cycle.batch, take = n > 0 ? (left ? Math.min(n, left) : n) : left;
+    $("fd-hint").textContent = (left ? `Faltam ${plural(left, "capítulo", "capítulos")} no site. ` : "")
+      + (take ? `Vão ${plural(take, "capítulo", "capítulos")}, ${lote} por lote: uns ${Math.max(1, Math.round((Math.ceil(take / lote) * cycleSeconds({ batch: lote, batches: 1, gap: 0, pause: state.speed === "safe" ? 0 : state.cycle.pause })) / 60))} min.` : "Vão todos os que faltam.");
+    $("fd-go").textContent = n > 0 ? `Enviar ${n}` : "Enviar todos";
+    return n;
+  }
+  document.querySelectorAll("#fd-chips [data-ch]").forEach((b) => { b.onclick = () => { focusChoice = Number(b.dataset.ch) || 0; $("fd-num").value = ""; renderFocusChoice(); }; });
+  $("fd-num").oninput = () => renderFocusChoice();
+  $("fd-cancel").onclick = () => closeFocus();
+  $("fd-queue").onclick = () => { const t = focusTarget; closeFocus(); if (t && t.list) addToQueue(t.list); };
+  $("fd-go").onclick = async () => {
+    const t = focusTarget, n = renderFocusChoice();
+    if (!t) return;
+    closeFocus();
+    const want = { id: t.id, title: t.title, chapters: n };
+    if (autoRunning()) {
+      let ok = false;
+      try { const r = await Native.focusJob(want); ok = Boolean(r && r.ok); } catch (_) { ok = false; }
+      if (ok) {
+        autoInfo.focus = { id: t.id, name: t.title, chapters: n };
+        toast(`${t.title} vai na frente${n ? ` com ${n} capítulos` : ""}. Começa depois do lote atual.`);
+        renderAuto(); if (work && Number(work.id) === t.id) renderSiteStatus();
+        return;
+      }
+    }
+    if (busy()) { toast("Espere o envio atual terminar."); return; }
+    // Automático desligado: liga já com a obra escolhida na frente.
+    await startAuto(false, want);
+  };
   $("w-manage").onclick = async () => {
     if (!work) return;
     try { const r = await engine.siteList("todas", "", 1, work.id); const it = (r.items || [])[0]; if (it) go(`#/gerir/${it.id}`); else toast("Obra ainda não encontrada no site."); }
@@ -996,7 +1065,7 @@
         if (e.auto) {
           if (!quiet || !state.auto.since) { state.auto.since = at; save(); }
           autoInfo.since = state.auto.since;
-          if (!quiet) autoInfo.review = null;
+          if (!quiet) { autoInfo.review = null; autoInfo.wheel = null; }
           $("run-work").textContent = "Modo automático"; $("run-queue").textContent = "Ligado"; setBar(0, 0); setStatus("Olhando a fila do site…"); renderAuto(); break;
         }
         $("run-queue").textContent = `${e.count} obra(s) na vez`; if (typeof e.count === "number") queueLeft = e.count; break;
@@ -1050,9 +1119,33 @@
         if (!e.total) setStatus(autoInfo.review && autoInfo.review.total ? `Revisão ${Math.min(autoInfo.review.total, autoInfo.review.done + 1)} de ${autoInfo.review.total}: ${e.name} está em dia.` : "Nenhum capítulo novo.");
         break;
       case "sending":
-        fetchNote = ""; beatRun(); clearInterval(countdown); setStatus(`Enviando capítulos ${e.from}${e.to > e.from ? ` a ${e.to}` : ""} de ${e.total}…`);
+        fetchNote = ""; beatRun(); clearInterval(countdown);
+        if (e.works) { setStatus(`Baixando ${plural(e.total, "capítulo", "capítulos")} de ${plural(e.works, "obra", "obras")}…`); break; }
+        setStatus(`Enviando capítulos ${e.from}${e.to > e.from ? ` a ${e.to}` : ""} de ${e.total}…`);
         note2(`${note.work || "Envio"}: buscando capítulos ${e.from}${e.to > e.from ? `–${e.to}` : ""} de ${e.total}.`);
         break;
+      // Rodízio: obra entrou (ou é a escolhida), estado das obras abertas, lote dividido entre elas.
+      case "slot-open":
+        if (!e.focus) note2(`${e.name}: entrou no rodízio (${plural(Number(e.total) || 0, "capítulo", "capítulos")} desta vez${e.later ? `; faltam mais ${e.later} depois` : ""}).`);
+        break;
+      case "wheel":
+        autoInfo.wheel = { slots: Array.isArray(e.slots) ? e.slots : [], max: Number(e.max) || 1 };
+        autoInfo.wheel.slots.forEach((sl) => rememberCover(Number(sl.id), sl.cover));
+        autoInfo.idle = false; autoInfo.scanning = false;
+        renderAuto(); break;
+      case "wheel-lote":
+        beatRun(); autoInfo.lastBatch = { n: Number(e.batch) || 0, ms: Number(e.batchMs) || 0 };
+        setStatus(`Lote de ${plural(Number(e.batch) || 0, "capítulo", "capítulos")} em ${plural(Number(e.works) || 0, "obra", "obras")}: +${e.added} no site.`);
+        renderAuto(); break;
+      case "focus-start":
+        autoInfo.focus = { id: Number(e.id), name: e.name, chapters: Number(e.chapters) || 0 };
+        autoInfo.idle = false;
+        setStatus(`${e.name}: na frente de tudo (${e.chapters > 0 ? `${e.chapters} capítulos` : "todos os capítulos que faltam"}).`);
+        renderAuto(); if (work) renderSiteStatus(); break;
+      case "focus-done":
+        autoInfo.focus = null;
+        if (!quiet) toast(e.error ? `${e.name}: ${e.error}` : e.note === "em dia" ? `${e.name} já está em dia no site.` : `${e.name}: +${e.added} capítulo(s). O automático continua.`);
+        renderAuto(); if (work) renderSiteStatus(); break;
       case "progress":
         if (e.batchMs) autoInfo.lastBatch = { n: Number(e.batch) || 0, ms: Number(e.batchMs) || 0 };
         beatRun(); note.done = e.done; note.total = e.total; setBar(e.done, e.total);
@@ -1067,7 +1160,7 @@
         count(remaining(e), (sec) => setStatus(e.cycle ? `Pausa do ciclo: próximos ${total} capítulos em ${mmss(sec)}.` : `Próximos ${n} capítulos em ${mmss(sec)}.`));
         break;
       }
-      case "posting": clearInterval(countdown); fetchNote = ""; setStatus(`Publicando ${e.count} capítulo(s) no site…`); break;
+      case "posting": clearInterval(countdown); fetchNote = ""; setStatus(e.works > 1 ? `Publicando ${e.count} capítulo(s) de ${e.works} obras no site…` : `Publicando ${e.count} capítulo(s) no site…`); break;
       // Recusa da API no meio do lote: o motor encolhe os lotes (15 → 10 → 5) e volta depois de 1 h sem recusa.
       case "batch-size":
         autoInfo.batchCap = Number(e.batch) || 0;
@@ -1111,14 +1204,16 @@
         // No automático, obra conferida sem capítulo novo não conta em "Hoje" nem em "Enviadas hoje".
         sendingId = null; if (!quiet && (Number(e.added) > 0 || !autoRunning())) { addToday(e.added, at); addRecord(e, at); }
         if (autoRunning() && !$("view-panel").hidden && !autoInfo.review) renderPanelQueue();
-        if (!(autoInfo.review && !Number(e.added) && !e.note && !e.skipped)) note2(`${e.name}: ${e.note ? e.note : `+${e.added} capítulo(s)${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}${e.later ? `; faltam ${e.later}, que vêm depois das outras obras novas` : ""}`}.`);
+        const quietDone = (autoInfo.review && !Number(e.added) && !e.note && !e.skipped) || (e.wheel && !Number(e.added) && (e.note === "em dia" || !e.note));
+        if (!quietDone) note2(`${e.name}: ${e.note && !Number(e.added) ? e.note : `+${e.added} capítulo(s)${e.skipped ? `, ${e.skipped} sem conteúdo` : ""}${e.later ? e.wheel ? `; faltam ${e.later}, na próxima vez dela` : `; faltam ${e.later}, que vêm depois das outras obras novas` : ""}`}.`);
         break;
       case "log": note2(e.text); break;
       case "run-done": finishRun(`Pronto: ${e.works} obra(s), ${e.added} capítulo(s) enviados.`, false, quiet, at); break;
       case "run-stopped":
         if (e.auto && restartAuto) {
           restartAuto = false; finishRun("Religando o automático com as opções novas…", false, true, at);
-          setTimeout(() => { if (!busy()) startAuto(true); }, 400); break;
+          const keep = autoInfo.focus;
+          setTimeout(() => { if (!busy()) startAuto(true, keep ? { id: keep.id, title: keep.name, chapters: keep.chapters } : null); }, 400); break;
         }
         if (e.auto) {
           // Desligado pelo admin (aqui ou no Parar da notificação): fica desligado até ligar de novo.
@@ -1152,7 +1247,8 @@
   /* ---------- painel e modo automático ---------- */
   // step: etapa do ciclo (fila, atualizada, conferencia, espera); pick: de onde veio a obra atual.
   // review: revisão das obras do site em andamento { done, total, news, added, queued }; lastReview: a última terminada.
-  let autoInfo = { idle: false, scanning: false, queue: null, updates: 0, works: 0, added: 0, since: null, pick: null, review: null, lastReview: null };
+  // wheel: obras abertas no rodízio { slots, max } (a escolhida vem primeiro, com focus); focus: obra escolhida.
+  let autoInfo = { idle: false, scanning: false, queue: null, updates: 0, works: 0, added: 0, since: null, pick: null, review: null, lastReview: null, wheel: null, focus: null };
   let workClock = null; // { id, at, done } para estimar quanto falta da obra atual
 
   /* Capítulos enviados por dia (contados neste celular), para "Hoje" e "7 dias". */
@@ -1245,24 +1341,28 @@
   function renderAuto() {
     const on = autoRunning(), other = busy() && !on, sw = $("auto-toggle");
     const hold = on ? autoInfo.hold : null;
-    const sending = on && !hold && !autoInfo.idle && !autoInfo.scanning && sendingId != null;
     const rv = on ? autoInfo.review : null;
+    // Rodízio (ou obra escolhida): várias obras recebendo capítulos; some durante a revisão.
+    const wh = on && !hold && !rv && autoInfo.wheel && autoInfo.wheel.slots.length ? autoInfo.wheel : null;
+    const focusSlot = wh ? wh.slots.find((x) => x.focus) : null;
+    const sending = on && !hold && !autoInfo.idle && !autoInfo.scanning && (sendingId != null || Boolean(wh));
     // Revisão e conferência de rotina são a mesma etapa na faixa: olhar as obras que já estão no site.
     const pickStep = (autoInfo.pick && autoInfo.pick.source) || "fila";
-    const step = !on || hold ? null : rv ? "revisao" : autoInfo.idle ? "espera" : sending ? (pickStep === "conferencia" ? "revisao" : pickStep) : null;
+    const step = !on || hold ? null : rv ? "revisao" : autoInfo.idle ? "espera" : wh ? "fila" : sending ? (pickStep === "conferencia" ? "revisao" : pickStep) : null;
     $("auto-card").dataset.state = on ? (hold ? "hold" : autoInfo.idle ? "idle" : "work") : other ? "busy" : "off";
     sw.setAttribute("aria-checked", String(on));
     sw.disabled = other || !NATIVE;
     $("auto-label").textContent = on ? (autoInfo.since ? `Automático ligado desde ${hhmm(autoInfo.since)}` : "Automático ligado") : "Modo automático";
     $("auto-title").textContent = !on ? (other ? "Outro envio rodando" : "Desligado")
       : hold ? (/^precisa de você/i.test(hold) ? "Precisa de você" : hold) : rv ? (rv.listing ? "Listando as obras do site" : "Revisando as obras do site")
-      : autoInfo.idle ? "Tudo em dia" : autoInfo.scanning ? "Procurando novidades" : sending ? "Enviando" : "Ligado";
+      : autoInfo.idle ? "Tudo em dia" : autoInfo.scanning ? "Procurando novidades"
+      : focusSlot ? "Obra escolhida" : wh ? `Enviando ${plural(wh.slots.length, "obra", "obras")}` : sending ? "Enviando" : "Ligado";
     if (!on) {
       const t = $("auto-text"); t.classList.remove("pause");
       t.textContent = !NATIVE ? "O modo automático funciona no app do Android (com o envio em segundo plano)." : other ? "Quando o envio atual terminar, você pode ligar o automático." : AUTO_OFF_TEXT;
     }
     // Obra que está indo agora: capa, de onde veio, capítulos e quanto falta.
-    $("auto-now").hidden = !sending && !(hold && sendingId != null);
+    $("auto-now").hidden = Boolean(wh) || (!sending && !(hold && sendingId != null));
     if (!$("auto-now").hidden) {
       const cov = $("auto-cover"), src = covers.get(Number(sendingId));
       cov.innerHTML = ""; cov.append(coverImg(src, note.work));
@@ -1272,6 +1372,7 @@
       $("auto-count").textContent = note.total ? `${(note.done || 0).toLocaleString("pt-BR")} de ${note.total.toLocaleString("pt-BR")} capítulos` : rv ? "Conferindo se tem capítulo novo…" : "Conferindo capítulos…";
       $("auto-eta").textContent = eta();
     }
+    renderWheel(wh);
     // Revisão das obras do site: quantas já foram conferidas e quantas tinham capítulo novo.
     $("auto-review").hidden = !rv || hold != null;
     if (rv && !hold) {
@@ -1309,6 +1410,32 @@
     $("auto-rate").textContent = on ? [speed, lb && lb.n > 1 ? `último em ${mmss(Math.round(lb.ms / 1000))}` : "", rate ? `~${rate}/h feitos` : ""].filter(Boolean).join(" · ") : "";
     $("q-send").hidden = busy() || !(Number($("n-queue").textContent) > 0);
   }
+  /** Obras do rodízio no Painel: a escolhida primeiro, depois as outras com o quanto já receberam desta vez. */
+  let wheelOpen = false;
+  function renderWheel(wh) {
+    $("auto-wheel").hidden = !wh;
+    if (!wh) return;
+    const slots = wh.slots, focusSlot = slots.find((x) => x.focus), others = slots.filter((x) => !x.focus);
+    const got = slots.reduce((n, x) => n + (Number(x.got) || 0), 0), want = slots.reduce((n, x) => n + (Number(x.total) || 0), 0);
+    $("wh-title").textContent = focusSlot ? "Escolhida por você" : `${plural(others.length, "obra", "obras")} ao mesmo tempo`;
+    $("wh-count").textContent = focusSlot ? `${focusSlot.got} de ${focusSlot.total}` : `${got.toLocaleString("pt-BR")} de ${want.toLocaleString("pt-BR")}`;
+    const list = $("wh-list"); list.innerHTML = "";
+    const show = wheelOpen ? others : others.slice(0, focusSlot ? 3 : 5);
+    const row = (x, extra) => {
+      const total = Number(x.total) || 0, gotN = Number(x.got) || 0, pct = total ? Math.round((gotN / total) * 100) : 0;
+      const bar = el("div", { className: "bar ok" }, el("span", { style: `width:${gotN > 0 ? Math.max(3, pct) : 0}%` }));
+      const head = el("div", { className: "min0" }, x.focus ? el("span", { className: "tag", textContent: "Na frente de tudo" }) : null,
+        el("p", { className: "t", textContent: x.name || `Obra ${x.id}` }), bar);
+      return el("li", { className: `wh-row${extra || ""}` }, coverImg(x.cover || covers.get(Number(x.id)), x.name), head,
+        el("span", { className: "n", textContent: `${gotN}/${total}` }));
+    };
+    if (focusSlot) list.append(row(focusSlot, " focus"));
+    show.forEach((x) => list.append(row(x, focusSlot ? " wait" : "")));
+    const hiddenN = others.length - show.length;
+    $("wh-more").hidden = hiddenN <= 0 && !wheelOpen;
+    $("wh-more").textContent = wheelOpen ? "Mostrar menos" : `Ver todas (${others.length})`;
+  }
+  $("wh-more").onclick = () => { wheelOpen = !wheelOpen; renderAuto(); };
   /** Quanto falta da obra atual, pelo ritmo medido desde que ela começou. */
   function eta() {
     if (!workClock || !note.total || !note.done || note.done >= note.total) return "";
@@ -1317,16 +1444,17 @@
     const left = Math.round(((note.total - note.done) * ms) / doneHere / 60_000);
     return left < 1 ? "termina já" : left < 60 ? `faltam ~${left} min` : `faltam ~${Math.floor(left / 60)} h ${String(left % 60).padStart(2, "0")}`;
   }
-  async function startAuto(silent) {
+  async function startAuto(silent, focus) {
     if (!NATIVE) { toast("O modo automático funciona no app do Android."); return; }
     if (!state.token) { toast("Cole a chave da MediocreScan primeiro."); $("token-card").hidden = false; return; }
     if (busy()) { toast("Espere o envio atual terminar."); return; }
     state.auto.on = true; save();
     if (!silent) await askBattery();
     $("log").innerHTML = ""; state.auto.since = Date.now(); save();
-    autoInfo = { idle: false, scanning: false, queue: autoInfo.queue, updates: 0, works: 0, added: 0, since: state.auto.since, pick: null };
+    autoInfo = { idle: false, scanning: false, queue: autoInfo.queue, updates: 0, works: 0, added: 0, since: state.auto.since, pick: null, wheel: null, focus: focus || null };
     const a = state.auto;
-    const ok = await startNative({ type: "auto", review: a.review !== false, discover: a.discover, requests: a.requests, wifiOnly: a.wifiOnly, chargingOnly: a.chargingOnly, firstPass: a.firstPass });
+    const ok = await startNative({ type: "auto", review: a.review !== false, discover: a.discover, requests: a.requests, wifiOnly: a.wifiOnly, chargingOnly: a.chargingOnly, firstPass: a.firstPass,
+      works: a.works, perWork: a.perWork, focus: focus || null });
     if (!ok) { state.auto.on = false; save(); toast("O Android não deixou ligar o automático. Tente de novo."); }
     else { setStatus("Ligando…"); if (!silent) toast("Automático ligado. Pode minimizar o app."); }
     renderAuto();
@@ -1378,8 +1506,7 @@
         const info = el("div", { className: "min0" },
           el("p", { className: "t", textContent: i.title || `Obra ${i.id}` }),
           el("p", { className: "s facts-inline" }, el("span", { textContent: `${i.chapters_on_site} no site` }), i.chapters_remaining > 0 ? el("span", { className: "left", textContent: `faltam ${i.chapters_remaining}` }) : null),
-          el("div", {}, now ? el("span", { className: "pill ok", textContent: "Enviando agora" }) : i.status === "running" ? el("span", { className: "pill hot", textContent: "Em andamento" }) : null,
-            i.priority > 0 ? el("span", { className: "pill hot", textContent: `Pedida por ${readers(i.priority)}` }) : null));
+          el("div", {}, workPill(i), i.priority > 0 ? el("span", { className: "pill hot", textContent: `Pedida por ${readers(i.priority)}` }) : null));
         const b = el("button", { type: "button", className: `site-row queue-open${now ? " is-now" : ""}` }, el("span", { className: "pos", textContent: String(idx + 1) }), coverImg(i.cover, i.title), info);
         b.onclick = () => go(`#/obra/${i.id}`);
         ul.append(el("li", {}, b));
@@ -1484,9 +1611,9 @@
     setView("settings", "Ajustes", true); navCurrent("");
     $("token").value = state.token; $("site-url-2").value = state.site;
     $("account").textContent = state.session && state.session.mode === "email" ? `Conectado como ${state.session.email}.` : "Conectado com código do painel.";
-    $("app-version").textContent = `Versão ${window.BM_VERSION || "de teste"}. Envio ${NATIVE ? "nativo: continua com o app fechado" : "pela tela"}; no máximo 5 capítulos a cada 1 min 12 s e 1 pedido por minuto à API.`;
+    $("app-version").textContent = `Versão ${window.BM_VERSION || "de teste"}. Envio ${NATIVE ? "nativo: continua com o app fechado" : "pela tela"}; o ritmo é o de Velocidade.`;
     $("open-battery").hidden = $("battery-hint").hidden = !NATIVE;
-    renderAutoSwitches(); renderSpeed();
+    renderAutoSwitches(); renderSpeed(); renderWheelSettings();
   }
   /** Duração aproximada de um ciclo (cada capítulo leva ~2,5 s para buscar, mais ~2 s por 5 para publicar no site). */
   function cycleSeconds(c) { return c.batches * Math.round(c.batch * 2.5 + Math.ceil(c.batch / 5) * 2) + Math.max(0, c.batches - 1) * c.gap + c.pause; }
@@ -1511,6 +1638,28 @@
     };
   });
   $("cy-reset").onclick = () => { state.cycle = Object.assign({}, CYCLE_DEFAULT); save(); renderSpeed(); applyToAuto("Ritmo padrão: o automático religa com ele."); };
+  /** Rodízio: quantas obras ao mesmo tempo e quantos capítulos cada uma recebe por vez (0 = até acabar). */
+  const WHEEL_LIMITS = { works: [1, 30], perWork: [0, 1000] };
+  function renderWheelSettings() {
+    const a = state.auto, n = a.works, per = a.perWork;
+    $("wh-works").value = String(n); $("wh-per").value = String(per);
+    $("sw-firstpass").hidden = n > 1;
+    const lote = state.speed === "safe" ? 5 : state.cycle.batch;
+    $("wheel-hint").textContent = n <= 1
+      ? `Uma obra de cada vez${per > 0 ? `, ${per} capítulos por vez` : ", até o fim"}, como antes. Ponha 2 ou mais para dividir os lotes entre várias obras.`
+      : `O lote de ${lote} é dividido entre as ${n} obras: ${lote >= n ? `${Math.floor(lote / n)}${lote % n ? " ou mais" : ""} capítulo${Math.floor(lote / n) === 1 && !(lote % n) ? "" : "s"} de cada` : `1 capítulo de cada, ${lote} por lote, em roda`}. `
+        + (per > 0 ? `Cada obra recebe ${per} capítulos e dá a vez para a próxima da fila; o resto dela vem na próxima vez. ` : "Cada obra fica até receber tudo o que falta. ")
+        + "Pedidas por leitores e obras que ganharam capítulos entram primeiro. Para mandar uma obra específica, abra a obra e toque em Enviar agora.";
+  }
+  ["works", "perWork"].forEach((k) => {
+    const i = $(k === "works" ? "wh-works" : "wh-per");
+    i.onchange = () => {
+      const [lo, hi] = WHEEL_LIMITS[k], v = Math.round(Number(i.value));
+      state.auto[k] = Number.isFinite(v) && i.value !== "" ? Math.max(lo, Math.min(hi, v)) : state.auto[k];
+      save(); renderWheelSettings(); applyToAuto("Rodízio salvo: o automático religa com ele.");
+    };
+  });
+  $("wh-reset").onclick = () => { state.auto.works = 15; state.auto.perWork = 10; save(); renderWheelSettings(); applyToAuto("Rodízio padrão: o automático religa com ele."); };
   /** Religa o que estiver rodando no automático para valer a configuração nova. */
   function applyToAuto(msg) {
     if (autoRunning() && NATIVE) { restartAuto = true; Native.stopJob().catch(() => {}); toast(msg || "Aplicando: o automático religa com a configuração nova."); }

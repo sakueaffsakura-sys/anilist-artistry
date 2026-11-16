@@ -103,6 +103,15 @@ final class EnvioEngine {
     static final long REVIEW_RETRY_MS = 10 * 60_000L;
     /** Páginas da lista de obras do site (30 por página) lidas no máximo. */
     static final int REVIEW_MAX_PAGES = 50;
+
+    /*
+     * Rodízio (pedido do dono em 16/11): várias obras recebem capítulos ao mesmo tempo. Cada lote é dividido entre
+     * elas (1 capítulo de cada, em roda); cada obra recebe até "capítulos por obra" e dá a vez para a próxima da fila.
+     */
+    /** Mais obras ao mesmo tempo que os Ajustes aceitam (o site lista 50 da fila por vez). */
+    static final int AUTO_MAX_WORKS = 30;
+    /** Obras abertas por volta (cada uma pede a lista de capítulos à API): o rodízio enche aos poucos, sem parar os lotes. */
+    static final int WHEEL_OPEN_PER_ROUND = 5;
     private static final Pattern UUID =Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
     private static final Pattern IP_BLOCK = Pattern.compile("ip\\s+bloquead|bloquead|blocked|banned", Pattern.CASE_INSENSITIVE);
 
@@ -186,10 +195,27 @@ final class EnvioEngine {
         int firstPass = AUTO_FIRST_PASS;
         /** Ao ligar (e a cada 12 h), revisa as obras do site antes da fila. */
         boolean review = true;
+        /** Rodízio: quantas obras recebem capítulos ao mesmo tempo (1 = uma de cada vez, até o fim). */
+        int works = 1;
+        /** Rodízio: capítulos que cada obra recebe antes de dar a vez para a próxima da fila (0 = até acabar). */
+        int perWork = 0;
+        /** Obra escolhida ao ligar (0 = nenhuma): recebe os lotes inteiros antes de tudo. */
+        long focusId;
+        String focusTitle;
+        int focusChapters;
 
         static AutoOptions from(Map<String, Object> job) {
             AutoOptions o = new AutoOptions();
             if (job == null) return o;
+            if (job.get("works") != null) o.works = (int) Config.clamp(job.get("works"), 1, AUTO_MAX_WORKS, 1);
+            if (job.get("perWork") != null) o.perWork = (int) Config.clamp(job.get("perWork"), 0, 1000, 0);
+            Map<String, Object> f = Json.obj(job.get("focus"));
+            Long fid = f == null ? null : Json.whole(f.get("id"));
+            if (fid != null && fid > 0) {
+                o.focusId = fid;
+                o.focusTitle = Json.str(f.get("title"));
+                o.focusChapters = (int) Config.clamp(f.get("chapters"), 0, 5000, 0);
+            }
             if (job.get("review") != null) o.review = Json.truthy(job.get("review"));
             if (job.get("discover") != null) o.discover = Json.truthy(job.get("discover"));
             if (job.get("requests") != null) o.requests = Json.truthy(job.get("requests"));
@@ -347,6 +373,33 @@ final class EnvioEngine {
         }
     }
 
+    /** Obra aberta no rodízio (ou a escolhida): os capítulos desta vez e o que já foi. */
+    static final class Slot {
+        final long id;
+        String title, slug, source, cover;
+        boolean created, focus;
+        int priority;
+        /** Capítulos que faltam nesta vez (já cortados no limite da vez). */
+        final List<Long> pending = new ArrayList<>();
+        Entries entries;
+        /** Quantos faltavam no total ao abrir; `total` = os desta vez. */
+        long totalAll, total, tried, added, skipped;
+        Slot(long id) { this.id = id; }
+
+        Map<String, Object> toMap() {
+            return Json.map("id", id, "name", title, "slug", slug, "cover", cover, "got", tried, "total", total, "added", added,
+                "later", Math.max(0, totalAll - total), "focus", focus, "source", source, "priority", priority);
+        }
+    }
+
+    /** Pedido da tela: "Enviar agora" numa obra (capítulos 0 = todos os que faltam). */
+    static final class FocusReq {
+        final long id;
+        final String title;
+        final int chapters;
+        FocusReq(long id, String title, int chapters) { this.id = id; this.title = title; this.chapters = chapters; }
+    }
+
     private static final class Entries {
         final Map<Long, Map<String, Object>> map = new LinkedHashMap<>();
         Long obrId;
@@ -472,6 +525,23 @@ final class EnvioEngine {
 
     /** Modo automático: acorda da espera (o admin pôs obras na fila pelo app). */
     void wake() { wake = true; }
+
+    /* Rodízio e obra escolhida (só no automático). */
+    private final List<Slot> wheel = new ArrayList<>();
+    private int wheelCursor;
+    private Slot focus;
+    private volatile FocusReq focusReq;
+    /** Obras que já receberam a vez delas no rodízio (id → quando): voltam depois das outras da fila. */
+    private final Map<Long, Long> rested = new LinkedHashMap<>();
+
+    /**
+     * "Enviar agora" numa obra: com o automático rodando, ela passa na frente de tudo (revisão, rodízio, fila) e
+     * recebe os lotes inteiros até receber `chapters` capítulos (0 = todos os que faltam). Depois tudo continua.
+     */
+    void requestFocus(long id, String title, int chapters) {
+        focusReq = new FocusReq(id, title, Math.max(0, chapters));
+        wake = true;
+    }
 
     /* Revisão das obras do site (só no automático). */
     private Review review;
@@ -1095,6 +1165,11 @@ final class EnvioEngine {
         boolean failed = true;
         try {
             for (int i = 0; i < pending.size();) {
+                // Obra escolhida na tela: esta para aqui (o site guarda o que falta) e a escolhida vai na frente.
+                if (autoOpts != null && focusReq != null) {
+                    log(title + ": pausada para a obra escolhida; continua depois.");
+                    break;
+                }
                 holdIfNeeded();
                 pairWait();
                 long batchStart = clock.now();
@@ -1500,6 +1575,9 @@ final class EnvioEngine {
     /* Condições do automático (Wi-Fi, carregador, bateria): só valem com o automático ligado. */
     private volatile AutoOptions autoOpts;
 
+    /** Está no modo automático agora (a obra escolhida só vale nele). */
+    boolean autoRunning() { return running && autoOpts != null; }
+
     /** Motivo para segurar o automático agora, ou null para seguir. */
     String holdReason(AutoOptions o) {
         if (o == null) return null;
@@ -1683,6 +1761,295 @@ final class EnvioEngine {
             "ms", rv.finishedAt - rv.startedAt, "nextMs", REVIEW_EVERY_MS);
     }
 
+    /**
+     * Abre uma obra para o rodízio (ou como escolhida): pede a lista à API, cria/atualiza no site e guarda os
+     * capítulos que faltam, cortados em `quota` (0 = todos). Devolve null se a obra não existe mais na MediocreScan.
+     */
+    private Slot openSlot(long id, String name, int quota, String source, int priority, boolean isFocus) throws Soft {
+        inBatch = false;
+        Object work = mediocre(true, "/obras/" + id);
+        if (work == null) {
+            site(Json.map("action", "finish", "obraId", id, "added", 0, "remaining", 0));
+            emit("work-done", "id", id, "name", name, "added", 0, "skipped", 0, "left", 0, "note", "não encontrada na MediocreScan", "wheel", true);
+            return null;
+        }
+        Map<String, Object> w = site(Json.map("action", "work", "obraId", id, "work", work, "publish", true));
+        List<Long> pending = longs(w.get("pendingCapIds"));
+        Long rem = Json.whole(w.get("remaining"));
+        Slot sl = new Slot(id);
+        sl.totalAll = rem != null ? Math.max(rem, pending.size()) : pending.size();
+        if (quota > 0 && pending.size() > quota) pending = new ArrayList<>(pending.subList(0, quota));
+        sl.pending.addAll(pending);
+        sl.total = pending.size();
+        sl.entries = listEntries(work);
+        Map<String, Object> wm = Json.obj(unwrap(work));
+        sl.title = wm != null && Json.str(wm.get("obr_nome")) != null && !Json.str(wm.get("obr_nome")).isEmpty()
+            ? Json.str(wm.get("obr_nome")) : name != null && !name.isEmpty() ? name : "Obra " + id;
+        sl.slug = Json.str(w.get("slug"));
+        sl.created = Json.truthy(w.get("created"));
+        sl.source = source;
+        sl.priority = priority;
+        sl.focus = isFocus;
+        emit("slot-open", "id", id, "name", sl.title, "slug", sl.slug, "created", sl.created, "total", sl.total,
+            "later", Math.max(0, sl.totalAll - sl.total), "source", source, "priority", priority, "focus", isFocus);
+        return sl;
+    }
+
+    /**
+     * Fecha a vez de uma obra: conta ao site o que falta. Se ainda falta (bateu o limite da vez), vai para o fim da
+     * fila (`defer`) e descansa no rodízio até as outras terem a vez delas.
+     */
+    private void closeSlot(Slot sl, String note) {
+        long remaining = Math.max(0, sl.totalAll - sl.tried);
+        boolean turnOver = remaining > 0 && sl.pending.isEmpty() && !stop;
+        Map<String, Object> finish = Json.map("action", "finish", "obraId", sl.id, "added", sl.added, "remaining", remaining);
+        if (turnOver && !sl.focus) finish.put("defer", true);
+        try {
+            site(finish, stop);
+        } catch (Soft | RuntimeException e) {
+            if (!stop) log(sl.title + ": o site não confirmou o fim da vez (" + e.getMessage() + ").");
+        }
+        if (turnOver && !sl.focus) rested.put(sl.id, clock.now());
+        emit("work-done", "id", sl.id, "name", sl.title, "added", sl.added, "skipped", sl.skipped, "left", 0,
+            "later", turnOver ? remaining : 0, "wheel", true, "focus", sl.focus, "note", note);
+    }
+
+    /** Une as listas de capítulos das obras abertas (o código de cada capítulo é único na MediocreScan). */
+    private static Entries merged(List<Slot> slots) {
+        Entries all = new Entries();
+        for (Slot sl : slots) {
+            if (sl.entries == null) continue;
+            for (Map.Entry<Long, Map<String, Object>> e : sl.entries.map.entrySet()) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("obr_id", sl.entries.obrId != null ? sl.entries.obrId : sl.id);
+                m.putAll(e.getValue());
+                all.map.put(e.getKey(), m);
+            }
+        }
+        return all;
+    }
+
+    /**
+     * Um lote dividido entre as obras abertas: 1 capítulo de cada, em roda, até encher o lote. As páginas vêm como
+     * num lote normal; o site recebe os de cada obra separados (de 5 em 5). Devolve os capítulos novos no site.
+     */
+    private long wheelLote(List<Slot> slots) {
+        holdIfNeeded();
+        pairWait();
+        long batchStart = clock.now();
+        int size = batchSize();
+        List<Long> group = new ArrayList<>();
+        Map<Long, Slot> owner = new HashMap<>();
+        List<Slot> live = new ArrayList<>();
+        for (Slot sl : slots) if (!sl.pending.isEmpty()) live.add(sl);
+        if (live.isEmpty()) return 0;
+        int start = live.size() > 1 ? wheelCursor % live.size() : 0;
+        Map<Slot, Integer> taken = new HashMap<>();
+        for (boolean more = true; more && group.size() < size;) {
+            more = false;
+            for (int k = 0; k < live.size() && group.size() < size; k++) {
+                Slot sl = live.get((start + k) % live.size());
+                int t = taken.containsKey(sl) ? taken.get(sl) : 0;
+                if (t >= sl.pending.size()) continue;
+                long cap = sl.pending.get(t);
+                group.add(cap);
+                owner.put(cap, sl);
+                taken.put(sl, t + 1);
+                more = true;
+            }
+        }
+        wheelCursor = start + 1;
+        inBatch = true;
+        emit("sending", "from", 1, "to", group.size(), "total", group.size(), "works", taken.size());
+        Map<Slot, List<Map<String, Object>>> byWork = new LinkedHashMap<>();
+        List<Fetched> got;
+        try {
+            got = fetchGroup(group, merged(live), 0, group.size());
+        } catch (Soft e) {
+            inBatch = false;
+            log("Lote: " + e.getMessage());
+            if (cfg.fast) batchDone();
+            return 0;
+        } finally {
+            inBatch = false;
+        }
+        long fetchMs = clock.now() - batchStart;
+        for (Fetched f : got) {
+            Slot sl = owner.get(f.capId);
+            sl.pending.remove(f.capId);
+            sl.tried++;
+            if (f.error != null) { log(sl.title + ", capítulo " + f.capId + ": " + f.error); sl.skipped++; continue; }
+            if (f.missing || f.data == null) { sl.skipped++; continue; }
+            List<Map<String, Object>> list = byWork.get(sl);
+            if (list == null) byWork.put(sl, list = new ArrayList<>());
+            list.add(Json.map("capId", f.capId, "meta", f.data.meta, "content", f.data.content));
+        }
+        long added = 0;
+        int count = 0;
+        for (List<Map<String, Object>> l : byWork.values()) count += l.size();
+        if (count > 0) emit("posting", "count", count, "works", byWork.size());
+        for (Map.Entry<Slot, List<Map<String, Object>>> e : byWork.entrySet()) {
+            Slot sl = e.getKey();
+            try {
+                long[] r = postChapters(sl.id, e.getValue());
+                sl.added += r[0];
+                sl.skipped += r[1];
+                added += r[0];
+            } catch (Soft x) {
+                sl.skipped += e.getValue().size();
+                log(sl.title + ": o site recusou os capítulos (" + x.getMessage() + ").");
+            }
+        }
+        if (cfg.fast) batchDone();
+        else synchronized (pace) {
+            lastPair = batchStart;
+            savePace();
+        }
+        emit("wheel-lote", "batch", group.size(), "works", taken.size(), "added", added, "batchMs", clock.now() - batchStart, "fetchMs", fetchMs);
+        return added;
+    }
+
+    private void emitWheel(int max) {
+        List<Object> l = new ArrayList<>();
+        if (focus != null) l.add(focus.toMap());
+        for (Slot sl : wheel) l.add(sl.toMap());
+        emit("wheel", "slots", l, "max", max, "rested", rested.size());
+    }
+
+    /**
+     * Obra escolhida na tela: abre (tirando do rodízio se estava lá) e manda um lote inteiro dela por volta, até
+     * receber o que foi pedido. Devolve true enquanto houver obra escolhida (a volta foi dela).
+     */
+    private boolean focusStep(Map<Long, long[]> fails, int max, long[] totals) {
+        FocusReq rq = focusReq;
+        if (rq != null) {
+            focusReq = null;
+            if (focus != null) {
+                Slot old = focus;
+                focus = null;
+                closeSlot(old, "trocada por outra obra escolhida");
+                if (old.added > 0) { totals[0] += old.added; totals[1]++; }
+            }
+            for (Iterator<Slot> it = wheel.iterator(); it.hasNext();) {
+                Slot sl = it.next();
+                if (sl.id != rq.id) continue;
+                it.remove();
+                closeSlot(sl, "virou a obra escolhida");
+                if (sl.added > 0) { totals[0] += sl.added; totals[1]++; }
+            }
+            rested.remove(rq.id);
+            fails.remove(rq.id);
+            String name = rq.title != null && !rq.title.isEmpty() ? rq.title : "Obra " + rq.id;
+            log("Obra escolhida: " + name + " (" + (rq.chapters > 0 ? rq.chapters + " capítulos" : "todos os capítulos que faltam")
+                + "). Ela recebe os lotes inteiros; o resto espera.");
+            emit("focus-start", "id", rq.id, "name", name, "chapters", rq.chapters);
+            Slot sl;
+            try {
+                sl = openSlot(rq.id, rq.title, rq.chapters, "escolhida", 0, true);
+            } catch (Soft e) {
+                log(name + ": " + e.getMessage());
+                emit("focus-done", "id", rq.id, "name", name, "added", 0, "error", e.getMessage());
+                return true;
+            }
+            if (sl == null) { emit("focus-done", "id", rq.id, "name", name, "added", 0, "note", "não encontrada"); return true; }
+            if (sl.pending.isEmpty()) {
+                closeSlot(sl, "já estava em dia");
+                log(sl.title + ": já está em dia no site.");
+                emit("focus-done", "id", sl.id, "name", sl.title, "added", 0, "note", "em dia");
+                return true;
+            }
+            focus = sl;
+            emitWheel(max);
+        }
+        if (focus == null) return false;
+        wheelLote(Collections.singletonList(focus));
+        if (focus.pending.isEmpty()) {
+            Slot f = focus;
+            focus = null;
+            closeSlot(f, null);
+            // Recebeu o que você pediu: o resto dela volta para a vez normal, depois das outras.
+            if (f.totalAll > f.tried) rested.put(f.id, clock.now());
+            if (f.added > 0) { totals[0] += f.added; totals[1]++; }
+            log("Obra escolhida concluída: " + f.title + " +" + f.added + " capítulo(s)" + (f.totalAll > f.tried ? "; faltam " + (f.totalAll - f.tried) + ", que seguem na fila" : "") + ".");
+            emit("focus-done", "id", f.id, "name", f.title, "added", f.added, "later", Math.max(0, f.totalAll - f.tried));
+        }
+        emitWheel(max);
+        return true;
+    }
+
+    /** Fecha a vez de todas as obras abertas (ao parar ou ao sair do rodízio), contando ao site o que falta. */
+    private void closeAll(long[] totals) {
+        List<Slot> all = new ArrayList<>(wheel);
+        if (focus != null) all.add(0, focus);
+        wheel.clear();
+        focus = null;
+        for (Slot sl : all) {
+            closeSlot(sl, stop ? "parou no meio" : null);
+            if (sl.added > 0) { totals[0] += sl.added; totals[1]++; }
+        }
+    }
+
+    /**
+     * Enche o rodízio até `opts.works` obras (no máximo WHEEL_OPEN_PER_ROUND por volta): pedidas por leitores,
+     * obras do site com capítulos novos, a fila na ordem do site (as que já tiveram a vez por último) e, sem nada
+     * disso, a conferência de rotina. Devolve quantas abriu.
+     */
+    private int fillWheel(AutoOptions opts, List<Long> open, Map<Long, Map<String, Object>> info, Map<Long, String> updates,
+                          Map<Long, long[]> fails, long[] totals) {
+        Set<Long> inWheel = new HashSet<>();
+        for (Slot sl : wheel) inWheel.add(sl.id);
+        if (focus != null) inWheel.add(focus.id);
+        List<Object[]> cands = new ArrayList<>();
+        for (Long id : open) {
+            Map<String, Object> im = info.get(id);
+            if (count(im, "priority") > 0 && !inWheel.contains(id)) cands.add(new Object[] { id, im == null ? null : Json.str(im.get("title")), "fila", (int) count(im, "priority"), opts.perWork });
+        }
+        for (Map.Entry<Long, String> u : updates.entrySet())
+            if (!inWheel.contains(u.getKey()) && !failedOut(fails, u.getKey())) cands.add(new Object[] { u.getKey(), u.getValue(), "atualizada", 0, 0 });
+        for (Long id : open) if (!rested.containsKey(id)) {
+            Map<String, Object> im = info.get(id);
+            if (count(im, "priority") <= 0 && !inWheel.contains(id)) cands.add(new Object[] { id, im == null ? null : Json.str(im.get("title")), "fila", 0, opts.perWork });
+        }
+        for (Long id : rested.keySet()) if (open.contains(id) && !inWheel.contains(id)) {
+            Map<String, Object> im = info.get(id);
+            if (count(im, "priority") <= 0) cands.add(new Object[] { id, im == null ? null : Json.str(im.get("title")), "fila", 0, opts.perWork });
+        }
+        int opened = 0;
+        Set<Long> tried = new HashSet<>();
+        for (Object[] c : cands) {
+            if (wheel.size() >= opts.works || opened >= WHEEL_OPEN_PER_ROUND) break;
+            long id = (Long) c[0];
+            if (!tried.add(id) || inWheel.contains(id)) continue;
+            String src = (String) c[2];
+            if ("atualizada".equals(src)) updates.remove(id);
+            rested.remove(id);
+            emit("auto-pick", "id", id, "source", src, "priority", c[3], "limit", c[4], "wheel", true);
+            try {
+                Slot sl = openSlot(id, (String) c[1], (Integer) c[4], src, (Integer) c[3], false);
+                opened++;
+                if (sl == null) continue;
+                Map<String, Object> im = info.get(id);
+                sl.cover = im == null ? null : Json.str(im.get("cover"));
+                if (sl.pending.isEmpty()) {
+                    closeSlot(sl, "em dia");
+                    continue;
+                }
+                wheel.add(sl);
+                inWheel.add(id);
+                fails.remove(id);
+                emitWheel(opts.works);
+            } catch (Soft e) {
+                opened++;
+                long[] f = fails.get(id);
+                long n = (f == null ? 0 : f[0]) + 1;
+                fails.put(id, new long[] { n, clock.now() });
+                log((c[1] != null ? c[1] : "Obra " + id) + ": " + e.getMessage()
+                    + (n >= AUTO_MAX_FAILS ? " O automático deixa esta obra para depois (tenta de novo em 6 h)." : ""));
+            }
+        }
+        return opened;
+    }
+
     void runAuto(boolean discover, boolean requests) {
         AutoOptions o = new AutoOptions();
         o.discover = discover;
@@ -1712,6 +2079,11 @@ final class EnvioEngine {
         int robin = 0;
         emit("run-start", "count", 0, "auto", true);
         emitSpeed();
+        wheel.clear();
+        focus = null;
+        rested.clear();
+        wheelCursor = 0;
+        if (opts.focusId > 0) focusReq = new FocusReq(opts.focusId, opts.focusTitle, opts.focusChapters);
         // Revisão: continua a que foi cortada no meio; senão pede uma (vale se a última acabou há mais de 1 h).
         review = null;
         reviewFinishedAt = 0;
@@ -1730,7 +2102,9 @@ final class EnvioEngine {
         } else if (opts.review) {
             reviewWanted = true;
         }
-        log("Modo automático ligado: " + (opts.review ? "revisão das obras do site, " : "") + "fila do site" + (opts.firstPass > 0 ? " (obras novas primeiro com " + opts.firstPass + " capítulos)" : "")
+        log("Modo automático ligado: " + (opts.review ? "revisão das obras do site, " : "") + "fila do site"
+            + (opts.works > 1 ? " (" + opts.works + " obras ao mesmo tempo" + (opts.perWork > 0 ? ", " + opts.perWork + " capítulos para cada uma por vez" : "") + ")"
+                : opts.firstPass > 0 ? " (obras novas primeiro com " + opts.firstPass + " capítulos)" : "")
             + ", obras atualizadas" + (opts.discover ? ", obras novas" : "") + (opts.requests ? " e pedidos de leitores" : "")
             + (opts.wifiOnly ? "; só no Wi-Fi" : "") + (opts.chargingOnly ? "; só carregando" : "") + ".");
         try {
@@ -1739,6 +2113,12 @@ final class EnvioEngine {
                 wake = false;
                 try {
                 holdIfNeeded();
+                // Obra escolhida na tela ("Enviar agora"): passa na frente de tudo até receber o que foi pedido.
+                long[] ft = new long[2];
+                boolean focused = focusStep(fails, opts.works, ft);
+                totalAdded += ft[0];
+                done += (int) ft[1];
+                if (focused) continue;
                 if (clock.now() >= nextScan) {
                     // A cada 10 min: obras do site atualizadas. A cada 30 min: também obras novas e pedidos.
                     boolean full = clock.now() >= nextDiscover;
@@ -1776,6 +2156,31 @@ final class EnvioEngine {
                 }
                 List<Long> open = new ArrayList<>();
                 for (Long id : queue) if (!failedOut(fails, id)) open.add(id);
+                // Rodízio: várias obras ao mesmo tempo, cada lote dividido entre elas.
+                if (opts.works > 1 || !wheel.isEmpty()) {
+                    long[] wt = new long[2];
+                    int opened = opts.works > 1 ? fillWheel(opts, open, info, updates, fails, wt) : 0;
+                    totalAdded += wt[0];
+                    done += (int) wt[1];
+                    if (!wheel.isEmpty()) {
+                        emit("auto-plan", "queue", Math.max(open.size(), count(plan, "queueTotal")), "requests", count(plan, "requestsWaiting"), "updates", updates.size(), "works", done, "added", totalAdded);
+                        wheelLote(wheel);
+                        for (Iterator<Slot> it = wheel.iterator(); it.hasNext();) {
+                            Slot sl = it.next();
+                            if (!sl.pending.isEmpty()) continue;
+                            it.remove();
+                            closeSlot(sl, null);
+                            if (sl.added > 0) { totalAdded += sl.added; done++; }
+                        }
+                        emitWheel(opts.works);
+                        continue;
+                    }
+                    // Abriu obras, mas todas estavam em dia: tenta as próximas.
+                    if (opened > 0) continue;
+                    // Nada para o rodízio: só a conferência de rotina (ou espera).
+                    open.clear();
+                    updates.clear();
+                }
                 WorkRef next = null;
                 String source = "fila";
                 int limit = 0;
@@ -1868,6 +2273,11 @@ final class EnvioEngine {
                 }
             }
         } catch (Stopped e) {
+            // O site fica sabendo o que falta de cada obra aberta (rodízio e escolhida).
+            long[] ct = new long[2];
+            closeAll(ct);
+            totalAdded += ct[0];
+            done += (int) ct[1];
             emit("run-stopped", "works", done, "added", totalAdded, "auto", true);
         } catch (Fatal e) {
             emit("run-error", "message", e.getMessage(), "works", done, "added", totalAdded, "auto", true);
