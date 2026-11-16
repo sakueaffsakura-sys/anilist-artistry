@@ -71,6 +71,24 @@ que não está bloqueado) e envia ao site pelo endpoint `/api/public/mediocre-in
   `review-done` {checked, news, added, failed}, `review-skip`; `auto-pick` traz `review`/`reviewTotal`. Na revisão,
   obra conferida sem capítulo novo não entra na atividade nem em "Hoje". Opção em Ajustes: "Revisar as obras do site
   ao ligar" (`review`, ligada por padrão).
+- **Várias obras ao mesmo tempo (rodízio, 1.54, pedido do dono):** com "Obras ao mesmo tempo" > 1 (padrão 15) o
+  automático abre até N obras (`openSlot`: 1 pedido à API pela lista + `work` no site; no máximo 5 por volta, então o
+  rodízio enche aos poucos sem parar os lotes) e divide cada lote entre elas, 1 capítulo de cada em roda
+  (`wheelLote`; as páginas usam o mesmo `fetchGroup`, e o site recebe os de cada obra separados, de 5 em 5). Cada obra
+  recebe até "Capítulos para cada obra" (padrão 10; 0 = até acabar) e dá a vez (`closeSlot`: `finish` com o que falta e
+  `defer`). Ordem de entrada: pedidas por leitores, obras do site com capítulos novos, a fila na ordem do site e só
+  depois as que já tiveram a vez (`rested`, porque o site no ar ainda ignora `defer` e as deixa "running" no topo).
+  Com 1 obra, o automático funciona como antes (`sendWork`, primeira passada). Eventos: `slot-open`, `wheel`
+  {slots: [{id, name, cover, got, total, later, focus}], max}, `wheel-lote` {batch, works, added, batchMs}; `work-done`
+  traz `wheel`. Parar conta ao site o que falta de cada obra aberta (`closeAll`). A revisão continua antes (uma obra por
+  vez).
+- **Obra escolhida ("Enviar agora"):** na obra (botão principal com o automático ligado) ou na fila (botão "Agora"), o
+  diálogo escolhe quantos capítulos (Todos, 10, 30, 50 ou outro número) e chama `Estudio.focusJob({id, title,
+  chapters})` → `requestFocus`. A obra passa na frente de tudo (revisão, rodízio, fila; uma obra em `sendWork` para no
+  fim do lote atual e guarda o que falta) e recebe os lotes inteiros até receber o pedido; depois fecha sem `defer`,
+  descansa no rodízio e tudo continua. Com o automático desligado, o diálogo liga o automático já com ela (`focus` no
+  trabalho). Eventos `focus-start` {id, name, chapters} e `focus-done` {added, later, note|error}; "Só pôr no fim da
+  fila" faz o que o botão antigo fazia.
 - **Ritmo (Ajustes → Velocidade), escolhido pelo dono:** "Ciclo de 15" (padrão desde a 1.52, pedido em 16/11) pega 15
   capítulos de uma vez, manda ao site e pausa 2 min (contados do fim do lote). Os quatro números (capítulos por lote até
   30, espera entre lotes, lotes por ciclo, pausa) são editáveis e vão na configuração do serviço (`config.cycle`; a tela
