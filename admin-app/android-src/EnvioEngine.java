@@ -12,6 +12,13 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 
 /**
@@ -25,7 +32,10 @@ import java.util.regex.Pattern;
 final class EnvioEngine {
     static final String API = "https://api.mediocretoons.net";
     static final String CDN = "https://cdn.mediocrescan.com";
+    /** Capítulos por pedido ao site (máximo do site) e por lote no ritmo seguro. */
     static final int PER_SEND = 5;
+    /** Maior lote do ciclo que os Ajustes aceitam (o site recebe de 5 em 5, um pedido logo depois do outro). */
+    static final int MAX_BATCH = 30;
     static final long WAIT_MS = 72_000L;
     static final long API_GAP_MS = 60_000L;
     static final long CDN_GAP_MS = 1_500L;
@@ -41,13 +51,16 @@ final class EnvioEngine {
     static final long PACE_FRESH_MS = 10 * 60_000L;
 
     /*
-     * Ciclo (padrão, escolhido pelo dono): pega 5 capítulos, espera 33 s, pega mais 5, espera 33 s, pega mais 5 e,
-     * completados os 15, pausa 2 min antes de recomeçar. Os números vêm dos Ajustes (Config.cycle*).
+     * Ciclo (padrão, escolhido pelo dono em 16/11): pega 15 capítulos de uma vez, manda ao site e pausa 2 min antes do
+     * próximo lote. Os números vêm dos Ajustes (Config.cycle*); com mais de 1 lote por ciclo, espera 33 s entre eles.
      */
-    static final int CYCLE_BATCH = 5;
+    static final int CYCLE_BATCH = 15;
     static final long CYCLE_GAP_MS = 33_000L;
-    static final int CYCLE_BATCHES = 3;
+    static final int CYCLE_BATCHES = 1;
     static final long CYCLE_PAUSE_MS = 120_000L;
+    /** Recusa da API no meio do lote: os próximos lotes encolhem 5 capítulos (até 5) e voltam 5 a cada 1 h sem recusa. */
+    static final int BATCH_STEP = 5;
+    static final long BATCH_RESTORE_MS = 60 * 60_000L;
     /** Entre os pedidos de capítulo de um mesmo lote. */
     static final long CYCLE_BURST_GAP_MS = 2_000L;
     /** Entre os outros pedidos à API (obra, listas, busca), para não virar rajada fora do lote. */
@@ -258,7 +271,7 @@ final class EnvioEngine {
             c.fast = !"safe".equals(Json.str(m.get("speed")));
             Map<String, Object> cy = Json.obj(m.get("cycle"));
             if (cy != null) {
-                c.cycleBatch = (int) clamp(cy.get("batch"), 1, PER_SEND, CYCLE_BATCH);
+                c.cycleBatch = (int) clamp(cy.get("batch"), 1, MAX_BATCH, CYCLE_BATCH);
                 c.cycleGapMs = clamp(cy.get("gap"), 0, 600, CYCLE_GAP_MS / 1000) * 1000L;
                 c.cycleBatches = (int) clamp(cy.get("batches"), 1, 20, CYCLE_BATCHES);
                 c.cyclePauseMs = clamp(cy.get("pause"), 0, 3600, CYCLE_PAUSE_MS / 1000) * 1000L;
@@ -362,18 +375,43 @@ final class EnvioEngine {
     private long lastCdn = -1;
     private long lastPair;
     private long lastLockEnd;
-    private int locksInRow;
-    private int cdnRefusals;
+    private volatile int locksInRow;
+    private volatile int cdnRefusals;
     /* Ciclo: lotes feitos no ciclo atual; enquanto busca os capítulos de um lote, os pedidos saem mais juntos. */
     private int cycleDone;
     private volatile boolean inBatch;
+    /* Lote encolhido depois de recusa da API (MAX_VALUE = o lote dos Ajustes) e hora da última recusa. */
+    private volatile int batchCap = Integer.MAX_VALUE;
+    private volatile long lastRefusal = -1;
+    /*
+     * Páginas do capítulo (CDN) buscadas numa thread à parte enquanto o próximo capítulo pede à API: o lote fica mais
+     * curto sem mudar o intervalo entre pedidos à API. Só com `cdnHttp` (o serviço passa um; os testes, não).
+     */
+    private final Http cdnHttp;
+    private final ThreadPoolExecutor cdnPool;
 
     EnvioEngine(Config cfg, Http http, Http uiHttp, Clock clock, Host host) {
+        this(cfg, http, uiHttp, null, clock, host);
+    }
+
+    EnvioEngine(Config cfg, Http http, Http uiHttp, Http cdnHttp, Clock clock, Host host) {
         this.cfg = cfg;
         this.http = http;
         this.uiHttp = uiHttp;
+        this.cdnHttp = cdnHttp;
         this.clock = clock;
         this.host = host;
+        if (cdnHttp != null) {
+            cdnPool = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(), new ThreadFactory() {
+                @Override
+                public Thread newThread(Runnable r) {
+                    Thread t = new Thread(r, "estudio-cdn");
+                    t.setDaemon(true);
+                    return t;
+                }
+            });
+            cdnPool.allowCoreThreadTimeOut(true);
+        } else cdnPool = null;
         long now = clock.now();
         lastApi = fresh(cfg.paceApi, now);
         lastPair = fresh(cfg.pacePair, now);
@@ -424,6 +462,12 @@ final class EnvioEngine {
     void requestStop() {
         stop = true;
         http.abort();
+        if (cdnHttp != null) cdnHttp.abort();
+    }
+
+    /** Fim do trabalho: solta a thread das páginas. */
+    void close() {
+        if (cdnPool != null) cdnPool.shutdownNow();
     }
 
     /** Modo automático: acorda da espera (o admin pôs obras na fila pelo app). */
@@ -509,7 +553,7 @@ final class EnvioEngine {
             long need = cycleEnd ? cfg.cyclePauseMs : cfg.cycleGapMs;
             long ms = Math.max(0, need - (clock.now() - mark));
             if (ms > 0) {
-                emit("waiting", "ms", ms, "cycle", cycleEnd, "next", cfg.cycleBatch, "batches", cfg.cycleBatches);
+                emit("waiting", "ms", ms, "cycle", cycleEnd, "next", batchSize(), "batches", cfg.cycleBatches);
                 pause(ms);
             }
         }
@@ -524,6 +568,28 @@ final class EnvioEngine {
         }
         cycleDone++;
         saveCycle();
+        restoreBatch();
+    }
+
+    /** A API recusou no meio do ciclo: os próximos lotes vão menores (15 → 10 → 5) até passar 1 h sem recusa. */
+    private void shrinkBatch() {
+        lastRefusal = clock.now();
+        if (!cfg.fast) return;
+        int cur = batchSize();
+        if (cur <= PER_SEND) return;
+        batchCap = Math.max(PER_SEND, cur - BATCH_STEP);
+        log("A MediocreScan recusou pedidos: os próximos lotes vão com " + batchCap + " capítulos. Volta a "
+            + cfg.cycleBatch + " aos poucos, depois de 1 h sem recusa.");
+        emit("batch-size", "batch", batchCap, "max", cfg.cycleBatch, "reason", "recusa");
+    }
+
+    private void restoreBatch() {
+        if (batchCap >= cfg.cycleBatch || lastRefusal < 0 || clock.now() - lastRefusal < BATCH_RESTORE_MS) return;
+        batchCap = Math.min(cfg.cycleBatch, batchCap + BATCH_STEP);
+        lastRefusal = clock.now();
+        if (batchCap >= cfg.cycleBatch) batchCap = Integer.MAX_VALUE;
+        log("1 h sem recusa da MediocreScan: lotes de " + batchSize() + " capítulos de novo.");
+        emit("batch-size", "batch", batchSize(), "max", cfg.cycleBatch, "reason", "volta");
     }
 
     private void lockPause(String reason) {
@@ -584,6 +650,10 @@ final class EnvioEngine {
 
     /** Pedido do envio à MediocreScan: espera a vez, aguenta recusas e quedas; null quando não existe (404). */
     private Object mediocre(boolean api, String path) throws Soft {
+        return mediocre(api, path, http);
+    }
+
+    private Object mediocre(boolean api, String path, Http http) throws Soft {
         String token = token();
         if (api && token.isEmpty()) throw new Fatal("Cole sua chave da MediocreScan nas configurações.");
         int netFails = 0;
@@ -610,6 +680,7 @@ final class EnvioEngine {
                     return null;
                 }
                 String reason = r.status == 429 ? "pedidos demais" : blocked ? "IP bloqueado" : api ? "acesso recusado" : "o CDN recusou as páginas";
+                if (api) shrinkBatch();
                 lockPause(reason);
                 continue;
             }
@@ -862,8 +933,118 @@ final class EnvioEngine {
         return out;
     }
 
-    /** Capítulos por lote: os do ciclo (até 5, o máximo do site) ou 5 no ritmo seguro. */
-    private int batchSize() { return cfg.fast ? Math.max(1, Math.min(PER_SEND, cfg.cycleBatch)) : PER_SEND; }
+    /** Capítulos por lote: os do ciclo (15 por padrão; menos depois de recusa) ou 5 no ritmo seguro. */
+    int batchSize() { return cfg.fast ? Math.max(1, Math.min(cfg.cycleBatch, batchCap)) : PER_SEND; }
+
+    /** Manda os capítulos de um lote ao site de 5 em 5 (máximo do site por pedido), um pedido logo depois do outro. */
+    private long[] postChapters(long id, List<Map<String, Object>> chapters) throws Soft {
+        long added = 0, skipped = 0;
+        for (int i = 0; i < chapters.size(); i += PER_SEND) {
+            Map<String, Object> r = site(chapterPayload(id, new ArrayList<>(chapters.subList(i, Math.min(chapters.size(), i + PER_SEND)))));
+            added += count(r, "added");
+            skipped += count(r, "skipped");
+        }
+        return new long[] { added, skipped };
+    }
+
+    /** Um capítulo do lote: os dados, ou o motivo de ter ficado de fora. */
+    static final class Fetched {
+        final long capId;
+        ChapterData data;
+        String error;
+        boolean missing;
+        Map<String, Object> meta;
+        boolean fromList;
+        Future<Object> content;
+        Fetched(long capId) { this.capId = capId; }
+    }
+
+    /**
+     * Busca os capítulos de um lote. Com a thread das páginas, cada capítulo pede à API (no intervalo do lote) e já
+     * passa as páginas (CDN) para a outra thread, seguindo para o próximo sem esperar; no fim, junta tudo na ordem.
+     */
+    private List<Fetched> fetchGroup(List<Long> group, Entries entries, long posBase, long total) throws Soft {
+        List<Fetched> out = new ArrayList<>();
+        for (int k = 0; k < group.size(); k++) {
+            long capId = group.get(k);
+            Fetched f = new Fetched(capId);
+            out.add(f);
+            emit("fetching", "n", k + 1, "of", group.size(), "pos", posBase + k + 1, "total", total);
+            if (cdnPool == null) {
+                try {
+                    f.data = chapterData(capId, entries);
+                    if (f.data == null) f.missing = true;
+                } catch (Soft e) {
+                    f.error = e.getMessage();
+                }
+                continue;
+            }
+            try {
+                Map<String, Object> e = entries.map.get(capId);
+                if (e != null && Json.str(e.get("cap_uuid")) != null) {
+                    f.meta = new LinkedHashMap<>();
+                    f.meta.put("obr_id", entries.obrId);
+                    f.meta.putAll(e);
+                    f.fromList = true;
+                } else {
+                    f.meta = Json.obj(unwrap(mediocre(true, "/capitulos/" + capId)));
+                    if (f.meta == null) { f.missing = true; continue; }
+                }
+                final String path = contentPath(f.meta);
+                if (path == null) {
+                    if (f.fromList) f.data = chapterData(capId, entries);
+                    else f.data = new ChapterData(f.meta, null);
+                    if (f.data == null) f.missing = true;
+                    continue;
+                }
+                f.content = cdnPool.submit(new java.util.concurrent.Callable<Object>() {
+                    @Override
+                    public Object call() {
+                        try { return mediocre(false, path, cdnHttp); } catch (Soft ignored) { return null; }
+                    }
+                });
+            } catch (Soft e) {
+                f.error = e.getMessage();
+            }
+        }
+        for (Fetched f : out) {
+            if (f.content == null) continue;
+            Object content = await(f.content);
+            f.content = null;
+            if (content == null && f.fromList) {
+                // As páginas pelo código da lista falharam: tenta pelo caminho normal (pede à API).
+                try {
+                    f.data = chapterData(f.capId, new Entries());
+                    if (f.data == null) f.missing = true;
+                } catch (Soft e) {
+                    f.error = e.getMessage();
+                }
+            } else f.data = new ChapterData(f.meta, content);
+        }
+        return out;
+    }
+
+    /** Espera as páginas buscadas na outra thread; o botão Parar e os erros graves passam para cá. */
+    private Object await(Future<Object> fu) {
+        for (;;) {
+            try {
+                return fu.get(500, TimeUnit.MILLISECONDS);
+            } catch (TimeoutException t) {
+                if (stop) { fu.cancel(true); throw new Stopped(); }
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                fu.cancel(true);
+                throw new Stopped();
+            } catch (ExecutionException ee) {
+                Throwable c = ee.getCause();
+                if (c instanceof RuntimeException) throw (RuntimeException) c;
+                if (c instanceof Error) throw (Error) c;
+                return null;
+            } catch (java.util.concurrent.CancellationException ce) {
+                throw new Stopped();
+            }
+        }
+    }
 
     private static long count(Map<String, Object> m, String key) {
         Long v = m == null ? null : Json.whole(m.get(key));
@@ -913,34 +1094,30 @@ final class EnvioEngine {
         long added = 0, skipped = 0, tried = 0;
         boolean failed = true;
         try {
-            int per = batchSize();
-            for (int i = 0; i < pending.size(); i += per) {
+            for (int i = 0; i < pending.size();) {
                 holdIfNeeded();
                 pairWait();
                 long batchStart = clock.now();
-                List<Long> group = pending.subList(i, Math.min(pending.size(), i + per));
+                // O lote pode mudar entre um e outro (encolhe depois de recusa da API e volta depois).
+                List<Long> group = pending.subList(i, Math.min(pending.size(), i + batchSize()));
+                i += group.size();
                 inBatch = true;
                 emit("sending", "from", tried + 1, "to", tried + group.size(), "total", total);
                 List<Map<String, Object>> chapters = new ArrayList<>();
-                for (int k = 0; k < group.size(); k++) {
-                    long capId = group.get(k);
-                    emit("fetching", "n", k + 1, "of", group.size(), "pos", tried + k + 1, "total", total);
-                    try {
-                        ChapterData data = chapterData(capId, entries);
-                        if (data == null) { log("Capítulo " + capId + ": não encontrado na MediocreScan."); continue; }
-                        chapters.add(Json.map("capId", capId, "meta", data.meta, "content", data.content));
-                    } catch (Soft e) {
-                        log("Capítulo " + capId + ": " + e.getMessage());
-                    }
+                for (Fetched f : fetchGroup(group, entries, tried, total)) {
+                    if (f.error != null) log("Capítulo " + f.capId + ": " + f.error);
+                    else if (f.missing || f.data == null) log("Capítulo " + f.capId + ": não encontrado na MediocreScan.");
+                    else chapters.add(Json.map("capId", f.capId, "meta", f.data.meta, "content", f.data.content));
                 }
                 inBatch = false;
+                long fetchMs = clock.now() - batchStart;
                 tried += group.size();
                 skipped += group.size() - chapters.size();
                 if (!chapters.isEmpty()) {
                     emit("posting", "count", chapters.size());
-                    Map<String, Object> r = site(chapterPayload(id, chapters));
-                    added += count(r, "added");
-                    skipped += count(r, "skipped");
+                    long[] r = postChapters(id, chapters);
+                    added += r[0];
+                    skipped += r[1];
                 }
                 if (cfg.fast) batchDone();
                 else synchronized (pace) {
@@ -948,7 +1125,8 @@ final class EnvioEngine {
                     lastPair = batchStart;
                     savePace();
                 }
-                emit("progress", "id", id, "done", Math.min(tried, total), "total", total, "added", added, "skipped", skipped, "left", left);
+                emit("progress", "id", id, "done", Math.min(tried, total), "total", total, "added", added, "skipped", skipped, "left", left,
+                    "batch", group.size(), "batchMs", clock.now() - batchStart, "fetchMs", fetchMs);
             }
             failed = false;
         } finally {
@@ -1021,33 +1199,30 @@ final class EnvioEngine {
                 if (pending.contains(c)) todo.add(c);
                 else { already++; emit("chapter-state", "id", id, "capId", c, "state", "site"); }
             }
-            int per = batchSize();
-            for (int i = 0; i < todo.size(); i += per) {
+            for (int i = 0; i < todo.size();) {
                 pairWait();
                 long batchStart = clock.now();
-                List<Long> group = todo.subList(i, Math.min(todo.size(), i + per));
+                int from = i;
+                List<Long> group = todo.subList(i, Math.min(todo.size(), i + batchSize()));
+                i += group.size();
                 inBatch = true;
                 for (Long c : group) emit("chapter-state", "id", id, "capId", c, "state", "sending");
-                emit("sending", "from", i + 1, "to", i + group.size(), "total", todo.size());
+                emit("sending", "from", from + 1, "to", from + group.size(), "total", todo.size());
                 List<Map<String, Object>> chapters = new ArrayList<>();
-                for (int k = 0; k < group.size(); k++) {
-                    long capId = group.get(k);
-                    emit("fetching", "n", k + 1, "of", group.size(), "pos", i + k + 1, "total", todo.size());
-                    try {
-                        ChapterData data = chapterData(capId, entries);
-                        if (data == null) { emit("chapter-state", "id", id, "capId", capId, "state", "fail"); skipped++; continue; }
-                        chapters.add(Json.map("capId", capId, "meta", data.meta, "content", data.content));
-                    } catch (Soft e) {
-                        emit("chapter-state", "id", id, "capId", capId, "state", "fail");
+                for (Fetched f : fetchGroup(group, entries, from, todo.size())) {
+                    if (f.error != null || f.missing || f.data == null) {
+                        emit("chapter-state", "id", id, "capId", f.capId, "state", "fail");
                         skipped++;
-                        log("Capítulo " + capId + ": " + e.getMessage());
+                        if (f.error != null) log("Capítulo " + f.capId + ": " + f.error);
+                        continue;
                     }
+                    chapters.add(Json.map("capId", f.capId, "meta", f.data.meta, "content", f.data.content));
                 }
                 if (!chapters.isEmpty()) {
                     emit("posting", "count", chapters.size());
-                    Map<String, Object> r = site(chapterPayload(id, chapters));
-                    long sk = count(r, "skipped");
-                    added += count(r, "added");
+                    long[] r = postChapters(id, chapters);
+                    long sk = r[1];
+                    added += r[0];
                     skipped += sk;
                     // O site responde em conjunto; quem falhou aparece na conferência do fim.
                     for (Map<String, Object> c : chapters) emit("chapter-state", "id", id, "capId", c.get("capId"), "state", sk > 0 ? "check" : "site");
@@ -1058,7 +1233,8 @@ final class EnvioEngine {
                     lastPair = batchStart;
                     savePace();
                 }
-                emit("progress", "id", id, "done", Math.min(i + group.size(), todo.size()), "total", todo.size(), "added", added, "skipped", skipped, "left", 1);
+                emit("progress", "id", id, "done", Math.min(i, todo.size()), "total", todo.size(), "added", added, "skipped", skipped, "left", 1,
+                    "batch", group.size(), "batchMs", clock.now() - batchStart);
             }
             emit("chapters-done", "id", id, "name", name, "added", added, "skipped", skipped, "already", already);
         } catch (Stopped e) {

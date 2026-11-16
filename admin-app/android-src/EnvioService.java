@@ -205,7 +205,8 @@ public class EnvioService extends Service {
         c.speedMinUntil = sp[2];
         // Automático: um vigia do Android religa o serviço quando houver internet, se ele for encerrado.
         if ("auto".equals(Json.str(job.get("type")))) EnvioWatch.schedule(this);
-        final EnvioEngine e = new EnvioEngine(c, new HttpConn(null), new HttpConn(null), CLOCK, host);
+        // Terceira conexão: páginas dos capítulos (CDN) numa thread à parte, enquanto o próximo capítulo pede à API.
+        final EnvioEngine e = new EnvioEngine(c, new HttpConn(null), new HttpConn(null), new HttpConn(null), CLOCK, host);
         engine = e;
         jsMode = false;
         endTitle = null;
@@ -256,6 +257,7 @@ public class EnvioService extends Service {
                 store.clearJob();
                 if (auto) EnvioWatch.cancel(this);
             }
+            e.close();
             engine = null;
             finishForeground(endTitle != null ? endTitle : "Envio encerrado", endText != null ? endText : "");
         }
@@ -311,7 +313,8 @@ public class EnvioService extends Service {
         return n;
     }
 
-    private void onEvent(Map<String, Object> e) {
+    /** Eventos vêm do motor e, às vezes, da thread das páginas: um de cada vez. */
+    private synchronized void onEvent(Map<String, Object> e) {
         long at = System.currentTimeMillis();
         String kind = String.valueOf(e.get("type"));
         if ("work-done".equals(kind) || "chapters-done".equals(kind)) addToday(num(e, "added"));
@@ -428,7 +431,8 @@ public class EnvioService extends Service {
             case "progress":
                 done = num(e, "done");
                 total = num(e, "total");
-                text = done + " de " + total + " capítulos · +" + num(e, "added") + " no site";
+                text = done + " de " + total + " capítulos · +" + num(e, "added") + " no site"
+                    + (e.get("batchMs") != null ? " · lote de " + num(e, "batch") + " em " + clock(num(e, "batchMs")) : "");
                 break;
             case "waiting":
                 countdownEnd = at + num(e, "ms");
