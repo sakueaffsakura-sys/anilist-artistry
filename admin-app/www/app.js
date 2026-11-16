@@ -16,9 +16,13 @@
   state.auto = Object.assign({ on: true, review: true, discover: true, requests: true, wifiOnly: false, chargingOnly: false, firstPass: 10 }, state.auto || {});
   // Versão 2: o automático fica sempre ligado (liga sozinho com internet); só desliga se o admin desligar.
   if (!state.auto.v || state.auto.v < 2) { state.auto.on = true; state.auto.v = 2; }
-  // Ritmo: "cycle" (padrão: 5 capítulos, 33 s, mais 5, 33 s, mais 5, pausa de 2 min) ou "safe" (1 pedido por minuto).
+  // Ritmo: "cycle" (padrão: lote de 15 capítulos e pausa de 2 min) ou "safe" (1 pedido por minuto).
   if (state.speed !== "safe") state.speed = "cycle";
-  state.cycle = Object.assign({ batch: 5, gap: 33, batches: 3, pause: 120 }, state.cycle || {});
+  // Ciclo (pedido do dono em 16/11): 15 capítulos de uma vez, manda ao site e pausa 2 min. v2 troca os lotes de 5.
+  const CYCLE_DEFAULT = { batch: 15, gap: 33, batches: 1, pause: 120, v: 2 };
+  const oldCycle = state.cycle || null;
+  state.cycle = Object.assign({}, CYCLE_DEFAULT, oldCycle || {});
+  if (oldCycle && !(oldCycle.v >= 2)) Object.assign(state.cycle, { batch: 15, batches: 1, v: 2 });
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (_) { /* sem armazenamento */ } };
   const host = (url) => { try { return new URL(url).host; } catch (_) { return url; } };
   /** 1234 → "1,2 mil" (mesmo jeito do site). */
@@ -1050,6 +1054,7 @@
         note2(`${note.work || "Envio"}: buscando capítulos ${e.from}${e.to > e.from ? `–${e.to}` : ""} de ${e.total}.`);
         break;
       case "progress":
+        if (e.batchMs) autoInfo.lastBatch = { n: Number(e.batch) || 0, ms: Number(e.batchMs) || 0 };
         beatRun(); note.done = e.done; note.total = e.total; setBar(e.done, e.total);
         if (!workClock || workClock.id !== e.id) workClock = { id: e.id, at, done: e.done };
         if (autoRunning()) renderAuto();
@@ -1063,6 +1068,11 @@
         break;
       }
       case "posting": clearInterval(countdown); fetchNote = ""; setStatus(`Publicando ${e.count} capítulo(s) no site…`); break;
+      // Recusa da API no meio do lote: o motor encolhe os lotes (15 → 10 → 5) e volta depois de 1 h sem recusa.
+      case "batch-size":
+        autoInfo.batchCap = Number(e.batch) || 0;
+        if (!quiet) toast(e.reason === "volta" ? `Lotes de ${e.batch} capítulos de novo.` : `A MediocreScan recusou: lotes de ${e.batch} por enquanto.`);
+        renderAuto(); break;
       case "fetching":
         fetchNote = `capítulo ${e.pos} de ${e.total} (${e.n}º de ${e.of} deste lote)`;
         clearInterval(countdown); setStatus(`Baixando ${fetchNote}…`);
@@ -1293,8 +1303,10 @@
     }
     $("sender").classList.toggle("auto", on);
     const rate = ratePerHour();
-    const speed = state.speed === "safe" ? "ritmo seguro" : `ciclo de ${state.cycle.batch * state.cycle.batches}`;
-    $("auto-rate").textContent = on ? [speed, rate ? `~${rate}/h feitos` : ""].filter(Boolean).join(" · ") : "";
+    const cap = autoInfo.batchCap && autoInfo.batchCap < state.cycle.batch ? autoInfo.batchCap : 0;
+    const speed = state.speed === "safe" ? "ritmo seguro" : cap ? `lotes de ${cap} (recusa)` : `lotes de ${state.cycle.batch}`;
+    const lb = autoInfo.lastBatch;
+    $("auto-rate").textContent = on ? [speed, lb && lb.n > 1 ? `último em ${mmss(Math.round(lb.ms / 1000))}` : "", rate ? `~${rate}/h feitos` : ""].filter(Boolean).join(" · ") : "";
     $("q-send").hidden = busy() || !(Number($("n-queue").textContent) > 0);
   }
   /** Quanto falta da obra atual, pelo ritmo medido desde que ela começou. */
@@ -1476,8 +1488,8 @@
     $("open-battery").hidden = $("battery-hint").hidden = !NATIVE;
     renderAutoSwitches(); renderSpeed();
   }
-  /** Duração aproximada de um ciclo (cada capítulo leva ~2 s para buscar, mais ~5 s para publicar o lote). */
-  function cycleSeconds(c) { return c.batches * (c.batch * 2 + 5) + Math.max(0, c.batches - 1) * c.gap + c.pause; }
+  /** Duração aproximada de um ciclo (cada capítulo leva ~2,5 s para buscar, mais ~2 s por 5 para publicar no site). */
+  function cycleSeconds(c) { return c.batches * Math.round(c.batch * 2.5 + Math.ceil(c.batch / 5) * 2) + Math.max(0, c.batches - 1) * c.gap + c.pause; }
   function renderSpeed() {
     document.querySelectorAll("[data-speed]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.speed === state.speed)));
     const c = state.cycle, cyc = state.speed !== "safe";
@@ -1486,10 +1498,10 @@
     const per = c.batch * c.batches, secs = cycleSeconds(c);
     const dur = (x) => (x >= 60 && x % 60 === 0 ? `${x / 60} min` : mmss(x));
     $("speed-hint").textContent = cyc
-      ? `Pega ${c.batch}, espera ${c.gap} s${c.batches > 2 ? `, pega mais ${c.batch}, espera ${c.gap} s` : ""}${c.batches > 1 ? `, pega mais ${c.batch}` : ""}${c.batches > 3 ? ` (${c.batches} lotes)` : ""} e pausa ${dur(c.pause)}. São ${per} capítulos a cada ~${dur(secs)}, uns ${Math.round(per * 3600 / secs)} por hora. Se a MediocreScan recusar, o app espera e tenta de novo; se recusar sempre, use "Segura".`
+      ? `${c.batches === 1 ? `Pega ${c.batch} de uma vez, manda ao site` : `Pega ${c.batch}, espera ${c.gap} s${c.batches > 2 ? `, pega mais ${c.batch}, espera ${c.gap} s` : ""}, pega mais ${c.batch}${c.batches > 3 ? ` (${c.batches} lotes)` : ""}`} e pausa ${dur(c.pause)}. São ${per} capítulos a cada ~${dur(secs)}, uns ${Math.round(per * 3600 / secs)} por hora. As páginas de um capítulo baixam enquanto o próximo pede à API. Se a MediocreScan recusar, o app espera, e os lotes diminuem sozinhos (de 5 em 5) e voltam depois de 1 h sem recusa; se recusar sempre, use "Segura".`
       : "1 pedido por minuto à MediocreScan e 5 capítulos a cada 1 min 12 s (uns 60 por hora, o ritmo antigo).";
   }
-  const CYCLE_LIMITS = { batch: [1, 5], gap: [0, 600], batches: [1, 20], pause: [0, 3600] };
+  const CYCLE_LIMITS = { batch: [1, 30], gap: [0, 600], batches: [1, 20], pause: [0, 3600] };
   ["batch", "gap", "batches", "pause"].forEach((k) => {
     const i = $(`cy-${k}`);
     i.onchange = () => {
@@ -1498,7 +1510,7 @@
       i.value = String(state.cycle[k]); save(); renderSpeed(); applyToAuto("Ritmo salvo: o automático religa com ele.");
     };
   });
-  $("cy-reset").onclick = () => { state.cycle = { batch: 5, gap: 33, batches: 3, pause: 120 }; save(); renderSpeed(); applyToAuto("Ritmo padrão: o automático religa com ele."); };
+  $("cy-reset").onclick = () => { state.cycle = Object.assign({}, CYCLE_DEFAULT); save(); renderSpeed(); applyToAuto("Ritmo padrão: o automático religa com ele."); };
   /** Religa o que estiver rodando no automático para valer a configuração nova. */
   function applyToAuto(msg) {
     if (autoRunning() && NATIVE) { restartAuto = true; Native.stopJob().catch(() => {}); toast(msg || "Aplicando: o automático religa com a configuração nova."); }

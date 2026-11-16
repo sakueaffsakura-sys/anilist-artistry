@@ -71,12 +71,17 @@ que não está bloqueado) e envia ao site pelo endpoint `/api/public/mediocre-in
   `review-done` {checked, news, added, failed}, `review-skip`; `auto-pick` traz `review`/`reviewTotal`. Na revisão,
   obra conferida sem capítulo novo não entra na atividade nem em "Hoje". Opção em Ajustes: "Revisar as obras do site
   ao ligar" (`review`, ligada por padrão).
-- **Ritmo (Ajustes → Velocidade), escolhido pelo dono:** "Ciclo de 15" (padrão) pega 5 capítulos, espera 33 s, pega mais
-  5, espera 33 s, pega mais 5 e, completados os 15, pausa 2 min (cerca de 15 capítulos a cada ~3 min 40 s, ~240 por
-  hora). Os quatro números (capítulos por lote até 5, espera entre lotes, lotes por ciclo, pausa) são editáveis e vão na
-  configuração do serviço (`config.cycle`); o ciclo continua entre obras e depois de reabrir. Dentro do lote os pedidos à
-  API saem a cada 2 s; fora do lote (obra, listas), a cada 10 s. Recusa da MediocreScan continua com as esperas
-  crescentes. "Segura" é o ritmo antigo (1 pedido/min, 5 capítulos a cada 1 min 12 s).
+- **Ritmo (Ajustes → Velocidade), escolhido pelo dono:** "Ciclo de 15" (padrão desde a 1.52, pedido em 16/11) pega 15
+  capítulos de uma vez, manda ao site e pausa 2 min (contados do fim do lote). Os quatro números (capítulos por lote até
+  30, espera entre lotes, lotes por ciclo, pausa) são editáveis e vão na configuração do serviço (`config.cycle`; a tela
+  migra quem tinha lotes de 5 com `cycle.v` 2); o ciclo continua entre obras e depois de reabrir. O site recebe no máximo
+  5 capítulos por pedido (`INGEST_MAX_CHAPTERS`), então o lote vai ao site em pedidos de 5, um logo depois do outro
+  (`postChapters`). Dentro do lote os pedidos à API saem a cada 2 s; fora do lote (obra, listas), a cada 10 s. As
+  páginas de cada capítulo (CDN) baixam numa thread à parte (`fetchGroup`, conexão própria `cdnHttp`) enquanto o
+  próximo capítulo pede à API, sem mudar o intervalo da API (lote ~30% mais curto no teste com 1,5 s por resposta).
+  Recusa da API (429/403) no meio do ciclo encolhe os próximos lotes de 5 em 5 (15 → 10 → 5, evento `batch-size`) e
+  cada 1 h sem recusa devolve 5. O evento `progress` traz `batch`, `batchMs` e `fetchMs` (notificação e Painel mostram
+  quanto levou o último lote). "Segura" é o ritmo antigo (1 pedido/min, 5 capítulos a cada 1 min 12 s).
 - **Ajustes e Histórico** são telas: Ajustes tem as opções do automático, conta/chave/site e bateria; Histórico agrupa
   por dia com filtros (enviados, avisos, pedidos) e o resumo de hoje. "Enviadas hoje" no Painel mostra as capas
   (registros em `bm-estudio-envios`) e o ritmo em capítulos por hora. A fila mostra o total real (`queueTotal`) e
