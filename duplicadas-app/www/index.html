@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#eef0f2" />
+  <meta name="theme-color" content="#000000" />
   <title>Duplicadas</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div id="wall" class="wall" aria-hidden="true" hidden></div>
   <header class="top">
     <h1 class="logo" aria-label="Duplicadas"><span aria-hidden="true" data-t="Duplicadas">Duplicadas</span></h1>
     <p class="tag">Obras repetidas na MediocreScan</p>
@@ -123,6 +124,20 @@
           <button id="set-clear" type="button" class="btn ghost small danger">Apagar catálogo salvo</button>
         </div>
       </details>
+      <article id="wp-card" class="card">
+        <h2>Papel de parede</h2>
+        <div class="wp-row">
+          <div id="wp-prev" class="wp-prev">Sem imagem</div>
+          <div class="wp-btns">
+            <button id="wp-pick" type="button" class="btn ghost small">Escolher da galeria</button>
+            <button id="wp-remove" type="button" class="btn ghost small" hidden>Tirar o fundo</button>
+          </div>
+        </div>
+        <input id="wp-file" type="file" accept="image/*" hidden />
+        <label class="range" for="wp-dim">Escurecer <span id="wp-dim-v"></span><input id="wp-dim" type="range" min="0" max="90" step="5" /></label>
+        <label class="range" for="wp-blur">Desfocar <span id="wp-blur-v"></span><input id="wp-blur" type="range" min="0" max="20" step="1" /></label>
+        <p class="note">A imagem fica só neste celular. Escurecer mais deixa os textos mais fáceis de ler.</p>
+      </article>
     </section>
 
     <!-- Duplicadas: grupos com motivos. -->

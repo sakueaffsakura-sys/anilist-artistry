@@ -10,6 +10,20 @@ let g = readFileSync(gradle, "utf8");
 g = g.replace(/versionCode\s+\d+/, `versionCode ${build}`).replace(/versionName\s+"[^"]*"/, `versionName "1.${build}"`);
 writeFileSync(gradle, g);
 
+// Tema preto também nas barras do Android (status e navegação) e no fundo da janela (sem clarão branco ao abrir).
+const stylesPath = "android/app/src/main/res/values/styles.xml";
+let st = readFileSync(stylesPath, "utf8");
+const black = `
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@android:color/black</item>`;
+const before = st;
+st = st.replace(/(<style name="AppTheme\.NoActionBar"[^>]*>)/, `$1${black}`);
+if (st === before) throw new Error("styles.xml sem AppTheme.NoActionBar");
+st = st.replace(/(<style name="AppTheme"[^>]*>)/, `$1${black}`);
+writeFileSync(stylesPath, st);
+
 function find(dir, name) {
   for (const f of readdirSync(dir)) {
     const p = join(dir, f);

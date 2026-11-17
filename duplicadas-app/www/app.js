@@ -38,7 +38,8 @@
   })();
 
   // auto: procura sozinho ao abrir o app (e a cada 6 h com ele aberto).
-  const settings = Object.assign({ gap: 2.5, min: 55, ignore: "", auto: true }, ls.get("dup-settings", {}));
+  // wpDim/wpBlur: papel de parede (escurecer 0–90 %, desfocar 0–20 px).
+  const settings = Object.assign({ gap: 2.5, min: 55, ignore: "", auto: true, wpDim: 55, wpBlur: 0 }, ls.get("dup-settings", {}));
   const saveSettings = () => ls.set("dup-settings", settings);
   let dismissed = new Set(ls.get("dup-dismissed", []));
   const saveDismissed = () => ls.set("dup-dismissed", Array.from(dismissed));
@@ -550,9 +551,69 @@
   setInterval(() => autoCycle(false), 60_000);
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") autoCycle(false); });
 
+  /* ---------- Papel de parede: imagem da galeria, reduzida e guardada no celular ---------- */
+  let wallUrl = null;
+  async function shrinkImage(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("Não deu para abrir essa imagem.")); i.src = url; });
+      const k = Math.min(1, 1800 / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      const blob = await new Promise((res) => c.toBlob(res, "image/jpeg", 0.86));
+      if (!blob) throw new Error("Não deu para preparar essa imagem.");
+      return blob;
+    } finally { URL.revokeObjectURL(url); }
+  }
+  function applyWallLook() {
+    const root = document.documentElement.style;
+    root.setProperty("--dim", String((Number(settings.wpDim) || 0) / 100));
+    root.setProperty("--blur", `${Number(settings.wpBlur) || 0}px`);
+    $("wp-dim").value = String(settings.wpDim); $("wp-blur").value = String(settings.wpBlur);
+    $("wp-dim-v").textContent = `${settings.wpDim}%`; $("wp-blur-v").textContent = Number(settings.wpBlur) ? `${settings.wpBlur}` : "nada";
+  }
+  async function loadWall() {
+    let v = await store.get("wallpaper");
+    if (wallUrl) { URL.revokeObjectURL(wallUrl); wallUrl = null; }
+    let src = null;
+    if (v instanceof Blob) src = wallUrl = URL.createObjectURL(v);
+    else if (typeof v === "string" && v.startsWith("data:image/")) src = v;
+    $("wall").hidden = !src;
+    document.body.classList.toggle("has-wall", Boolean(src));
+    document.documentElement.style.setProperty("--wall-img", src ? `url("${src}")` : "none");
+    $("wp-prev").style.backgroundImage = src ? `url("${src}")` : "";
+    $("wp-prev").textContent = src ? "" : "Sem imagem";
+    $("wp-remove").hidden = !src;
+    $("wp-pick").textContent = src ? "Trocar imagem" : "Escolher da galeria";
+    applyWallLook();
+  }
+  $("wp-pick").onclick = () => $("wp-file").click();
+  $("wp-file").onchange = async () => {
+    const f = $("wp-file").files && $("wp-file").files[0];
+    $("wp-file").value = "";
+    if (!f) return;
+    try {
+      const blob = await shrinkImage(f);
+      try { await store.set("wallpaper", blob); }
+      catch (_) {
+        // Sem IndexedDB: guarda como texto (pode não caber).
+        const data = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+        ls.set("dup-wallpaper", data);
+      }
+      await loadWall();
+      toast("Papel de parede salvo.");
+    } catch (e) { toast(e.message || "Não deu para usar essa imagem."); }
+  };
+  $("wp-remove").onclick = async () => { await store.del("wallpaper"); ls.del("dup-wallpaper"); await loadWall(); toast("Fundo tirado."); };
+  $("wp-dim").oninput = () => { settings.wpDim = Number($("wp-dim").value); applyWallLook(); };
+  $("wp-blur").oninput = () => { settings.wpBlur = Number($("wp-blur").value); applyWallLook(); };
+  $("wp-dim").onchange = $("wp-blur").onchange = () => saveSettings();
+
   /* ---------- Início ---------- */
   (async () => {
     renderToken();
+    loadWall().catch(() => {});
     await loadCatalog();
     renderCat();
     renderAuto();
