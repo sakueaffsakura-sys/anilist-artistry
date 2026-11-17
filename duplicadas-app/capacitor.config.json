@@ -1,0 +1,9 @@
+{
+  "appId": "net.bettermanga.duplicadas",
+  "appName": "Duplicadas",
+  "webDir": "www",
+  "android": { "backgroundColor": "#eef0f2" },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}
