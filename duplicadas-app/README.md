@@ -31,6 +31,10 @@ App separado do Estúdio que só procura **obras duplicadas na MediocreScan**. N
   pares dispensados no celular.
 - **Links (1.6+, pedido do dono):** cada obra mostra o link `https://mediocrescan.com/obra/{id}` (toque abre no
   navegador); "Copiar links" e o relatório levam título + link; os filtros aceitam um link colado.
+- **Tema preto e papel de parede (1.8+, pedido do dono):** fundo preto (também nas barras do Android, via
+  `styles.xml` no `patch-android.mjs`), cartões translúcidos. Cartão "Papel de parede": escolhe uma imagem da galeria
+  (`<input type="file">`), reduz para no máximo 1800 px em JPEG e guarda no IndexedDB (`wallpaper`); "Escurecer"
+  (0–90 %) e "Desfocar" (0–20 px) ficam nos ajustes (`wpDim`, `wpBlur`).
 - **Telas:** Análise (token, catálogo, procurar, conferir, ajustes), Duplicadas (grupos com motivos, filtros, copiar
   IDs e relatório) e Catálogo (busca por palavra-chave em todas as obras lidas).
 - **Build:** `.github/workflows/duplicadas-apk.yml` (Capacitor 7, HTTP nativo via `CapacitorHttp`, tela acesa) publica
