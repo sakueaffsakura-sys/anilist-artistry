@@ -4,8 +4,9 @@
  * Compara cada obra só com as que dividem alguma palavra-chave (índice de palavras), e soma sinais:
  * título igual (com e sem acentos, artigos e palavras de formato), nome alternativo igual, mesmas palavras em
  * outra ordem, título quase igual (erro de digitação), um título começando com o outro, palavras-chave raras em
- * comum (peso maior para palavras que quase nenhuma obra usa), mesma capa e sinopse parecida (quando os
- * detalhes foram lidos). Números diferentes no título (2, II, temporada 3) e formatos diferentes (novel × quadrinho)
+ * comum (peso maior para palavras que quase nenhuma obra usa), mesma capa (arquivo ou imagem parecida, pelo
+ * hash da capa) e sinopse igual ou parecida (quando os detalhes foram lidos). Obras com sinopses que dividem
+ * várias palavras raras também viram candidatas, mesmo com títulos diferentes (outra língua, nome trocado). Números diferentes no título (2, II, temporada 3) e formatos diferentes (novel × quadrinho)
  * baixam a nota, porque costumam ser continuação ou adaptação, não cópia.
  */
 (function (root) {
@@ -72,12 +73,27 @@
     if (file.length < 8 || /^(default|placeholder|sem[-_]?capa|no[-_]?image)/i.test(file)) return null;
     return file.toLowerCase();
   }
+  /** Sinopse: palavras (sem artigos) e trechos de 3 palavras seguidas (pegam texto copiado com pequenas mudanças). */
   function descWords(desc, ignore) {
     const n = normalize(desc);
     if (n.length < 80) return null;
-    const out = new Set();
-    for (const w of n.split(" ")) if (w.length > 2 && !STOP.has(w) && !ignore.has(w)) out.add(w);
-    return out.size >= 12 ? out : null;
+    const words = n.split(" ").filter((w) => w.length > 2 && !STOP.has(w) && !ignore.has(w));
+    const out = new Set(words);
+    if (out.size < 12) return null;
+    const shingles = new Set();
+    for (let i = 0; i + 2 < words.length; i++) shingles.add(words[i] + " " + words[i + 1] + " " + words[i + 2]);
+    out.shingles = shingles;
+    return out;
+  }
+  /** Distância entre dois hashes de capa (16 caracteres hexadecimais = 64 bits). */
+  function hamming(a, b) {
+    if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return 64;
+    let d = 0;
+    for (let i = 0; i < a.length; i++) {
+      let x = parseInt(a[i], 16) ^ parseInt(b[i], 16);
+      while (x) { d += x & 1; x >>= 1; }
+    }
+    return d;
   }
   function jaccard(a, b) {
     let inter = 0;
@@ -144,15 +160,21 @@
       const names = [analyze(w.title, ignore)].concat(alts.map((s) => analyze(s, ignore))).filter((n, k) => k === 0 || n.norm);
       const tokens = new Set();
       names.forEach((n) => n.tokens.forEach((t) => tokens.add(t)));
-      return { i, w, names, main: names[0], tokens, kind: kindClass(w.format), cover: coverKey(w.cover), desc: descWords(w.desc, ignore) };
+      const hash = typeof w.coverHash === "string" && /^[0-9a-f]{16}$/.test(w.coverHash) ? w.coverHash : null;
+      return { i, w, names, main: names[0], tokens, kind: kindClass(w.format), cover: coverKey(w.cover), hash, desc: descWords(w.desc, ignore) };
     });
   }
 
   function idfTable(prepared) {
-    const df = new Map();
-    for (const p of prepared) for (const t of p.tokens) df.set(t, (df.get(t) || 0) + 1);
+    const df = new Map(), ddf = new Map(), hdf = new Map();
+    for (const p of prepared) {
+      for (const t of p.tokens) df.set(t, (df.get(t) || 0) + 1);
+      if (p.desc) for (const t of p.desc) ddf.set(t, (ddf.get(t) || 0) + 1);
+      if (p.hash) hdf.set(p.hash, (hdf.get(p.hash) || 0) + 1);
+    }
     const n = prepared.length || 1;
-    return { df, idf: (t) => Math.log(1 + n / (df.get(t) || 1)) };
+    // Capa usada por muitas obras é imagem padrão ("sem capa"): não conta.
+    return { df, ddf, hdf, idf: (t) => Math.log(1 + n / (df.get(t) || 1)), placeholder: (h) => (hdf.get(h) || 0) > 3 };
   }
 
   /** Pares candidatos: obras que dividem uma palavra-chave não comum, a mesma capa ou o mesmo começo de título. */
@@ -166,6 +188,7 @@
         if (n.norm && !n.tokens.length) add("n:" + n.norm, p.i);
       }
       if (p.cover) add("c:" + p.cover, p.i);
+      if (p.hash && !table.placeholder(p.hash)) add("h:" + p.hash.slice(0, 4), p.i);
     }
     const pairs = new Set();
     for (const list of buckets.values()) {
@@ -176,6 +199,23 @@
         pairs.add(x * 1e6 + y);
       }
     }
+    // Sinopses: as 10 palavras mais raras de cada uma (usadas por 2 a 40 obras); 3 ou mais em comum = candidatas.
+    const dBuckets = new Map();
+    for (const p of prepared) {
+      if (!p.desc) continue;
+      const keys = Array.from(p.desc).filter((t) => { const d = table.ddf.get(t) || 0; return d >= 2 && d <= 40; })
+        .sort((x, y) => (table.ddf.get(x) || 0) - (table.ddf.get(y) || 0)).slice(0, 10);
+      for (const k of keys) { let l = dBuckets.get(k); if (!l) dBuckets.set(k, (l = [])); l.push(p.i); }
+    }
+    const co = new Map();
+    for (const list of dBuckets.values()) {
+      if (list.length < 2) continue;
+      for (let a = 0; a < list.length; a++) for (let b = a + 1; b < list.length; b++) {
+        const k = Math.min(list[a], list[b]) * 1e6 + Math.max(list[a], list[b]);
+        co.set(k, (co.get(k) || 0) + 1);
+      }
+    }
+    for (const [k, n] of co) if (n >= 3) pairs.add(k);
     return pairs;
   }
 
@@ -217,11 +257,17 @@
       const kw = (score) => sig(score, `Palavras-chave em comum: ${sorted.join(", ")}`);
       if (wj >= 0.8) kw(82); else if (wj >= 0.65 && shared.length >= 2) kw(70); else if (wj >= 0.5 && shared.length >= 2) kw(55);
     }
-    if (A.cover && A.cover === B.cover) sig(90, "Mesma capa");
+    if (A.cover && A.cover === B.cover) sig(90, "Mesmo arquivo de capa");
+    else if (A.hash && B.hash && !table.placeholder(A.hash) && !table.placeholder(B.hash)) {
+      const d = hamming(A.hash, B.hash);
+      if (d <= 5) sig(92, "Mesma imagem de capa");
+      else if (d <= 10) sig(72, "Capa muito parecida");
+    }
     if (A.desc && B.desc) {
+      const sh = A.desc.shingles.size && B.desc.shingles.size ? jaccard(A.desc.shingles, B.desc.shingles) : 0;
       const j = jaccard(A.desc, B.desc);
-      if (j >= 0.85) sig(96, "Mesma sinopse");
-      else if (j >= 0.6) sig(88, `Sinopse quase igual (${Math.round(j * 100)}%)`);
+      if (sh >= 0.7 || j >= 0.85) sig(96, "Mesma sinopse");
+      else if (sh >= 0.4 || j >= 0.6) sig(88, `Sinopse quase igual (${Math.round(Math.max(sh, j) * 100)}%)`);
       else if (j >= 0.4) sig(70, `Sinopse parecida (${Math.round(j * 100)}%)`);
     }
     if (!signals.length) return null;
@@ -231,6 +277,7 @@
     const notes = [];
     const ca = Number(A.w.chapters), cb = Number(B.w.chapters);
     if (ca > 5 && ca === cb) { score += 3; reasons.push(`Mesmo número de capítulos (${ca})`); }
+    else if (ca > 5 && cb > 5 && Math.abs(ca - cb) <= Math.max(2, Math.round(Math.max(ca, cb) * 0.05))) { score += 2; reasons.push(`Número de capítulos parecido (${ca} × ${cb})`); }
     if (A.main.seq !== B.main.seq) {
       // 8 × 9 é outra obra quase sempre; "Obra" × "Obra 2" costuma ser a continuação.
       score -= A.main.seq && B.main.seq ? 45 : 30;
@@ -241,6 +288,18 @@
       notes.push(`Formatos diferentes (${A.w.format} × ${B.w.format}): pode ser adaptação`);
     }
     return { score: Math.max(0, Math.min(100, Math.round(score))), reasons, notes };
+  }
+
+  /**
+   * Qual manter: a mais completa (mais capítulos); empate, a que tem detalhes lidos; depois a mais antiga (menor ID).
+   * Devolve {id, why}.
+   */
+  function keepOf(works) {
+    const ch = (w) => (Number.isFinite(Number(w.chapters)) && w.chapters != null ? Number(w.chapters) : -1);
+    const sorted = works.slice().sort((a, b) => ch(b) - ch(a) || (b.detailed ? 1 : 0) - (a.detailed ? 1 : 0) || Number(a.id) - Number(b.id));
+    const best = sorted[0], second = sorted[1];
+    const why = ch(best) > (second ? ch(second) : -1) ? `mais capítulos (${ch(best)})` : "mais antiga no site";
+    return { id: best.id, why };
   }
 
   function levelOf(score) { return score >= 90 ? "alta" : score >= 70 ? "provavel" : "talvez"; }
@@ -287,7 +346,7 @@
     const groups = Array.from(byRoot.values()).map((g) => {
       const ws = Array.from(g.works.values()).sort((x, y) => Number(x.id) - Number(y.id));
       g.pairs.sort((x, y) => y.score - x.score);
-      return { key: ws.map((w) => w.id).join("-"), ids: ws.map((w) => w.id), works: ws, pairs: g.pairs, score: g.score, level: levelOf(g.score) };
+      return { key: ws.map((w) => w.id).join("-"), ids: ws.map((w) => w.id), works: ws, pairs: g.pairs, score: g.score, level: levelOf(g.score), keep: keepOf(ws) };
     }).sort((x, y) => y.score - x.score || y.works.length - x.works.length);
     return { groups, pairs, compared: cands.size, ms: Date.now() - t0 };
   }
@@ -313,7 +372,7 @@
     return out.sort((x, y) => y.rank - x.rank || String(x.w.title).localeCompare(String(y.w.title))).map((x) => x.w);
   }
 
-  const api = { normalize, analyze, ignoreSet, similarity, findDuplicates, search, levelOf, pairKey, FORMAT_WORDS };
+  const api = { normalize, analyze, ignoreSet, similarity, hamming, keepOf, findDuplicates, search, levelOf, pairKey, FORMAT_WORDS };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.Dup = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
