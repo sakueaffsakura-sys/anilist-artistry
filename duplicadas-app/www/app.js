@@ -37,23 +37,45 @@
     };
   })();
 
-  const settings = Object.assign({ gap: 2.5, min: 55, ignore: "" }, ls.get("dup-settings", {}));
+  // auto: procura sozinho ao abrir o app (e a cada 6 h com ele aberto).
+  const settings = Object.assign({ gap: 2.5, min: 55, ignore: "", auto: true }, ls.get("dup-settings", {}));
   const saveSettings = () => ls.set("dup-settings", settings);
   let dismissed = new Set(ls.get("dup-dismissed", []));
   const saveDismissed = () => ls.set("dup-dismissed", Array.from(dismissed));
   const getToken = () => ls.get("dup-token", "") || "";
 
-  /* ---------- Pedidos: HTTP nativo do Capacitor (sem bloqueio de CORS); no navegador, fetch ---------- */
-  const native = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp;
-  async function http(url, headers) {
-    if (native) {
-      const r = await native.request({ url, method: "GET", headers, responseType: "json", connectTimeout: 20000, readTimeout: 45000 });
-      return { status: r.status, data: r.data };
+  /*
+   * Pedidos: no celular, o plugin DupHttp (o mesmo caminho do Estúdio, que a MediocreScan aceita); se ele faltar, o
+   * HTTP nativo do Capacitor; no navegador, fetch.
+   */
+  const C = window.Capacitor;
+  const isNative = Boolean(C && typeof C.isNativePlatform === "function" && C.isNativePlatform());
+  const plugin = (name) => {
+    if (!isNative) return null;
+    const reg = (window.capacitorExports && window.capacitorExports.registerPlugin) || C.registerPlugin;
+    try { return reg ? reg(name) : (C.Plugins && C.Plugins[name]) || null; } catch (_) { return (C.Plugins && C.Plugins[name]) || null; }
+  };
+  const DupHttp = plugin("DupHttp");
+  const CapHttp = isNative ? (window.capacitorExports && window.capacitorExports.CapacitorHttp) || (C.Plugins && C.Plugins.CapacitorHttp) || null : null;
+  let dupHttpBroken = false;
+  async function http(url, headers, token) {
+    if (DupHttp && !dupHttpBroken) {
+      try {
+        const r = await DupHttp.get({ url, token });
+        return { status: Number(r.status) || 0, data: typeof r.body === "string" ? r.body : "", via: "nativo" };
+      } catch (e) {
+        const msg = String((e && e.message) || e);
+        // Plugin ausente nesta versão: usa o outro caminho. Erro de rede: devolve como queda (o leitor espera e tenta).
+        if (/not implemented|não implementado|plugin.*(not|não)/i.test(msg)) dupHttpBroken = true;
+        else return { status: 0, data: null, error: msg, via: "nativo" };
+      }
+    }
+    if (CapHttp) {
+      const r = await CapHttp.request({ url, method: "GET", headers, responseType: "text", connectTimeout: 20000, readTimeout: 45000 });
+      return { status: r.status, data: r.data, via: "capacitor" };
     }
     const r = await fetch(url, { headers });
-    let data = null;
-    try { data = await r.json(); } catch (_) { data = null; }
-    return { status: r.status, data };
+    return { status: r.status, data: await r.text().catch(() => ""), via: "fetch" };
   }
 
   /* ---------- Estado ---------- */
@@ -67,11 +89,13 @@
       cat.progress = saved.progress || null;
       cat.lettersNext = saved.lettersNext || null;
       cat.savedAt = saved.savedAt || null;
+      Object.assign(cat, { pagers: saved.pagers || {}, prevIds: saved.prevIds || {}, lettersBigrams: Boolean(saved.lettersBigrams), lettersDone: saved.lettersDone || null });
     }
   }
   async function saveCatalog() {
     cat.savedAt = Date.now();
-    await store.set("catalog", { works: Array.from(cat.works.values()), progress: cat.progress, lettersNext: cat.lettersNext, savedAt: cat.savedAt });
+    await store.set("catalog", { works: Array.from(cat.works.values()), progress: cat.progress, lettersNext: cat.lettersNext, savedAt: cat.savedAt,
+      pagers: cat.pagers || {}, prevIds: cat.prevIds || {}, lettersBigrams: Boolean(cat.lettersBigrams), lettersDone: cat.lettersDone || null });
     $("cat-count").textContent = fmt(cat.works.size);
   }
 
@@ -125,7 +149,8 @@
     ls.set("dup-token", v);
     $("token-input").value = "";
     $("token-status").textContent = "Token salvo neste celular.";
-    renderToken(); renderCat();
+    renderToken(); renderCat(); renderAuto();
+    setTimeout(() => autoCycle(true), 300);
   };
   $("token-change").onclick = () => { $("token-saved").hidden = true; $("token-form").hidden = false; $("token-input").focus(); };
   $("token-cancel").onclick = () => renderToken();
@@ -155,7 +180,7 @@
     $("cat-count").textContent = fmt(cat.works.size);
     const p = cat.progress;
     const when = cat.savedAt ? new Date(cat.savedAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : null;
-    const reading = busy === "catalog" || busy === "letters" || busy === "details";
+    const reading = busy === "catalog" || busy === "letters" || busy === "details" || busy === "recent";
     if (!reading) {
       $("cat-meta").textContent = !cat.works.size ? "Nada lido ainda. A leitura passa por todas as páginas da MediocreScan, uma de cada vez. Deixe o app aberto: a tela fica acesa."
         : p && p.step !== "pronto" ? `Leitura parada em ${STEP_NAME[p.step] || p.step}, página ${p.page}. Toque em Continuar para seguir de onde parou. Salvo em ${when}.`
@@ -169,12 +194,38 @@
     $("find-run").disabled = !cat.works.size || reading;
     $("deep-run").disabled = reading;
     $("token-test").disabled = !getToken() || Boolean(busy);
+    $("auto-now").disabled = reading || autoBusy;
   }
   function elapsed() {
     const s = Math.round((Date.now() - runStart) / 1000);
     return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`;
   }
+  /* ---------- Diagnóstico: os últimos pedidos (caminho, status, tempo e começo da resposta; nunca o token) ---------- */
+  const diag = ls.get("dup-diag", []);
+  function addDiag(e) {
+    diag.unshift({ at: Date.now(), path: e.path, status: e.status, ms: e.ms, via: e.via || "", text: e.text || "" });
+    diag.length = Math.min(diag.length, 40);
+    ls.set("dup-diag", diag);
+    if (!$("diag").hidden) renderDiag();
+  }
+  function renderDiag() {
+    const list = $("diag-list");
+    list.innerHTML = "";
+    $("diag-empty").hidden = diag.length > 0;
+    diag.slice(0, 20).forEach((d) => {
+      const ok = d.status >= 200 && d.status < 300;
+      list.append(el("li", { className: ok ? "ok" : "bad" },
+        el("p", { className: "d-h" }, el("b", { text: d.status ? String(d.status) : "sem resposta" }), ` ${d.path} · ${d.ms} ms${d.via ? ` · ${d.via}` : ""} · ${new Date(d.at).toLocaleTimeString("pt-BR")}`),
+        d.text ? el("p", { className: "d-t", text: d.text }) : null));
+    });
+  }
+  function diagText() {
+    return [`Duplicadas ${window.BM_VERSION || ""} — diagnóstico`, `Obras salvas: ${cat.works.size}; leitura: ${cat.progress ? JSON.stringify(cat.progress) : "nenhuma"}`, ""]
+      .concat(diag.map((d) => `${new Date(d.at).toLocaleString("pt-BR")} ${d.status || "sem resposta"} ${d.path} ${d.ms} ms ${d.via}\n  ${d.text}`)).join("\n");
+  }
+
   function onEvent(e) {
+    if (e.type === "req") { addDiag(e); return; }
     const run = $("run");
     if (e.type === "wait") {
       clearInterval(waitTimer);
@@ -188,6 +239,10 @@
       return;
     }
     if (e.type === "resume") { clearInterval(waitTimer); run.classList.remove("waiting"); $("run-text").textContent = "Tentando de novo…"; return; }
+    if (e.type === "pager") {
+      $("run-sub").textContent = e.step === "letras" ? "A busca não aceita uma letra só: usando pares de letras." : e.param ? `A lista pagina com “${e.param}”.` : "Essa lista não tem mais páginas.";
+      return;
+    }
     if (e.type === "method") {
       $("run-sub").textContent = e.ok ? `A busca geral funciona: ${fmt(e.totalItems)} obras em ${fmt(e.totalPages)} páginas.` : "A busca geral não lista tudo: lendo as listas de adicionadas e atualizadas.";
       return;
@@ -223,7 +278,12 @@
     try { await fn(reader); ok = true; }
     catch (e) {
       if (e && e.stopped) toast("Leitura parada. O que já foi lido está salvo.");
-      else { toast(e.message || String(e)); $("run-text").textContent = e.message || String(e); }
+      else {
+        toast(e.message || String(e));
+        $("run-text").textContent = e.message || String(e);
+        const d = diag[0];
+        $("run-sub").textContent = d ? `Último pedido: ${d.status || "sem resposta"} em ${d.path}${d.text ? ` — ${d.text.slice(0, 140)}` : ""}` : "";
+      }
     } finally {
       clearInterval(waitTimer);
       busy = null; reader = null;
@@ -398,6 +458,9 @@
   }
   $("c-more").onclick = () => { cShown += 50; renderCatalog(); };
 
+  $("diag-show").onclick = () => { const d = $("diag"); d.hidden = !d.hidden; $("diag-show").textContent = d.hidden ? "Ver diagnóstico" : "Esconder diagnóstico"; if (!d.hidden) renderDiag(); };
+  $("diag-copy").onclick = () => copyText(diagText(), "Diagnóstico copiado (sem o token).");
+
   /* ---------- Ajustes ---------- */
   $("set-gap").value = String(settings.gap);
   $("set-min").value = String(settings.min);
@@ -410,17 +473,79 @@
     if (busy) return;
     if (!confirm("Apagar o catálogo salvo neste celular? O token continua salvo.")) return;
     cat.works = new Map(); cat.progress = null; cat.lettersNext = null; cat.savedAt = null; result = null;
+    cat.pagers = {}; cat.prevIds = {}; cat.lettersBigrams = false; cat.lettersDone = null;
     await store.del("catalog");
     $("levels").hidden = true; $("deep").hidden = true; $("find-meta").textContent = ""; $("tab-count").hidden = true;
     renderCat(); toast("Catálogo apagado.");
   };
+
+  /* ---------- Automático: procura sozinho ---------- */
+  // Ao abrir (e a cada 6 h com o app aberto): lê o que falta do catálogo (ou só as obras novas), procura as
+  // duplicadas e confere as suspeitas na API. Leitura completa de novo a cada 3 dias.
+  const AUTO_EVERY_MS = 6 * 3600_000, FULL_EVERY_MS = 3 * 24 * 3600_000, AUTO_DETAILS_MAX = 400;
+  let autoBusy = false;
+  function autoLine(text) { $("auto-text").textContent = text; }
+  function renderAuto() {
+    $("set-auto").checked = Boolean(settings.auto);
+    const last = ls.get("dup-auto-last", 0);
+    if (autoBusy) return;
+    autoLine(!settings.auto ? "Desligado: use os botões abaixo." : !getToken() ? "Coloque o token para ele começar sozinho."
+      : last ? `Última procura às ${new Date(last).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}. A próxima vem sozinha em até 6 h (ou ao abrir o app).` : "Vai começar sozinho.");
+  }
+  async function autoCycle(force) {
+    if (autoBusy || busy || !settings.auto || !getToken()) return;
+    const last = ls.get("dup-auto-last", 0);
+    if (!force && last && Date.now() - last < AUTO_EVERY_MS && cat.progress && cat.progress.step === "pronto") return;
+    autoBusy = true;
+    $("auto-card").classList.add("on");
+    try {
+      const p = cat.progress;
+      const fullAge = p && p.finished ? Date.now() - p.finished : Infinity;
+      if (!cat.works.size || !p || p.step !== "pronto" || fullAge > FULL_EVERY_MS) {
+        autoLine(cat.works.size && p && p.step !== "pronto" ? "Continuando a leitura do catálogo de onde parou…" : "Lendo o catálogo inteiro da MediocreScan…");
+        if (p && p.step === "pronto") cat.progress = null;
+        if (!(await runTask("catalog", (r) => r.readCatalog(cat, saveCatalog)))) return;
+        // Sem a busca geral, as listas podem não mostrar tudo: completa buscando por letra (uma vez por leitura).
+        if (!(cat.progress && cat.progress.buscaOk) && (!cat.lettersDone || (cat.progress && cat.progress.finished && cat.lettersDone < cat.progress.finished))) {
+          autoLine("Completando o catálogo pela busca de cada letra…");
+          if (!(await runTask("letters", (r) => r.readLetters(cat, saveCatalog, cat.lettersNext)))) return;
+        }
+      } else {
+        autoLine("Procurando obras novas na MediocreScan…");
+        let novas = 0;
+        if (!(await runTask("recent", async (r) => { novas = await r.readRecent(cat, saveCatalog); }))) return;
+        if (novas) toast(`${fmt(novas)} obra(s) nova(s) no catálogo.`);
+      }
+      autoLine("Procurando duplicadas…");
+      find();
+      const sus = suspects().slice(0, AUTO_DETAILS_MAX);
+      if (sus.length) {
+        autoLine(`Conferindo ${fmt(sus.length)} suspeita(s) na API (nomes alternativos e sinopse)…`);
+        if (!(await runTask("details", (r) => r.readDetails(cat, sus, saveCatalog)))) return;
+        find();
+      }
+      ls.set("dup-auto-last", Date.now());
+      const n = result ? result.groups.length : 0;
+      toast(n ? `Procura automática: ${fmt(n)} grupo(s) de possíveis duplicadas.` : "Procura automática: nenhuma duplicada encontrada.");
+    } finally {
+      autoBusy = false;
+      $("auto-card").classList.remove("on");
+      renderAuto();
+    }
+  }
+  $("set-auto").onchange = () => { settings.auto = $("set-auto").checked; saveSettings(); renderAuto(); if (settings.auto) autoCycle(true); else if (reader) reader.stop(); };
+  $("auto-now").onclick = () => { if (!settings.auto) { settings.auto = true; saveSettings(); } autoCycle(true); };
+  setInterval(() => autoCycle(false), 60_000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") autoCycle(false); });
 
   /* ---------- Início ---------- */
   (async () => {
     renderToken();
     await loadCatalog();
     renderCat();
+    renderAuto();
     if (cat.works.size) find();
-    if (window.BM_VERSION) $("find-meta").title = `Versão ${window.BM_VERSION}`;
+    if (window.BM_VERSION) $("app-version").textContent = `Versão ${window.BM_VERSION} · pedidos pelo ${DupHttp ? "plugin nativo" : CapHttp ? "HTTP do Capacitor" : "navegador"}.`;
+    setTimeout(() => autoCycle(false), 1200);
   })();
 })();

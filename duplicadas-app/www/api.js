@@ -14,6 +14,16 @@
   const BACKOFF_S = [60, 120, 300, 600, 900];
   const LIST = { adicionadas: { path: "/obras/adicionados-recentes", size: 20 }, atualizadas: { path: "/obras/atualizadas-recentes", size: 30 } };
   const MAX_PAGES = 1500;
+  // Jeitos de pedir a página N de uma lista (a API pode ignorar um deles): o primeiro que trouxer obras diferentes vale.
+  const PAGERS = [
+    (L, n) => `offset=${(n - 1) * L.size}`,
+    (L, n) => `pagina=${n}`,
+    (L, n) => `page=${n}`,
+    (L, n) => `offset=${(n - 1) * L.size}&limit=${L.size}`,
+    (L, n) => `skip=${(n - 1) * L.size}`,
+  ];
+  // Se a busca não aceitar uma letra só, usa pares de letras comuns em títulos.
+  const BIGRAMS = "an ar as ca ce co da de di do el em en er es ga ia in is la le li lo ma me mi mo na ne no on or os pa pe po ra re ri ro sa se si so ta te ti to tr ur va ve vi".split(" ");
 
   class Stopped extends Error { constructor() { super("Parado."); this.stopped = true; } }
   class Fatal extends Error {}
@@ -31,7 +41,27 @@
       if (Array.isArray(raw[k])) return raw[k];
       if (isObj(raw[k])) { const inner = listOf(raw[k], depth + 1); if (inner.length) return inner; }
     }
-    return [];
+    // Formato desconhecido: a maior lista de objetos com cara de obra (obr_id/obr_nome), em qualquer lugar.
+    return depth ? [] : deepWorks(raw);
+  }
+  function deepWorks(raw) {
+    let best = [];
+    const walk = (v, d) => {
+      if (d > 5 || v == null) return;
+      if (Array.isArray(v)) {
+        const works = v.filter((o) => isObj(o) && (("obr_id" in o && "obr_nome" in o) || (isObj(o.obra) && "obr_id" in o.obra)));
+        if (works.length > best.length) best = works;
+        v.slice(0, 50).forEach((x) => walk(x, d + 1));
+      } else if (isObj(v)) Object.values(v).forEach((x) => walk(x, d + 1));
+    };
+    walk(raw, 0);
+    return best;
+  }
+  /** Começo da resposta, para o diagnóstico (nunca leva o token: ele só vai no cabeçalho). */
+  function snippet(data) {
+    let t;
+    try { t = typeof data === "string" ? data : JSON.stringify(data); } catch (_) { t = String(data); }
+    return String(t == null ? "" : t).replace(/\s+/g, " ").slice(0, 220);
   }
   /** Bloco de páginas da resposta, quando existe. */
   function pagination(raw) {
@@ -118,8 +148,9 @@
         if (since < gap) await wait(gap - since);
         lastAt = deps.now();
         let r;
+        const t0 = deps.now();
         try {
-          r = await deps.http(API + path, { Accept: "application/json", Authorization: `Bearer ${t}` });
+          r = await deps.http(API + path, { Accept: "application/json", Authorization: `Bearer ${t}` }, t);
         } catch (e) {
           if (e && e.stopped) throw e;
           r = { status: 0, data: null, error: String((e && e.message) || e) };
@@ -128,6 +159,7 @@
         const status = Number(r && r.status) || 0;
         let data = r ? r.data : null;
         if (typeof data === "string") { try { data = JSON.parse(data); } catch (_) { /* fica texto */ } }
+        emit({ type: "req", path, status, ms: deps.now() - t0, via: r && r.via, error: r && r.error, text: status >= 200 && status < 300 ? snippet(data).slice(0, 120) : snippet(r && r.error ? r.error : data) });
         if (status >= 200 && status < 300) return data;
         if (status === 404) return null;
         if (status === 401) throw new Fatal("A MediocreScan recusou o token (401). Confira ou troque o token.");
@@ -148,6 +180,69 @@
       return toWorks(data).length;
     }
 
+    /** Junta obras ao catálogo; devolve quantas eram novas. */
+    function mergeInto(cat, list) {
+      let added = 0;
+      for (const w of list) {
+        const old = cat.works.get(w.id);
+        if (!old) { cat.works.set(w.id, w); added++; }
+        else cat.works.set(w.id, Object.assign({}, w, old, { alts: old.alts && old.alts.length ? old.alts : w.alts, cover: old.cover || w.cover }));
+      }
+      return added;
+    }
+
+    /**
+     * Página N de uma lista. Na página 2, descobre como a API pagina (offset, pagina, page…): vale o primeiro jeito que
+     * trouxer obras diferentes das da página anterior; fica salvo em cat.pagers.
+     */
+    async function listPage(cat, name, n) {
+      const L = LIST[name];
+      cat.pagers = cat.pagers || {};
+      cat.prevIds = cat.prevIds || {};
+      const tryGet = async (path) => {
+        try { return toWorks(await get(path)); } catch (e) { if (e instanceof Fatal || e instanceof Stopped) throw e; return []; }
+      };
+      let list;
+      if (n === 1) list = await tryGet(L.path);
+      else if (cat.pagers[name] === -1) list = [];
+      else if (cat.pagers[name] != null) list = await tryGet(`${L.path}?${PAGERS[cat.pagers[name]](L, n)}`);
+      else {
+        const prev = new Set(cat.prevIds[name] || []);
+        list = [];
+        for (let k = 0; k < PAGERS.length; k++) {
+          const got = await tryGet(`${L.path}?${PAGERS[k](L, n)}`);
+          if (got.length && got.some((w) => !prev.has(w.id))) { cat.pagers[name] = k; list = got; break; }
+        }
+        if (cat.pagers[name] == null) cat.pagers[name] = -1;
+        emit({ type: "pager", step: name, param: cat.pagers[name] >= 0 ? PAGERS[cat.pagers[name]](L, 2).split("=")[0] : null });
+      }
+      cat.prevIds[name] = list.map((w) => w.id);
+      return list;
+    }
+
+    /**
+     * Atualização rápida (modo automático): lê o começo das listas de adicionadas e atualizadas até as páginas só
+     * trazerem obras que já estavam salvas. Devolve quantas obras novas entraram.
+     */
+    async function readRecent(cat, save) {
+      stop = false;
+      let total = 0;
+      for (const name of ["adicionadas", "atualizadas"]) {
+        let repeat = 0;
+        for (let page = 1; page <= 60; page++) {
+          const list = await listPage(cat, name, page);
+          const added = mergeInto(cat, list);
+          total += added;
+          emit({ type: "page", step: name, page, pages: 0, added, count: cat.works.size });
+          await save(cat);
+          if (!list.length) break;
+          repeat = added ? 0 : repeat + 1;
+          if (repeat >= (name === "adicionadas" ? 2 : 1)) break;
+        }
+      }
+      return total;
+    }
+
     /**
      * Lê o catálogo inteiro (ou continua a leitura salva). cat: {works: Map id→obra, progress}. save(cat) a cada página.
      * progress: {step: "busca"|"adicionadas"|"atualizadas"|"pronto", page, offset, total, empty, buscaOk}.
@@ -155,15 +250,7 @@
     async function readCatalog(cat, save) {
       stop = false;
       const p = cat.progress = Object.assign({ step: "busca", page: 1, offset: 0, empty: 0, total: 0, buscaOk: false, started: deps.now() }, cat.progress || {});
-      const merge = (list) => {
-        let added = 0;
-        for (const w of list) {
-          const old = cat.works.get(w.id);
-          if (!old) { cat.works.set(w.id, w); added++; }
-          else cat.works.set(w.id, Object.assign({}, w, old, { alts: old.alts && old.alts.length ? old.alts : w.alts, cover: old.cover || w.cover }));
-        }
-        return added;
-      };
+      const merge = (list) => mergeInto(cat, list);
       const step = (name) => { p.step = name; p.page = 1; p.offset = 0; p.empty = 0; p.total = 0; };
       // 1) Busca sem texto, página por página (só se a API devolver o total de páginas).
       while (p.step === "busca") {
@@ -191,16 +278,12 @@
       // 2) e 3) Listas com deslocamento: param quando a página vem vazia ou só repete obras (2 vezes seguidas).
       for (const name of ["adicionadas", "atualizadas"]) {
         while (p.step === name) {
-          const L = LIST[name];
-          let data;
-          try { data = await get(p.offset ? `${L.path}?offset=${p.offset}` : L.path); }
-          catch (e) { if (e instanceof Fatal || e instanceof Stopped) throw e; data = null; }
-          const list = toWorks(data);
+          const list = await listPage(cat, name, p.page);
           const added = merge(list);
           p.empty = added ? 0 : p.empty + 1;
           emit({ type: "page", step: name, page: p.page, pages: 0, added, count: cat.works.size });
           p.page++;
-          p.offset += L.size;
+          p.offset = (p.page - 1) * LIST[name].size;
           const done = !list.length || p.empty >= 2 || p.page > MAX_PAGES;
           if (done) step(name === "adicionadas" ? "atualizadas" : "pronto");
           await save(cat);
@@ -208,18 +291,24 @@
       }
       p.finished = deps.now();
       await save(cat);
+      if (!cat.works.size) throw new Fatal("A MediocreScan respondeu, mas nenhuma página trouxe obras. Veja o Diagnóstico em Ajustes (mostra o que a API devolveu).");
       return cat;
     }
 
     /** Completa o catálogo buscando cada letra e número (para obras que as listas não mostram). */
     async function readLetters(cat, save, from) {
       stop = false;
-      const keys = "abcdefghijklmnopqrstuvwxyz0123456789".split("");
-      for (let k = Math.max(0, keys.indexOf(from || "a")); k < keys.length; k++) {
+      let keys = cat.lettersBigrams ? BIGRAMS : "abcdefghijklmnopqrstuvwxyz0123456789".split("");
+      for (let k = Math.max(0, keys.indexOf(from || keys[0])); k < keys.length; k++) {
         for (let page = 1; page <= MAX_PAGES; page++) {
           let data;
           try { data = await get(`/obras/buscar?string=${encodeURIComponent(keys[k])}&pagina=${page}`); }
-          catch (e) { if (e instanceof Fatal || e instanceof Stopped) throw e; data = null; }
+          catch (e) {
+            if (e instanceof Fatal || e instanceof Stopped) throw e;
+            // A busca não aceita uma letra só: troca por pares de letras e recomeça.
+            if ((e.status === 400 || e.status === 422) && !cat.lettersBigrams) { cat.lettersBigrams = true; keys = BIGRAMS; k = -1; emit({ type: "pager", step: "letras", param: "pares" }); break; }
+            data = null;
+          }
           const list = toWorks(data), pag = pagination(data);
           let added = 0;
           for (const w of list) if (!cat.works.has(w.id)) { cat.works.set(w.id, w); added++; }
@@ -230,6 +319,7 @@
         }
       }
       cat.lettersNext = null;
+      cat.lettersDone = deps.now();
       await save(cat);
       return cat;
     }
@@ -253,10 +343,10 @@
       return cat;
     }
 
-    return { get, test, readCatalog, readLetters, readDetails, stop: () => { stop = true; }, get stopped() { return stop; } };
+    return { get, test, readCatalog, readRecent, readLetters, readDetails, stop: () => { stop = true; }, get stopped() { return stop; } };
   }
 
-  const api = { createReader, toWork, toWorks, toDetail, pagination, listOf, Stopped, Fatal, API, CDN };
+  const api = { createReader, toWork, toWorks, toDetail, pagination, listOf, snippet, Stopped, Fatal, API, CDN };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.MediocreApi = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

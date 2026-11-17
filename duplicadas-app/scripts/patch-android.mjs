@@ -22,6 +22,12 @@ const main = find("android/app/src/main/java", "MainActivity.java");
 if (!main) throw new Error("MainActivity.java não encontrado");
 const pkg = /package\s+([\w.]+);/.exec(readFileSync(main, "utf8"))[1];
 
+// Plugin nativo de pedidos (o mesmo caminho do Estúdio, que funciona com a API da MediocreScan).
+const javaDir = main.slice(0, main.lastIndexOf("/"));
+for (const f of readdirSync("android-src").filter((x) => x.endsWith(".java"))) {
+  writeFileSync(join(javaDir, f), readFileSync(join("android-src", f), "utf8").replace("package __PKG__;", `package ${pkg};`));
+}
+
 // Tela acesa enquanto o app está aberto: a leitura do catálogo roda na tela e pode levar vários minutos.
 writeFileSync(main, `package ${pkg};
 
@@ -32,9 +38,10 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        registerPlugin(DupHttpPlugin.class);
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 }
 `);
-console.log(`Versão 1.${build}; MainActivity com a tela acesa (${pkg}).`);
+console.log(`Versão 1.${build}; MainActivity com a tela acesa e o plugin DupHttp (${pkg}).`);
