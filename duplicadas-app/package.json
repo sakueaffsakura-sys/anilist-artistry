@@ -1,0 +1,13 @@
+{
+  "name": "duplicadas-mediocrescan",
+  "private": true,
+  "version": "1.0.0",
+  "description": "App Android que lê o catálogo da MediocreScan com o token do dono e procura obras duplicadas.",
+  "dependencies": {
+    "@capacitor/android": "^7.4.0",
+    "@capacitor/core": "^7.4.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.0"
+  }
+}

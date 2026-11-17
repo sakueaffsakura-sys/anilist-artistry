@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#eef0f2" />
+  <title>Duplicadas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="top">
+    <h1 class="logo" aria-label="Duplicadas"><span aria-hidden="true" data-t="Duplicadas">Duplicadas</span></h1>
+    <p class="tag">Obras repetidas na MediocreScan</p>
+    <nav class="tabs" aria-label="Telas">
+      <button type="button" data-tab="analise" aria-current="page">Análise</button>
+      <button type="button" data-tab="grupos">Duplicadas <span id="tab-count" class="count" hidden></span></button>
+      <button type="button" data-tab="catalogo">Catálogo</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Análise: token, leitura do catálogo, procura e ajustes. -->
+    <section id="v-analise" class="view">
+      <article id="token-card" class="card">
+        <h2>Token da MediocreScan</h2>
+        <div id="token-saved" class="token-saved" hidden>
+          <p><span class="dot ok" aria-hidden="true"></span><span id="token-mask"></span></p>
+          <button id="token-change" type="button" class="link">Trocar</button>
+        </div>
+        <form id="token-form" class="token-form">
+          <label for="token-input">Cole o token da API (fica só neste celular)</label>
+          <div class="pass">
+            <input id="token-input" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="eyJhbGciOi…" />
+            <button id="token-eye" type="button" class="eye" aria-label="Mostrar o token" aria-pressed="false">Ver</button>
+          </div>
+          <div class="row">
+            <button type="submit" class="btn primary">Salvar token</button>
+            <button id="token-cancel" type="button" class="btn ghost" hidden>Cancelar</button>
+          </div>
+        </form>
+        <div class="row tight">
+          <button id="token-test" type="button" class="btn ghost small">Testar token</button>
+          <p id="token-status" class="note" role="status"></p>
+        </div>
+      </article>
+
+      <article id="cat-card" class="card">
+        <h2>Catálogo</h2>
+        <p class="big"><strong id="cat-count">0</strong> <span>obras lidas</span></p>
+        <p id="cat-meta" class="note">Nada lido ainda. A leitura passa por todas as páginas da MediocreScan, uma de cada vez.</p>
+        <div id="run" class="run" hidden>
+          <div class="bar"><span id="run-bar"></span></div>
+          <p id="run-text" class="run-text" role="status"></p>
+          <p id="run-sub" class="note"></p>
+        </div>
+        <div class="row">
+          <button id="cat-read" type="button" class="btn primary">Ler todas as obras</button>
+          <button id="cat-stop" type="button" class="btn ghost" hidden>Parar</button>
+        </div>
+        <button id="cat-letters" type="button" class="link small-link">Completar buscando cada letra (mais demorado)</button>
+      </article>
+
+      <article id="find-card" class="card">
+        <h2>Procurar duplicadas</h2>
+        <p class="note">Compara títulos, nomes alternativos, palavras-chave raras, capa e sinopse. Roda aqui no celular, sem gastar pedidos.</p>
+        <div id="levels" class="levels" hidden>
+          <button type="button" class="lvl alta" data-go="alta"><strong id="n-alta">0</strong><span>Certeza alta</span></button>
+          <button type="button" class="lvl provavel" data-go="provavel"><strong id="n-provavel">0</strong><span>Provável</span></button>
+          <button type="button" class="lvl talvez" data-go="talvez"><strong id="n-talvez">0</strong><span>Talvez</span></button>
+        </div>
+        <p id="find-meta" class="note"></p>
+        <div class="row">
+          <button id="find-run" type="button" class="btn primary">Procurar agora</button>
+        </div>
+        <div id="deep" class="deep" hidden>
+          <p id="deep-text" class="note"></p>
+          <button id="deep-run" type="button" class="btn ghost">Conferir as suspeitas na API</button>
+        </div>
+      </article>
+
+      <details class="card settings">
+        <summary><h2>Ajustes</h2></summary>
+        <label class="field">Intervalo entre pedidos (segundos)
+          <input id="set-gap" type="number" inputmode="decimal" min="1" max="60" step="0.5" />
+        </label>
+        <p class="note">Mais curto lê mais rápido, mas a MediocreScan pode recusar. Se recusar, o app espera e tenta de novo sozinho.</p>
+        <label class="field">Mostrar a partir da nota
+          <select id="set-min">
+            <option value="55">55 — tudo, até os “talvez”</option>
+            <option value="70">70 — prováveis e certas</option>
+            <option value="90">90 — só as de certeza alta</option>
+          </select>
+        </label>
+        <label class="field">Palavras a ignorar nos títulos
+          <textarea id="set-ignore" rows="3" placeholder="remake, temporada…"></textarea>
+        </label>
+        <p class="note">Já ignoradas: artigos, “manhwa”, “manga”, “novel”, “colorido”, “oficial”, “IA” e parecidas. Separe com vírgula.</p>
+        <div class="row">
+          <button id="set-reset-dismissed" type="button" class="btn ghost small">Mostrar de novo as dispensadas</button>
+          <button id="set-clear" type="button" class="btn ghost small danger">Apagar catálogo salvo</button>
+        </div>
+      </details>
+    </section>
+
+    <!-- Duplicadas: grupos com motivos. -->
+    <section id="v-grupos" class="view" hidden>
+      <div class="filters" role="group" aria-label="Filtrar por certeza">
+        <button type="button" class="chip" data-f="todas" aria-pressed="true">Todas</button>
+        <button type="button" class="chip" data-f="alta" aria-pressed="false">Alta</button>
+        <button type="button" class="chip" data-f="provavel" aria-pressed="false">Provável</button>
+        <button type="button" class="chip" data-f="talvez" aria-pressed="false">Talvez</button>
+      </div>
+      <input id="g-q" class="search" type="search" placeholder="Filtrar por palavra-chave ou ID" />
+      <div class="row tight">
+        <p id="g-meta" class="note grow"></p>
+        <button id="g-copy" type="button" class="link">Copiar relatório</button>
+      </div>
+      <ol id="g-list" class="groups"></ol>
+      <button id="g-more" type="button" class="btn ghost wide" hidden>Mostrar mais</button>
+      <p id="g-empty" class="empty" hidden></p>
+    </section>
+
+    <!-- Catálogo: busca por palavra-chave em todas as obras lidas. -->
+    <section id="v-catalogo" class="view" hidden>
+      <input id="c-q" class="search" type="search" placeholder="Palavra-chave: título, nome alternativo ou ID" />
+      <p id="c-meta" class="note"></p>
+      <ol id="c-list" class="works"></ol>
+      <button id="c-more" type="button" class="btn ghost wide" hidden>Mostrar mais</button>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="capacitor.js"></script>
+  <script src="version.js"></script>
+  <script src="dup.js"></script>
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

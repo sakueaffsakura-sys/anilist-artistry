@@ -1,0 +1,93 @@
+name: APK Duplicadas
+
+# Compila o app que procura obras duplicadas na MediocreScan (duplicadas-app/) e publica duplicadas.apk na
+# release "duplicadas-apk". O token da MediocreScan não passa por aqui: o dono coloca no próprio app.
+on:
+  push:
+    branches: [main, "apk-*"]
+    paths: ["duplicadas-app/**", ".github/workflows/duplicadas-apk.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: duplicadas-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: duplicadas-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Testar o detector e a leitura
+        run: |
+          mkdir -p /tmp/dt && cp www/dup.js /tmp/dt/dup.cjs && cp www/api.js /tmp/dt/api.cjs
+          node -e '
+            const Dup = require("/tmp/dt/dup.cjs"), Api = require("/tmp/dt/api.cjs");
+            const r = Dup.findDuplicates([{id:1,title:"Solo Leveling"},{id:2,title:"Solo Leveling (IA)"},{id:3,title:"Torre de Deus",alts:["Tower of God"]},{id:4,title:"Tower of God"},{id:5,title:"Outra Obra"}]);
+            if (r.groups.length !== 2) { console.error("detector:", JSON.stringify(r.groups)); process.exit(1); }
+            const w = Api.toWork({obr_id: 9, obr_nome: "X", obr_imagem: "a.webp", formato: {formt_nome: "Manhwa"}});
+            if (!w || w.cover !== "https://cdn.mediocrescan.com/obras/9/a.webp") { console.error("api:", w); process.exit(1); }
+            console.log("ok:", r.groups.length, "grupos");'
+      - name: Instalar o Capacitor
+        run: npm install --no-audit --no-fund
+      - name: Copiar o Capacitor para o app
+        run: |
+          f=$(ls node_modules/@capacitor/core/dist/capacitor.js 2>/dev/null || true)
+          if [ -z "$f" ]; then echo "::error::capacitor.js não encontrado em @capacitor/core/dist"; exit 1; fi
+          cp "$f" www/capacitor.js
+          echo "window.BM_VERSION = '1.${{ github.run_number }}';" > www/version.js
+          # Cada versão carrega os próprios arquivos (evita o WebView usar os antigos do cache).
+          sed -i -E 's#src="(capacitor|version|dup|api|app)\.js"#src="\1.js?v=${{ github.run_number }}"#g; s#href="style\.css"#href="style.css?v=${{ github.run_number }}"#' www/index.html
+          grep -c "?v=${{ github.run_number }}" www/index.html
+      - name: Gerar o projeto Android
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: npx cap add android && node scripts/patch-android.mjs && npx cap sync android
+      - name: Compilar
+        working-directory: duplicadas-app/android
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease --no-daemon 2>&1 | tee ../build.log
+      - name: Mostrar erros de compilação
+        if: failure()
+        run: |
+          grep -E "error:|\.java:[0-9]+|FAILURE|What went wrong" -A2 build.log | head -40 | while IFS= read -r line; do echo "::error::$line"; done || true
+      - name: Assinar
+        env:
+          KS_PASS: estudio-bm-2026
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/zipalign" -p -f 4 android/app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+          "$BT/apksigner" sign --ks ../admin-app/keystore/estudio.jks --ks-key-alias estudio --ks-pass "pass:$KS_PASS" --key-pass "pass:$KS_PASS" --out duplicadas.apk aligned.apk
+          "$BT/apksigner" verify duplicadas.apk
+          ls -la duplicadas.apk
+      - name: Guardar o APK do teste
+        if: github.ref != 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: duplicadas-apk
+          path: duplicadas-app/duplicadas.apk
+          retention-days: 7
+      - name: Publicar na release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete duplicadas-apk --yes --cleanup-tag || true
+          gh release create duplicadas-apk duplicadas.apk \
+            --title "Duplicadas — versão 1.${{ github.run_number }}" \
+            --notes "App que lê o catálogo da MediocreScan com o seu token e procura obras duplicadas. Instale por cima da versão anterior." \
+            --latest=false
