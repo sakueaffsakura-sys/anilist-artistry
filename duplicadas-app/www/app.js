@@ -3,9 +3,10 @@
  * (IndexedDB) para continuar depois e procurar de novo sem gastar pedidos.
  *
  * Procura automática (ligada por padrão), em 4 etapas: Catálogo (lê o que falta ou só as obras novas),
- * Suspeitas (detalhes das obras dos grupos), Capas (hash da imagem das suspeitas) e Detalhes (um pouco de todas as
- * obras a cada procura, até completar). Roda ao abrir o app, ao salvar o token, quando a internet volta e no horário
- * marcado (6 h depois da última; 15 min se ainda faltam detalhes).
+ * Suspeitas (detalhes das obras dos grupos), Capas (as das suspeitas e mais um pouco de todas: abre cada imagem,
+ * mede e guarda o hash) e Detalhes (sinopse, nomes e autores de um pouco de todas as obras, até completar). Roda ao
+ * abrir o app, ao salvar o token, quando a internet volta e no horário marcado (6 h depois da última; 15 min se ainda
+ * faltam capas ou detalhes). Além das duplicadas, aponta sinopses zuadas e capas quebradas (aba Problemas).
  */
 (function () {
   "use strict";
@@ -45,13 +46,17 @@
     };
   })();
 
-  // auto: procura sozinho; deep/deepPer: detalhes de todas aos poucos; covers: hash das capas das suspeitas.
+  // auto: procura sozinho; deep/deepPer: detalhes de todas aos poucos; covers/coverPer: conferir as capas (as das
+  // suspeitas e mais coverPer de todas a cada procura); coverGap: segundos entre capas.
   // wpDim/wpBlur: papel de parede (escurecer 0–90 %, desfocar 0–20 px).
-  const settings = Object.assign({ gap: 2.5, min: 55, ignore: "", auto: true, deep: true, deepPer: 250, covers: true, wpDim: 55, wpBlur: 0 }, ls.get("dup-settings", {}));
+  const settings = Object.assign({ gap: 2.5, min: 55, ignore: "", auto: true, deep: true, deepPer: 250, covers: true, coverPer: 300, coverGap: 0.8, wpDim: 55, wpBlur: 0 }, ls.get("dup-settings", {}));
   const saveSettings = () => ls.set("dup-settings", settings);
   let dismissed = new Set(ls.get("dup-dismissed", []));
   const saveDismissed = () => ls.set("dup-dismissed", Array.from(dismissed));
   const getToken = () => ls.get("dup-token", "") || "";
+  // Problemas dispensados ("id:desc" / "id:cover").
+  let okProblems = new Set(ls.get("dup-ok", []));
+  const saveOk = () => ls.set("dup-ok", Array.from(okProblems));
   // Grupos já vistos na aba Duplicadas (os outros aparecem como "Novos").
   let seen = new Set(ls.get("dup-seen", []));
   const history = ls.get("dup-history", []);
@@ -92,41 +97,76 @@
   }
 
   /**
-   * Hash da capa (dHash, 64 bits em 16 caracteres): a imagem reduzida a 9×8 em tons de cinza, cada pixel comparado
-   * com o vizinho. Imagens iguais (mesmo com outro nome, tamanho ou compressão) dão hashes quase iguais.
+   * Confere uma capa: {s: status, t: tipo, b: bytes, w, h, std: variação de brilho, hash, ok, err}.
+   * No celular o plugin DupHttp abre a imagem no Android (não passa o arquivo para a tela); no navegador, canvas.
+   * Hash = dHash (64 bits em 16 caracteres): a imagem reduzida a 9×8, cada pixel comparado com o vizinho; imagens
+   * iguais (mesmo com outro nome, tamanho ou compressão) dão hashes quase iguais.
    */
-  async function coverHash(url) {
-    let src = null, revoke = null;
-    if (DupHttp && !dupHttpBroken) {
-      const r = await DupHttp.get({ url, binary: true });
-      if (!(r.status >= 200 && r.status < 300) || !r.body) return null;
-      src = `data:${String(r.type || "image/jpeg").split(";")[0]};base64,${r.body}`;
-    } else {
-      const r = await fetch(url);
-      if (!r.ok) return null;
-      src = revoke = URL.createObjectURL(await r.blob());
+  const COVER_HOSTS = /^https:\/\/([a-z0-9-]+\.)*(mediocrescan\.com|mediocretoons\.net)\/\S{1,780}$/;
+  async function coverCheck(url) {
+    if (!COVER_HOSTS.test(url)) {
+      let host = "outro site";
+      try { host = new URL(url).host || host; } catch (_) { /* endereço estranho */ }
+      return { s: -1, err: host };
     }
+    const t0 = Date.now();
+    let info;
+    if (DupHttp && !dupHttpBroken) {
+      try { info = await DupHttp.cover({ url }); }
+      catch (e) {
+        const msg = String((e && e.message) || e);
+        if (missingPlugin(msg)) dupHttpBroken = true;
+        info = { s: 0, err: msg };
+      }
+      if (info && !("s" in info)) info = { s: 0, err: "resposta vazia" };
+    }
+    if (!info) info = await coverCheckWeb(url);
+    if (!(info.s >= 200 && info.s < 300 && info.ok)) {
+      addDiag({ path: "capa " + url.replace(/^https:\/\/[^/]+/, ""), status: info.s, ms: info.ms || Date.now() - t0, via: DupHttp && !dupHttpBroken ? "nativo" : "fetch", text: [info.t, info.err, info.ok === false && info.s >= 200 && info.s < 300 ? "não abriu como imagem" : null].filter(Boolean).join(" · ") });
+    }
+    return info;
+  }
+  async function coverCheckWeb(url) {
+    let r;
+    try { r = await fetch(url); } catch (e) { return { s: 0, err: String((e && e.message) || e) }; }
+    const out = { s: r.status, t: r.headers.get("content-type") || "", ok: false };
+    if (!r.ok) return out;
+    const blob = await r.blob();
+    out.b = blob.size;
+    const src = URL.createObjectURL(blob);
     try {
       const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
-      const c = document.createElement("canvas");
-      c.width = 9; c.height = 8;
-      const g = c.getContext("2d", { willReadFrequently: true });
-      g.drawImage(img, 0, 0, 9, 8);
-      const d = g.getImageData(0, 0, 9, 8).data;
-      const lum = (i) => d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+      out.w = img.naturalWidth; out.h = img.naturalHeight;
+      if (!out.w || !out.h) return out;
+      const draw = (w, h) => {
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const g = c.getContext("2d", { willReadFrequently: true });
+        g.fillStyle = "#fff"; g.fillRect(0, 0, w, h);
+        g.drawImage(img, 0, 0, w, h);
+        const d = g.getImageData(0, 0, w, h).data;
+        return (x, y) => { const i = (y * w + x) * 4; return d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114; };
+      };
+      const l9 = draw(9, 8);
       let hex = "";
       for (let y = 0; y < 8; y++) {
         let byte = 0;
-        for (let x = 0; x < 8; x++) { const i = (y * 9 + x) * 4; byte = (byte << 1) | (lum(i) > lum(i + 4) ? 1 : 0); }
+        for (let x = 0; x < 8; x++) byte = (byte << 1) | (l9(x, y) > l9(x + 1, y) ? 1 : 0);
         hex += byte.toString(16).padStart(2, "0");
       }
-      return hex;
-    } finally { if (revoke) URL.revokeObjectURL(revoke); }
+      const l16 = draw(16, 16);
+      let sum = 0, sq = 0;
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const l = l16(x, y); sum += l; sq += l * l; }
+      const mean = sum / 256;
+      return Object.assign(out, { ok: true, hash: hex, std: Math.sqrt(Math.max(0, sq / 256 - mean * mean)) });
+    } catch (_) {
+      return out;
+    } finally { URL.revokeObjectURL(src); }
   }
 
   /* ---------- Estado ---------- */
   const cat = { works: new Map(), progress: null, lettersNext: null, savedAt: null };
-  let result = null, busy = null, reader = null, runStart = 0, waitTimer = null;
+  let result = null, problems = null, busy = null, reader = null, runStart = 0, waitTimer = null;
 
   async function loadCatalog() {
     const saved = await store.get("catalog");
@@ -201,8 +241,9 @@
   function showTab(name) {
     tab = name;
     document.querySelectorAll(".bottom [data-tab]").forEach((b) => { if (b.dataset.tab === name) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
-    for (const v of ["painel", "grupos", "catalogo", "ajustes"]) $("v-" + v).hidden = v !== name;
+    for (const v of ["painel", "grupos", "problemas", "catalogo", "ajustes"]) $("v-" + v).hidden = v !== name;
     if (name === "grupos") renderGroups(true);
+    if (name === "problemas") renderProblems();
     if (name === "catalogo") renderCatalog();
     if (name === "ajustes") renderSettings();
     if (name === "painel") renderPanel();
@@ -320,7 +361,7 @@
     if (e.type === "detail" || e.type === "cover") {
       setBar(e.n, e.of);
       $("run-text").textContent = `${e.type === "cover" ? "Capas" : "Detalhes"}: ${fmt(e.n)} de ${fmt(e.of)} · ${e.title}`;
-      const left = (e.of - e.n) * (e.type === "cover" ? 1.3 : Math.max(1, Number(settings.gap) || 2.5)) * 1000;
+      const left = (e.of - e.n) * (e.type === "cover" ? coverGapS() + 0.5 : Math.max(1, Number(settings.gap) || 2.5)) * 1000;
       $("run-sub").textContent = `${elapsed()}${left > 5000 ? ` · falta uns ${dur(left)}` : ""}`;
     }
   }
@@ -366,20 +407,33 @@
   function suspectCovers() {
     if (!result) return [];
     const ids = new Set();
-    for (const g of result.groups) for (const w of g.works) { const f = full(w); if (f.cover && f.coverHash === undefined) ids.add(w.id); }
+    for (const g of result.groups) for (const w of g.works) { const f = full(w); if (f.cover && !f.coverInfo) ids.add(w.id); }
     return Array.from(ids);
   }
+  /** Obras com capa ainda não conferida, as mais novas primeiro. */
+  function uncheckedCovers() {
+    return Array.from(cat.works.values()).filter((w) => w.cover && !w.coverInfo).sort((a, b) => Number(b.id) - Number(a.id)).map((w) => w.id);
+  }
+  const coverGapS = () => Math.max(0.05, Math.min(10, Number(settings.coverGap) || 0.8));
+  const coverOpts = (force) => ({ gapMs: coverGapS() * 1000, force: Boolean(force) });
   /** Obras ainda sem detalhes, as mais novas primeiro (são as que mais costumam ser repostadas). */
   function undetailed() {
     return Array.from(cat.works.values()).filter((w) => !w.detailed).sort((a, b) => Number(b.id) - Number(a.id)).map((w) => w.id);
   }
   function find() {
-    if (!cat.works.size) { result = null; renderPanel(); return; }
-    result = Dup.findDuplicates(Array.from(cat.works.values()), { min: Number(settings.min) || 55, ignore: settings.ignore, dismissed });
-    $("find-meta").textContent = `${fmt(result.groups.length)} grupo(s) em ${fmt(cat.works.size)} obras · ${fmt(result.compared)} comparações em ${result.ms < 1000 ? `${result.ms} ms` : `${(result.ms / 1000).toFixed(1)} s`}.`;
-    gShown = PAGE;
+    if (!cat.works.size) { result = null; problems = null; renderPanel(); return; }
+    const all = Array.from(cat.works.values());
+    result = Dup.findDuplicates(all, { min: Number(settings.min) || 55, ignore: settings.ignore, dismissed });
+    // Problemas (sinopse e capa) e, com eles, qual obra de cada grupo manter (a sem problema, se empatar).
+    problems = Dup.findProblems(all, { groups: result.groups, ignore: settings.ignore, ignored: okProblems });
+    const bad = new Set(problems.items.filter((it) => it.grave).map((it) => it.w.id));
+    result.groups.forEach((g) => { g.keep = Dup.keepOf(g.works.map(full), bad); });
+    const ms = result.ms + problems.ms;
+    $("find-meta").textContent = `${fmt(result.groups.length)} grupo(s) e ${fmt(problems.items.length)} problema(s) em ${fmt(cat.works.size)} obras · ${fmt(result.compared)} comparações em ${ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`}.`;
+    gShown = PAGE; pShown = PAGE;
     renderPanel();
     if (tab === "grupos") renderGroups(false);
+    if (tab === "problemas") renderProblems();
   }
   const newGroups = () => (result ? result.groups.filter((g) => !seen.has(g.key)) : []);
 
@@ -401,8 +455,21 @@
     const tc = $("tab-count");
     const total = result ? result.groups.length : 0;
     tc.hidden = !total;
-    tc.textContent = fresh.length ? `${fmt(fresh.length)} nova${fresh.length === 1 ? "" : "s"}` : fmt(total);
+    // Rosa = quantas são novas; cinza = total.
+    tc.textContent = fresh.length ? fmt(fresh.length) : fmt(total);
+    tc.title = fresh.length ? `${fmt(fresh.length)} nova(s)` : `${fmt(total)} grupo(s)`;
     tc.classList.toggle("fresh", fresh.length > 0);
+    // Problemas: sinopses e capas (e quantas já foram conferidas).
+    const pc = problems ? problems.counts : null;
+    const pt = $("tab-prob");
+    pt.hidden = !(pc && pc.desc + pc.cover);
+    pt.textContent = pc ? fmt(pc.desc + pc.cover) : "";
+    $("pr-desc").textContent = fmt(pc ? pc.desc : 0);
+    $("pr-cover").textContent = fmt(pc ? pc.cover : 0);
+    $("pr-desc-sub").textContent = pc ? `${fmt(pc.descChecked)} de ${fmt(pc.total)} conferidas` : "nada conferido";
+    $("pr-cover-sub").textContent = pc ? `${fmt(pc.coverChecked)} de ${fmt(pc.total)} conferidas` : "nada conferido";
+    $("pr-grave").hidden = !(pc && pc.grave);
+    $("pr-grave").textContent = pc ? `${fmt(pc.grave)} grave${pc.grave === 1 ? "" : "s"}` : "";
     // Novidades.
     $("news").hidden = !fresh.length;
     const nl = $("news-list"); nl.innerHTML = "";
@@ -424,6 +491,7 @@
         if (h.detalhes) parts.push(`${fmt(h.detalhes)} detalhe${h.detalhes === 1 ? "" : "s"}`);
         if (h.capas) parts.push(`${fmt(h.capas)} capa${h.capas === 1 ? "" : "s"}`);
         parts.push(h.novos ? `${fmt(h.novos)} grupo${h.novos === 1 ? "" : "s"} novo${h.novos === 1 ? "" : "s"} (${fmt(h.grupos)} no total)` : `${fmt(h.grupos)} grupo${h.grupos === 1 ? "" : "s"}`);
+        if (h.problemas != null) parts.push(`${fmt(h.problemas)} problema${h.problemas === 1 ? "" : "s"}`);
       }
       hl.append(el("li", { className: h.err ? "err" : null }, el("b", { text: when(h.at) }), el("span", { text: `${parts.join(" · ")}${h.ms ? ` · ${dur(h.ms)}` : ""}` })));
     });
@@ -450,29 +518,32 @@
     const hero = $("hero");
     hero.classList.toggle("on", autoBusy);
     const offline = navigator.onLine === false;
-    const title = autoBusy ? { catalogo: "Lendo o catálogo", suspeitas: "Conferindo suspeitas", capas: "Comparando capas", detalhes: "Lendo detalhes" }[autoStep] || "Procurando"
+    const title = autoBusy ? { catalogo: "Lendo o catálogo", suspeitas: "Conferindo suspeitas", capas: "Conferindo capas", detalhes: "Lendo detalhes" }[autoStep] || "Procurando"
       : busy ? "Trabalhando" : !getToken() ? "Falta o token" : offline ? "Sem internet" : !settings.auto ? "Automático desligado"
       : !cat.works.size ? "Pronto para começar" : "Tudo em dia";
     $("hero-title").textContent = title;
     $("hero-kicker").textContent = settings.auto ? "Procurar sozinho" : "Procurar sozinho (desligado)";
-    // Etapas: feitas, a atual e as que faltam.
-    // Parado depois de uma procura que deu certo: etapas feitas; Detalhes mostra quanto do catálogo já tem detalhes.
+    // Etapas: feitas, a atual e as que faltam. Parado depois de uma procura que deu certo: etapas feitas; Capas e
+    // Detalhes mostram quanto do catálogo já foi conferido.
     const cur = autoBusy ? STEPS.indexOf(autoStep) : -1;
     const left = undetailed().length, total = cat.works.size;
+    const covLeft = settings.covers ? uncheckedCovers().length : 0, withCover = Array.from(cat.works.values()).filter((w) => w.cover).length;
     const idleDone = cur < 0 && total > 0 && history.length > 0 && !history[0].err;
+    const share = { detalhes: total ? (total - left) / total : 1, capas: withCover ? (withCover - covLeft) / withCover : 1 };
     document.querySelectorAll("#steps li").forEach((li) => {
       const i = STEPS.indexOf(li.dataset.s);
-      const part = idleDone && li.dataset.s === "detalhes" && left > 0;
+      const part = idleDone && li.dataset.s in share && share[li.dataset.s] < 1;
       li.className = cur >= 0 ? (i < cur ? "done" : i === cur ? "now" : "") : idleDone ? (part ? "part" : "done") : "";
-      li.style.setProperty("--p", part ? `${Math.round(((total - left) / total) * 100)}%` : "0%");
+      li.style.setProperty("--p", part ? `${Math.round(share[li.dataset.s] * 100)}%` : "0%");
       li.toggleAttribute("aria-current", i === cur);
     });
+    const missing = [settings.covers && covLeft ? `capas de ${fmt(covLeft)}` : null, settings.deep && left ? `detalhes de ${fmt(left)}` : null].filter(Boolean);
     const nr = nextRun();
     $("hero-next").textContent = autoBusy ? "Deixe o app aberto: a tela fica acesa. Parar guarda o que já foi feito."
       : !getToken() ? "Cole o token acima: o app lê o catálogo, procura as duplicadas e confere tudo sozinho."
       : offline ? "Volta sozinho quando a conexão voltar."
       : !settings.auto ? "Ligue para ele procurar ao abrir o app e de tempos em tempos."
-      : [nr ? `Próxima procura às ${hhmm(nr)}` : "A próxima procura começa já", settings.deep && left && cat.works.size ? `faltam detalhes de ${fmt(left)} obra${left === 1 ? "" : "s"}` : null, lastError ? `último erro: ${lastError}` : null].filter(Boolean).join(" · ") + ".";
+      : [nr ? `Próxima procura às ${hhmm(nr)}` : "A próxima procura começa já", missing.length && cat.works.size ? `faltam ${missing.join(" e ")} obras` : null, lastError ? `último erro: ${lastError}` : null].filter(Boolean).join(" · ") + ".";
   }
   function addHistory(h) {
     history.unshift(h);
@@ -510,11 +581,12 @@
         h.detalhes += sus.length;
         find();
       }
-      // 3) Capas das suspeitas: a mesma imagem com outro nome de arquivo.
+      // 3) Capas: primeiro as das suspeitas (a mesma imagem com outro nome de arquivo), depois mais um pouco de
+      //    todas (capa quebrada, vazia, padrão…).
       step("capas");
-      const cov = settings.covers ? suspectCovers().slice(0, COVER_MAX) : [];
+      const cov = settings.covers ? Array.from(new Set(suspectCovers().slice(0, COVER_MAX).concat(uncheckedCovers().slice(0, Math.max(20, Number(settings.coverPer) || 300))))) : [];
       if (cov.length) {
-        if (!(await runTask("covers", (r) => r.readCovers(cat, cov, saveCatalog, coverHash)))) return;
+        if (!(await runTask("covers", (r) => r.readCovers(cat, cov, saveCatalog, coverCheck, coverOpts())))) return;
         h.capas = cov.length;
         find();
       }
@@ -532,15 +604,16 @@
       h.grupos = after.length;
       h.novos = after.filter((g) => !beforeKeys.has(g.key) && !seen.has(g.key)).length;
       h.ms = Date.now() - t0;
+      h.problemas = problems ? problems.items.length : 0;
       if (!ok && lastError) h.err = lastError;
       if (ok || lastError) addHistory(h);
-      // Próxima: 15 min se a leitura parou no meio ou ainda faltam detalhes; senão 6 h. Erro: tenta de novo em 30 min.
-      const more = !(cat.progress && cat.progress.step === "pronto") || (settings.deep && undetailed().length > 0);
+      // Próxima: 15 min se a leitura parou no meio ou ainda faltam detalhes ou capas; senão 6 h. Erro: 30 min.
+      const more = !(cat.progress && cat.progress.step === "pronto") || (settings.deep && undetailed().length > 0) || (settings.covers && uncheckedCovers().length > 0);
       ls.set("dup-auto-next", Date.now() + (!ok && lastError ? 30 * 60_000 : more ? DEEP_AGAIN_MS : AUTO_EVERY_MS));
       if (ok) ls.set("dup-auto-last", Date.now());
       autoBusy = false; autoStep = null;
       renderPanel();
-      if (ok) toast(h.novos ? `${fmt(h.novos)} grupo(s) novo(s) de possíveis duplicadas.` : `Procura feita: ${fmt(h.grupos)} grupo(s), nenhum novo.`);
+      if (ok) toast(`${h.novos ? `${fmt(h.novos)} grupo(s) novo(s) de possíveis duplicadas` : `Procura feita: ${fmt(h.grupos)} grupo(s), nenhum novo`} · ${fmt(h.problemas)} problema(s).`);
     }
   }
   $("set-auto").onchange = () => {
@@ -569,11 +642,12 @@
     if (await runTask("details", (r) => r.readDetails(cat, ids, saveCatalog))) { find(); toast("Suspeitas conferidas."); }
   };
   $("cover-run").onclick = async () => {
-    const ids = suspectCovers();
-    if (!ids.length) { toast("As capas das suspeitas já foram comparadas."); return; }
-    if (await runTask("covers", (r) => r.readCovers(cat, ids, saveCatalog, coverHash))) { find(); toast("Capas comparadas."); }
+    const ids = Array.from(new Set(suspectCovers().concat(uncheckedCovers().slice(0, Math.max(20, Number(settings.coverPer) || 300)))));
+    if (!ids.length) { toast("Todas as capas já foram conferidas."); return; }
+    if (await runTask("covers", (r) => r.readCovers(cat, ids, saveCatalog, coverCheck, coverOpts()))) { find(); toast(`${fmt(ids.length)} capa(s) conferida(s).`); }
   };
   document.querySelectorAll(".levels [data-go]").forEach((b) => { b.onclick = () => { setFilter(b.dataset.go); showTab("grupos"); }; });
+  document.querySelectorAll("[data-gp]").forEach((b) => { b.onclick = () => { setPFilter(b.dataset.gp); showTab("problemas"); }; });
   $("news-all").onclick = () => { setFilter("novas"); showTab("grupos"); };
 
   /* ---------- Duplicadas ---------- */
@@ -671,6 +745,99 @@
     copyText(lines.join("\n"), "Relatório copiado.");
   };
 
+  /* ---------- Problemas: sinopses zuadas e capas quebradas ---------- */
+  let pFilter = "todas", pShown = PAGE;
+  function setPFilter(f) {
+    pFilter = f; pShown = PAGE;
+    document.querySelectorAll(".pfilters [data-p]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.p === f)));
+  }
+  document.querySelectorAll(".pfilters [data-p]").forEach((b) => { b.onclick = () => { setPFilter(b.dataset.p); renderProblems(); }; });
+  $("p-q").oninput = () => { pShown = PAGE; renderProblems(); };
+  function filteredProblems() {
+    if (!problems) return [];
+    const raw = $("p-q").value, fromLink = /obra\/(\d+)/.exec(raw);
+    const q = fromLink ? fromLink[1] : Dup.normalize(raw);
+    return problems.items.filter((it) => (pFilter === "todas" || (pFilter === "graves" ? it.grave : it.kind === pFilter))
+      && (!q || String(it.w.id) === q || Dup.normalize(it.w.title).includes(q)));
+  }
+  const kb = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1).replace(".", ",")} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+  /** Linha com o que a conferência da capa achou (tamanho, tipo, peso). */
+  function coverLine(c) {
+    if (!c) return null;
+    if (c.s === -1) return c.err || null;
+    if (!(c.s >= 200 && c.s < 300)) return c.s ? `Resposta ${c.s}${c.err ? ` · ${c.err}` : ""}` : `Sem resposta${c.err ? ` · ${c.err}` : ""}`;
+    return [c.w && c.h ? `${c.w}×${c.h} px` : null, c.t ? String(c.t).split(";")[0].replace("image/", "") : null, c.b ? kb(c.b) : null].filter(Boolean).join(" · ");
+  }
+  function problemCard(it) {
+    const f = full(it.w);
+    const li = el("li", { className: `prob-card${it.grave ? " grave" : ""}` });
+    const kind = el("span", { className: "kind", text: it.kind === "desc" ? "Sinopse" : "Capa" });
+    const head = el("div", { className: "wbody" },
+      el("div", { className: "p-head" }, kind, it.grave ? el("span", { className: "grave-tag", text: "Grave" }) : null),
+      el("p", { className: "t", text: f.title }), linkEl(f));
+    li.append(el("div", { className: "p-top" }, cover(f, "pcover"), head));
+    const ul = el("ul", { className: "issues" });
+    it.issues.forEach((x) => {
+      const refs = (x.refs || []).map((id) => cat.works.get(id) || cat.works.get(Number(id))).filter(Boolean);
+      ul.append(el("li", { className: x.level }, x.text, ...refs.map((o) => el("span", { className: "ref" }, " — ", el("a", { className: "lnk", href: workUrl(o), rel: "noopener", text: o.title })))));
+    });
+    li.append(ul);
+    if (it.kind === "desc" && f.desc) li.append(el("blockquote", { className: "snip", text: f.desc.length > 260 ? f.desc.slice(0, 260) + "…" : f.desc }));
+    if (it.kind === "cover") { const cl = coverLine(f.coverInfo); if (cl) li.append(el("p", { className: "m", text: cl })); }
+    const copy = el("button", { type: "button", className: "btn ghost small", text: "Copiar link" });
+    copy.onclick = () => copyText(`${f.title}\n${workUrl(f)}\n${it.issues.map((x) => "- " + x.text).join("\n")}`, "Link copiado.");
+    const again = el("button", { type: "button", className: "btn ghost small", text: "Conferir de novo" });
+    again.onclick = () => recheck(f.id, it.kind);
+    const ok = el("button", { type: "button", className: "btn ghost small", text: "Ignorar" });
+    ok.onclick = () => {
+      okProblems.add(it.key); saveOk(); find();
+      toast("Problema ignorado.", { label: "Desfazer", run: () => { okProblems.delete(it.key); saveOk(); find(); } });
+    };
+    li.append(el("div", { className: "g-acts" }, copy, again, ok));
+    return li;
+  }
+  /** Lê de novo os detalhes ou a capa de uma obra (depois de arrumar no site). */
+  async function recheck(id, kind) {
+    if (busy) { toast(autoBusy ? "Espere a procura automática terminar (ou toque em Parar no Painel)." : "Espere a leitura terminar."); return; }
+    const done = await runTask("recheck", async (r) => {
+      if (kind === "desc") await r.readDetails(cat, [id], saveCatalog, { force: true });
+      else await r.readCovers(cat, [id], saveCatalog, coverCheck, coverOpts(true));
+    });
+    if (!done) return;
+    find();
+    const still = problems && problems.items.some((it) => it.w.id === id && it.kind === kind);
+    toast(still ? "Conferido: o problema continua." : "Conferido: está tudo certo agora.");
+  }
+  function renderProblems() {
+    const list = $("p-list");
+    list.innerHTML = "";
+    const warn = $("p-warn");
+    warn.innerHTML = "";
+    (problems ? problems.warnings : []).forEach((w) => warn.append(el("p", { text: w })));
+    warn.hidden = !warn.childElementCount;
+    const its = filteredProblems();
+    const c = problems ? problems.counts : null;
+    $("p-cover-meta").textContent = c ? `Sinopses conferidas em ${fmt(c.descChecked)} de ${fmt(c.total)} obras e capas em ${fmt(c.coverChecked)}. O resto entra aos poucos na procura automática.` : "";
+    $("p-meta").textContent = c ? `${fmt(its.length)} obra(s)${okProblems.size ? ` · ${fmt(okProblems.size)} ignorado(s)` : ""}` : "";
+    $("p-empty").hidden = its.length > 0;
+    $("p-empty").textContent = !cat.works.size ? "Ainda não há catálogo: o Painel lê sozinho assim que o token estiver salvo." : !problems ? "Toque em Atualizar agora no Painel." : problems.items.length ? "Nenhum problema com esse filtro." : "Nenhum problema nas obras conferidas até agora.";
+    its.slice(0, pShown).forEach((it) => list.append(problemCard(it)));
+    $("p-more").hidden = its.length <= pShown;
+    $("p-more").textContent = `Mostrar mais (${fmt(its.length - pShown)})`;
+    $("p-copy").hidden = !its.length;
+  }
+  $("p-more").onclick = () => { pShown += PAGE; renderProblems(); };
+  $("p-copy").onclick = () => {
+    const its = filteredProblems();
+    const lines = [`Problemas na MediocreScan — ${new Date().toLocaleString("pt-BR")}`, `${its.length} obra(s)`, ""];
+    its.forEach((it, i) => {
+      lines.push(`${i + 1}. ${it.kind === "desc" ? "Sinopse" : "Capa"}${it.grave ? " (grave)" : ""}: ${full(it.w).title} — ${workUrl(it.w)}`);
+      it.issues.forEach((x) => lines.push(`   - ${x.text}`));
+      lines.push("");
+    });
+    copyText(lines.join("\n"), "Relatório copiado.");
+  };
+
   /* ---------- Catálogo ---------- */
   let cShown = 50;
   $("c-q").oninput = () => { cShown = 50; renderCatalog(); };
@@ -688,9 +855,15 @@
       const g = groupOf(w.id);
       const dupe = g ? el("button", { type: "button", className: "dupe", text: `${LEVEL_NAME[g.level]}: ${g.works.length} obras parecidas` }) : null;
       if (dupe) dupe.onclick = () => { setFilter("todas"); $("g-q").value = String(w.id); showTab("grupos"); };
+      const probs = problems ? problems.items.filter((it) => it.w.id === w.id) : [];
+      const pb = probs.map((it) => {
+        const b = el("button", { type: "button", className: `dupe prob${it.grave ? " grave" : ""}`, text: it.kind === "desc" ? "Sinopse com problema" : "Capa com problema" });
+        b.onclick = () => { setPFilter("todas"); $("p-q").value = String(w.id); showTab("problemas"); };
+        return b;
+      });
       const m = meta(w);
       list.append(el("li", { className: "work" }, cover(w), el("div", {}, el("p", { className: "t", text: w.title }), linkEl(w), m ? el("p", { className: "m", text: m }) : null,
-        w.alts && w.alts.length ? el("p", { className: "m", text: `Também: ${w.alts.slice(0, 3).join(" · ")}` }) : null, dupe)));
+        w.alts && w.alts.length ? el("p", { className: "m", text: `Também: ${w.alts.slice(0, 3).join(" · ")}` }) : null, dupe || pb.length ? el("div", { className: "tags" }, dupe, ...pb) : null)));
     });
     $("c-more").hidden = hits.length <= cShown;
     $("c-more").textContent = `Mostrar mais (${fmt(hits.length - cShown)})`;
@@ -706,6 +879,7 @@
     $("set-deep").checked = Boolean(settings.deep);
     $("set-deep-n").value = String(settings.deepPer);
     $("set-covers").checked = Boolean(settings.covers);
+    $("set-cover-n").value = String(settings.coverPer);
     $("app-version").textContent = `Versão ${window.BM_VERSION || "de teste"} · pedidos pelo ${DupHttp && !dupHttpBroken ? "plugin nativo" : CapHttp ? "HTTP do Capacitor" : "navegador"} · ${fmt(cat.works.size)} obras salvas.`;
   }
   $("set-gap").onchange = () => { const v = Number($("set-gap").value); settings.gap = Number.isFinite(v) ? Math.max(1, Math.min(60, v)) : 2.5; $("set-gap").value = String(settings.gap); saveSettings(); };
@@ -713,7 +887,9 @@
   $("set-ignore").onchange = () => { settings.ignore = $("set-ignore").value; saveSettings(); find(); };
   $("set-deep").onchange = () => { settings.deep = $("set-deep").checked; saveSettings(); renderHero(); };
   $("set-deep-n").onchange = () => { const v = Math.round(Number($("set-deep-n").value)); settings.deepPer = Number.isFinite(v) ? Math.max(20, Math.min(2000, v)) : 250; $("set-deep-n").value = String(settings.deepPer); saveSettings(); };
-  $("set-covers").onchange = () => { settings.covers = $("set-covers").checked; saveSettings(); };
+  $("set-covers").onchange = () => { settings.covers = $("set-covers").checked; saveSettings(); renderHero(); };
+  $("set-cover-n").onchange = () => { const v = Math.round(Number($("set-cover-n").value)); settings.coverPer = Number.isFinite(v) ? Math.max(20, Math.min(3000, v)) : 300; $("set-cover-n").value = String(settings.coverPer); saveSettings(); };
+  $("set-reset-ok").onclick = () => { const n = okProblems.size; okProblems = new Set(); saveOk(); find(); toast(n ? `${n} problema(s) de volta na lista.` : "Nenhum problema ignorado."); };
   $("set-reset-dismissed").onclick = () => { const n = dismissed.size; dismissed = new Set(); saveDismissed(); find(); toast(n ? `${n} par(es) de volta na lista.` : "Nenhum par dispensado."); };
   $("set-clear").onclick = async () => {
     if (busy) return;

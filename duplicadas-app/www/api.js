@@ -75,7 +75,7 @@
   }
   function names(v) {
     if (!Array.isArray(v)) return typeof v === "string" && v.trim() ? v.split(/\s*[,;|\n]\s*/).filter(Boolean) : [];
-    return v.map((e) => (typeof e === "string" ? e.trim() : isObj(e) ? str(e, "nome", "titulo", "title", "obr_titulo", "alt_titulo", "name") : null)).filter(Boolean);
+    return v.map((e) => (typeof e === "string" ? e.trim() : isObj(e) ? str(e, "nome", "titulo", "title", "obr_titulo", "alt_titulo", "name", "aut_nome", "art_nome", "autor_nome") : null)).filter(Boolean);
   }
   function image(v, id) {
     if (typeof v !== "string" || !v.trim()) return null;
@@ -86,7 +86,22 @@
     if (/^\/?obras\//.test(s)) return CDN + s.replace(/^\//, "");
     return null;
   }
-  /** Uma obra da API no formato do app: {id, title, alts, cover, format, status, chapters, desc, slug, tags}. */
+  // Campos da sinopse e dos autores (a API pode usar nomes diferentes).
+  const DESC_KEYS = ["obr_descricao", "descricao", "sinopse", "obr_sinopse", "description", "synopsis", "resumo"];
+  const DESC_MAX = 1500;
+  function authorsOf(o) {
+    const out = [];
+    for (const k of ["obr_autor", "autor", "autores", "author", "authors", "obr_artista", "artista", "artistas", "artist", "artists"]) {
+      const v = o[k];
+      if (isObj(v)) { const n = str(v, "nome", "name", "aut_nome", "art_nome"); if (n) out.push(n); }
+      else out.push(...names(v));
+    }
+    return Array.from(new Set(out)).slice(0, 6);
+  }
+  /**
+   * Uma obra da API no formato do app: {id, title, alts, cover, format, status, chapters, desc, descField, descCut,
+   * authors, slug, tags}. descField: a resposta trazia o campo da sinopse (mesmo vazio).
+   */
   function toWork(o) {
     if (!isObj(o)) return null;
     if (isObj(o.obra) && !("obr_id" in o || "obr_nome" in o)) return toWork(o.obra);
@@ -100,14 +115,17 @@
     const status = typeof st === "string" ? st.trim() : isObj(st) ? str(st, "stt_nome", "nome", "name") : null;
     const caps = Array.isArray(o.capitulos) ? o.capitulos.length : null;
     const chapters = int(o, "obr_total_capitulos", "total_capitulos", "capitulos_count", "qtd_capitulos", "obr_qtd_capitulos", "cap_count", "chapters_count") ?? caps;
-    const desc = str(o, "obr_descricao", "descricao", "sinopse", "description");
+    const desc = str(o, ...DESC_KEYS);
     const tags = Array.isArray(o.tags) ? o.tags.map((t) => (typeof t === "string" ? t : isObj(t) ? str(t, "tag_nome", "nome", "name") : null)).filter(Boolean) : [];
     return {
       id, title,
       alts: names(o.obr_titulos_alternativos ?? o.titulos_alternativos ?? o.alternative_titles ?? o.obr_nomes_alternativos),
       cover: image(str(o, "obr_imagem", "imagem", "image", "capa", "cover"), id),
       format, status, chapters: chapters ?? null,
-      desc: desc ? desc.slice(0, 900) : null,
+      desc: desc ? desc.slice(0, DESC_MAX) : null,
+      descField: DESC_KEYS.some((k) => k in o),
+      descCut: Boolean(desc && desc.length > DESC_MAX),
+      authors: authorsOf(o),
       slug: str(o, "obr_slug", "slug"),
       tags: tags.slice(0, 12),
     };
@@ -324,19 +342,30 @@
       return cat;
     }
 
-    /** Lê os detalhes (nomes alternativos, sinopse, formato, capítulos) das obras pedidas. */
-    async function readDetails(cat, ids, save) {
+    /**
+     * Lê os detalhes (nomes alternativos, sinopse, autores, formato, capítulos) das obras pedidas.
+     * opts.force: lê de novo mesmo as que já têm detalhes ("Conferir de novo").
+     */
+    async function readDetails(cat, ids, save, opts) {
       stop = false;
+      const force = Boolean(opts && opts.force);
       let n = 0;
       for (const id of ids) {
         n++;
         const old = cat.works.get(id);
-        if (!old || old.detailed) continue;
+        if (!old || (old.detailed && !force)) continue;
         let w = null;
         try { w = toDetail(await get(`/obras/${id}`)); }
         catch (e) { if (e instanceof Fatal || e instanceof Stopped) throw e; }
-        if (w) cat.works.set(id, Object.assign({}, old, w, { detailed: true, alts: w.alts.length ? w.alts : old.alts, cover: w.cover || old.cover }));
-        else cat.works.set(id, Object.assign({}, old, { detailed: true }));
+        if (w) {
+          // Sem o campo da sinopse na resposta, fica a que veio da lista; capa nova: confere de novo.
+          const keepDesc = !w.descField && old.desc;
+          const fresh = { detailed: true, alts: w.alts.length ? w.alts : old.alts || [], cover: w.cover || old.cover, authors: w.authors.length ? w.authors : old.authors || [] };
+          if (keepDesc) Object.assign(fresh, { desc: old.desc, descField: Boolean(old.descField), descCut: Boolean(old.descCut) });
+          const next = Object.assign({}, old, w, fresh);
+          if (next.cover !== old.cover) { delete next.coverInfo; delete next.coverHash; delete next.coverTries; }
+          cat.works.set(id, next);
+        } else cat.works.set(id, Object.assign({}, old, { detailed: true }));
         emit({ type: "detail", n, of: ids.length, id, title: (w || old).title });
         if (n % 5 === 0 || n === ids.length) await save(cat);
       }
@@ -344,24 +373,40 @@
     }
 
     /**
-     * Capas das obras pedidas: baixa cada imagem do CDN (1 por vez, intervalo de 1,2 s) e guarda o hash da imagem
-     * (w.coverHash), que acha a mesma capa mesmo com outro nome de arquivo. hasher(url) → hash ou null.
+     * Confere as capas das obras pedidas: baixa cada imagem (1 por vez, intervalo opts.gapMs, padrão 0,8 s) e guarda
+     * w.coverInfo {s: status, t: tipo, b: bytes, w, h, std: variação de brilho, ok: abriu como imagem, err} e o hash
+     * da imagem (w.coverHash), que acha a mesma capa com outro nome de arquivo. check(url) → esse objeto (ou só o
+     * hash, ou null). Sem resposta (s 0): tenta de novo nas próximas procuras; na 3ª vez fica registrado.
+     * opts.force: confere de novo mesmo as já conferidas.
      */
-    async function readCovers(cat, ids, save, hasher) {
+    async function readCovers(cat, ids, save, checkCover, opts) {
       stop = false;
+      const gap = opts && Number.isFinite(opts.gapMs) ? opts.gapMs : 800;
+      const force = Boolean(opts && opts.force);
       let n = 0, lastCdn = 0;
       for (const id of ids) {
         n++;
         check();
         const w = cat.works.get(id);
-        if (!w || !w.cover || w.coverHash !== undefined) continue;
+        if (!w || !w.cover || (w.coverInfo && !force)) continue;
         const since = deps.now() - lastCdn;
-        if (since < 1200) await wait(1200 - since);
+        if (since < gap) await wait(gap - since);
         lastCdn = deps.now();
-        let h = null;
-        try { h = await hasher(w.cover); } catch (_) { h = null; }
+        let info = null;
+        try { info = await checkCover(w.cover); } catch (e) { info = { s: 0, err: String((e && e.message) || e).slice(0, 80) }; }
         check();
-        cat.works.set(id, Object.assign({}, w, { coverHash: h || null }));
+        if (typeof info === "string") info = { s: 200, ok: true, hash: info };
+        if (!info) info = { s: 0 };
+        const next = Object.assign({}, w);
+        if (!info.s) {
+          next.coverTries = (w.coverTries || 0) + 1;
+          if (next.coverTries >= 3 || force) next.coverInfo = { s: 0, err: info.err || null, at: deps.now() };
+        } else {
+          next.coverInfo = { s: info.s, t: info.t || null, b: info.b || 0, w: info.w || 0, h: info.h || 0, std: info.std == null ? null : Math.round(info.std * 10) / 10, ok: Boolean(info.ok), err: info.err || null, at: deps.now() };
+          next.coverHash = info.ok && typeof info.hash === "string" ? info.hash : null;
+          delete next.coverTries;
+        }
+        cat.works.set(id, next);
         emit({ type: "cover", n, of: ids.length, id, title: w.title });
         if (n % 10 === 0 || n === ids.length) await save(cat);
       }
