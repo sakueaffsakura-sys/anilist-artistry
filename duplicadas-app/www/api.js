@@ -343,7 +343,33 @@
       return cat;
     }
 
-    return { get, test, readCatalog, readRecent, readLetters, readDetails, stop: () => { stop = true; }, get stopped() { return stop; } };
+    /**
+     * Capas das obras pedidas: baixa cada imagem do CDN (1 por vez, intervalo de 1,2 s) e guarda o hash da imagem
+     * (w.coverHash), que acha a mesma capa mesmo com outro nome de arquivo. hasher(url) → hash ou null.
+     */
+    async function readCovers(cat, ids, save, hasher) {
+      stop = false;
+      let n = 0, lastCdn = 0;
+      for (const id of ids) {
+        n++;
+        check();
+        const w = cat.works.get(id);
+        if (!w || !w.cover || w.coverHash !== undefined) continue;
+        const since = deps.now() - lastCdn;
+        if (since < 1200) await wait(1200 - since);
+        lastCdn = deps.now();
+        let h = null;
+        try { h = await hasher(w.cover); } catch (_) { h = null; }
+        check();
+        cat.works.set(id, Object.assign({}, w, { coverHash: h || null }));
+        emit({ type: "cover", n, of: ids.length, id, title: w.title });
+        if (n % 10 === 0 || n === ids.length) await save(cat);
+      }
+      await save(cat);
+      return cat;
+    }
+
+    return { get, test, readCatalog, readRecent, readLetters, readDetails, readCovers, stop: () => { stop = true; }, get stopped() { return stop; } };
   }
 
   const api = { createReader, toWork, toWorks, toDetail, pagination, listOf, snippet, Stopped, Fatal, API, CDN };

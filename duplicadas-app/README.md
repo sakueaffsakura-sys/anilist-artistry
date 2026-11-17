@@ -7,10 +7,15 @@ App separado do Estúdio que só procura **obras duplicadas na MediocreScan**. N
   1.2 usava o `CapacitorHttp` e o dono relatou que não puxava nada. Se o plugin faltar, cai no `CapacitorHttp` e, no
   navegador, no `fetch`. Ajustes → "Ver diagnóstico" mostra os últimos 20 pedidos (status, caminho, tempo, via e o
   começo da resposta; nunca o token) e "Copiar diagnóstico" copia para mandar.
-- **Procurar sozinho (padrão ligado):** ao abrir o app, ao salvar o token e a cada 6 h com o app aberto: continua a
-  leitura parada (ou relê tudo a cada 3 dias), senão só lê o começo das listas até repetir (`readRecent`); se a busca
-  geral não serviu, completa pela busca por letra uma vez por leitura; procura as duplicadas e confere até 400
-  suspeitas na API.
+- **Procurar sozinho (padrão ligado, em 4 etapas):** ao abrir o app, ao salvar o token, quando a internet
+  volta e no horário marcado (`dup-auto-next`: 15 min se a leitura parou no meio ou faltam detalhes, senão 6 h; 30 min
+  depois de um erro). 1) Catálogo: continua a leitura parada (ou relê tudo a cada 3 dias), senão só lê o começo das
+  listas até repetir (`readRecent`); se a busca geral não serviu, completa pela busca por letra. 2) Suspeitas: lê os
+  detalhes de até 400 obras dos grupos. 3) Capas: baixa a capa das suspeitas do CDN (`DupHttp` com `binary`, 1,2 s
+  entre imagens) e guarda o dHash de 64 bits (`coverHash`). 4) Detalhes: lê os detalhes de mais 250 obras ainda sem
+  detalhes (as mais novas primeiro) até completar o catálogo; "Detalhes por procura" e os interruptores ficam em
+  Ajustes → Automação. Cada procura entra no Histórico (`dup-history`); grupos ainda não vistos aparecem em "Novas"
+  (`dup-seen`).
 - **Token:** o dono cola o token da API na tela (fica só no celular, em `localStorage`, nunca no repositório).
   "Testar token" lê a primeira página das atualizadas.
 - **Leitura do catálogo** (`www/api.js`): 1 pedido de cada vez, intervalo ajustável (padrão 2,5 s); recusa ou
@@ -25,17 +30,23 @@ App separado do Estúdio que só procura **obras duplicadas na MediocreScan**. N
 - **Detector** (`www/dup.js`, sem tela, testável em Node): compara cada obra só com as que dividem uma palavra-chave
   pouco comum, a mesma capa ou o mesmo começo de título. Sinais: título igual (com/sem acentos, artigos e palavras de
   formato como manhwa, novel, colorido, IA), nome alternativo igual, mesmas palavras em outra ordem, erro de
-  digitação, um título começando com o outro, palavras-chave raras em comum (peso por raridade), mesma capa, sinopse
-  igual/parecida e mesmo número de capítulos. Números diferentes no título (2, II, temporada 3) e formatos diferentes
-  (novel × quadrinho) baixam a nota. Notas: 90+ certeza alta, 70+ provável, 55+ talvez. "Não é duplicada" guarda os
-  pares dispensados no celular.
+  digitação, um título começando com o outro, palavras-chave raras em comum (peso por raridade), mesmo arquivo de
+  capa, mesma imagem de capa (dHash a até 5 bits; 10 = "muito parecida"; hash repetido em mais de 3 obras é capa
+  padrão e não conta), sinopse igual/quase igual (trechos de 3 palavras e palavras em comum; obras com 3+ palavras
+  raras da sinopse em comum também são comparadas) e número de capítulos parecido. Números diferentes no título (2,
+  II, temporada 3) e formatos diferentes (novel × quadrinho) baixam a nota. Notas: 90+ certeza alta, 70+ provável,
+  55+ talvez. Cada grupo sugere qual manter (`keepOf`: mais capítulos, depois a mais antiga no site). "Não é
+  duplicada" guarda os pares dispensados no celular.
 - **Links (1.6+, pedido do dono):** cada obra mostra o link `https://mediocrescan.com/obra/{id}` (toque abre no
   navegador); "Copiar links" e o relatório levam título + link; os filtros aceitam um link colado.
 - **Tema preto e papel de parede (1.8+, pedido do dono):** fundo preto (também nas barras do Android, via
   `styles.xml` no `patch-android.mjs`), cartões translúcidos. Cartão "Papel de parede": escolhe uma imagem da galeria
   (`<input type="file">`), reduz para no máximo 1800 px em JPEG e guarda no IndexedDB (`wallpaper`); "Escurecer"
   (0–90 %) e "Desfocar" (0–20 px) ficam nos ajustes (`wpDim`, `wpBlur`).
-- **Telas:** Análise (token, catálogo, procurar, conferir, ajustes), Duplicadas (grupos com motivos, filtros, copiar
-  IDs e relatório) e Catálogo (busca por palavra-chave em todas as obras lidas).
-- **Build:** `.github/workflows/duplicadas-apk.yml` (Capacitor 7, HTTP nativo via `CapacitorHttp`, tela acesa) publica
+- **Telas:** navegação embaixo. Painel (token no primeiro uso, cartão da procura automática com as 4 etapas e o
+  andamento, números, níveis, novas desde a última vez, histórico e ferramentas manuais), Duplicadas (2 obras lado a
+  lado com capa, link e "Manter"; 3+ uma por linha; motivos em etiquetas; filtros Todas/Novas/níveis; ordenar por
+  nota, novas, obras ou capítulos; copiar links e relatório), Catálogo (busca por palavra-chave) e Ajustes (token,
+  automação, análise, papel de parede, diagnóstico e dados).
+- **Build:** `.github/workflows/duplicadas-apk.yml` (Capacitor 7, plugin `DupHttp`, tela acesa) publica
   `duplicadas.apk` na release `duplicadas-apk`, assinado com a mesma chave do Estúdio.

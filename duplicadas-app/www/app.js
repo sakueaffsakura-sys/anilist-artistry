@@ -1,6 +1,11 @@
 /*
  * Duplicadas — tela. O token fica só neste celular (localStorage); o catálogo lido fica salvo no aparelho
  * (IndexedDB) para continuar depois e procurar de novo sem gastar pedidos.
+ *
+ * Procura automática (ligada por padrão), em 4 etapas: Catálogo (lê o que falta ou só as obras novas),
+ * Suspeitas (detalhes das obras dos grupos), Capas (hash da imagem das suspeitas) e Detalhes (um pouco de todas as
+ * obras a cada procura, até completar). Roda ao abrir o app, ao salvar o token, quando a internet volta e no horário
+ * marcado (6 h depois da última; 15 min se ainda faltam detalhes).
  */
 (function () {
   "use strict";
@@ -9,6 +14,9 @@
   const fmt = (n) => Number(n || 0).toLocaleString("pt-BR");
   const LEVEL_NAME = { alta: "Certeza alta", provavel: "Provável", talvez: "Talvez" };
   const STEP_NAME = { busca: "Busca geral", adicionadas: "Lista de adicionadas", atualizadas: "Lista de atualizadas", letras: "Busca por letra" };
+  const when = (t) => new Date(t).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const hhmm = (t) => new Date(t).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const dur = (ms) => { const s = Math.round(ms / 1000); return s < 60 ? `${s} s` : s < 3600 ? `${Math.floor(s / 60)} min${s % 60 ? ` ${s % 60} s` : ""}` : `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min`; };
 
   /* ---------- Guardar no celular ---------- */
   const ls = {
@@ -16,7 +24,7 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) { /* sem espaço: segue sem salvar */ } },
     del(k) { try { localStorage.removeItem(k); } catch (_) { /* ok */ } },
   };
-  /** Catálogo no IndexedDB (cabe muito mais que o localStorage); sem IndexedDB, usa o localStorage. */
+  /** Catálogo e papel de parede no IndexedDB (cabe muito mais que o localStorage); sem IndexedDB, localStorage. */
   const store = (() => {
     let dbp = null;
     const open = () => dbp || (dbp = new Promise((res, rej) => {
@@ -37,13 +45,16 @@
     };
   })();
 
-  // auto: procura sozinho ao abrir o app (e a cada 6 h com ele aberto).
+  // auto: procura sozinho; deep/deepPer: detalhes de todas aos poucos; covers: hash das capas das suspeitas.
   // wpDim/wpBlur: papel de parede (escurecer 0–90 %, desfocar 0–20 px).
-  const settings = Object.assign({ gap: 2.5, min: 55, ignore: "", auto: true, wpDim: 55, wpBlur: 0 }, ls.get("dup-settings", {}));
+  const settings = Object.assign({ gap: 2.5, min: 55, ignore: "", auto: true, deep: true, deepPer: 250, covers: true, wpDim: 55, wpBlur: 0 }, ls.get("dup-settings", {}));
   const saveSettings = () => ls.set("dup-settings", settings);
   let dismissed = new Set(ls.get("dup-dismissed", []));
   const saveDismissed = () => ls.set("dup-dismissed", Array.from(dismissed));
   const getToken = () => ls.get("dup-token", "") || "";
+  // Grupos já vistos na aba Duplicadas (os outros aparecem como "Novos").
+  let seen = new Set(ls.get("dup-seen", []));
+  const history = ls.get("dup-history", []);
 
   /*
    * Pedidos: no celular, o plugin DupHttp (o mesmo caminho do Estúdio, que a MediocreScan aceita); se ele faltar, o
@@ -59,6 +70,7 @@
   const DupHttp = plugin("DupHttp");
   const CapHttp = isNative ? (window.capacitorExports && window.capacitorExports.CapacitorHttp) || (C.Plugins && C.Plugins.CapacitorHttp) || null : null;
   let dupHttpBroken = false;
+  const missingPlugin = (msg) => /not implemented|não implementado|plugin.*(not|não)/i.test(msg);
   async function http(url, headers, token) {
     if (DupHttp && !dupHttpBroken) {
       try {
@@ -67,7 +79,7 @@
       } catch (e) {
         const msg = String((e && e.message) || e);
         // Plugin ausente nesta versão: usa o outro caminho. Erro de rede: devolve como queda (o leitor espera e tenta).
-        if (/not implemented|não implementado|plugin.*(not|não)/i.test(msg)) dupHttpBroken = true;
+        if (missingPlugin(msg)) dupHttpBroken = true;
         else return { status: 0, data: null, error: msg, via: "nativo" };
       }
     }
@@ -77,6 +89,39 @@
     }
     const r = await fetch(url, { headers });
     return { status: r.status, data: await r.text().catch(() => ""), via: "fetch" };
+  }
+
+  /**
+   * Hash da capa (dHash, 64 bits em 16 caracteres): a imagem reduzida a 9×8 em tons de cinza, cada pixel comparado
+   * com o vizinho. Imagens iguais (mesmo com outro nome, tamanho ou compressão) dão hashes quase iguais.
+   */
+  async function coverHash(url) {
+    let src = null, revoke = null;
+    if (DupHttp && !dupHttpBroken) {
+      const r = await DupHttp.get({ url, binary: true });
+      if (!(r.status >= 200 && r.status < 300) || !r.body) return null;
+      src = `data:${String(r.type || "image/jpeg").split(";")[0]};base64,${r.body}`;
+    } else {
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      src = revoke = URL.createObjectURL(await r.blob());
+    }
+    try {
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+      const c = document.createElement("canvas");
+      c.width = 9; c.height = 8;
+      const g = c.getContext("2d", { willReadFrequently: true });
+      g.drawImage(img, 0, 0, 9, 8);
+      const d = g.getImageData(0, 0, 9, 8).data;
+      const lum = (i) => d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+      let hex = "";
+      for (let y = 0; y < 8; y++) {
+        let byte = 0;
+        for (let x = 0; x < 8; x++) { const i = (y * 9 + x) * 4; byte = (byte << 1) | (lum(i) > lum(i + 4) ? 1 : 0); }
+        hex += byte.toString(16).padStart(2, "0");
+      }
+      return hex;
+    } finally { if (revoke) URL.revokeObjectURL(revoke); }
   }
 
   /* ---------- Estado ---------- */
@@ -97,9 +142,8 @@
     cat.savedAt = Date.now();
     await store.set("catalog", { works: Array.from(cat.works.values()), progress: cat.progress, lettersNext: cat.lettersNext, savedAt: cat.savedAt,
       pagers: cat.pagers || {}, prevIds: cat.prevIds || {}, lettersBigrams: Boolean(cat.lettersBigrams), lettersDone: cat.lettersDone || null });
-    $("cat-count").textContent = fmt(cat.works.size);
+    renderStats();
   }
-
   function makeReader() {
     return MApi.createReader({
       http, sleep: (ms) => new Promise((r) => setTimeout(r, ms)), now: () => Date.now(), token: getToken,
@@ -107,15 +151,21 @@
     });
   }
 
-  /* ---------- Toast ---------- */
+  /* ---------- Pequenos ajudantes de tela ---------- */
+  function el(tag, props, ...kids) {
+    const n = document.createElement(tag);
+    if (props) for (const [k, v] of Object.entries(props)) { if (v == null) continue; if (k === "className") n.className = v; else if (k === "text") n.textContent = v; else n.setAttribute(k, v); }
+    for (const c of kids) if (c != null) n.append(c);
+    return n;
+  }
   let toastTimer = null;
   function toast(text, action) {
     const t = $("toast");
     t.innerHTML = "";
     t.append(document.createTextNode(text));
     if (action) {
-      const b = document.createElement("button");
-      b.type = "button"; b.className = "link"; b.style.color = "#7fd9ec"; b.style.marginLeft = "10px"; b.textContent = action.label;
+      const b = el("button", { type: "button", className: "link", text: action.label });
+      b.style.marginLeft = "10px";
       b.onclick = () => { t.hidden = true; action.run(); };
       t.append(b);
     }
@@ -123,18 +173,53 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { t.hidden = true; }, action ? 6000 : 3500);
   }
+  async function copyText(text, msg) {
+    try { await navigator.clipboard.writeText(text); toast(msg); return; } catch (_) { /* tenta do jeito antigo */ }
+    const ta = el("textarea", { style: "position:fixed;opacity:0" }); ta.value = text; document.body.append(ta); ta.select();
+    try { document.execCommand("copy"); toast(msg); } catch (_) { toast("Não deu para copiar."); }
+    ta.remove();
+  }
+  function cover(w, cls) {
+    const ph = () => el("span", { className: `ph ${cls || ""}`, text: (w.title || "?").slice(0, 1) });
+    if (!w.cover) return ph();
+    const img = el("img", { src: w.cover, alt: "", loading: "lazy", className: cls || null });
+    img.onerror = () => img.replaceWith(ph());
+    return img;
+  }
+  /** Link da obra no site da MediocreScan (o dono quer o link, não só o ID). */
+  const OBRA_URL = "https://mediocrescan.com/obra/";
+  const workUrl = (w) => OBRA_URL + encodeURIComponent(String(w.id));
+  const linkEl = (w) => el("a", { className: "lnk", href: workUrl(w), rel: "noopener", text: workUrl(w).replace(/^https:\/\//, "") });
+  const full = (w) => cat.works.get(w.id) || w;
+  function meta(w) {
+    const f = full(w);
+    return [f.format, f.chapters != null ? `${fmt(f.chapters)} cap.` : null, f.status].filter(Boolean).join(" · ");
+  }
 
-  /* ---------- Abas ---------- */
+  /* ---------- Abas (embaixo) ---------- */
+  let tab = "painel";
   function showTab(name) {
-    document.querySelectorAll(".tabs [data-tab]").forEach((b) => { if (b.dataset.tab === name) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
-    for (const v of ["analise", "grupos", "catalogo"]) $("v-" + v).hidden = v !== name;
-    if (name === "grupos") renderGroups();
+    tab = name;
+    document.querySelectorAll(".bottom [data-tab]").forEach((b) => { if (b.dataset.tab === name) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+    for (const v of ["painel", "grupos", "catalogo", "ajustes"]) $("v-" + v).hidden = v !== name;
+    if (name === "grupos") renderGroups(true);
     if (name === "catalogo") renderCatalog();
+    if (name === "ajustes") renderSettings();
+    if (name === "painel") renderPanel();
     window.scrollTo(0, 0);
   }
-  document.querySelectorAll(".tabs [data-tab]").forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
+  document.querySelectorAll(".bottom [data-tab]").forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
 
   /* ---------- Token ---------- */
+  function saveToken(v) {
+    v = String(v || "").trim().replace(/^bearer\s+/i, "");
+    if (v.length < 10) { toast("Esse token parece curto demais. Cole o token inteiro."); return false; }
+    ls.set("dup-token", v);
+    renderToken(); renderPanel();
+    toast("Token salvo neste celular. Procurando sozinho…");
+    setTimeout(() => autoCycle(true), 300);
+    return true;
+  }
   function renderToken() {
     const t = getToken();
     $("token-saved").hidden = !t;
@@ -142,17 +227,10 @@
     $("token-cancel").hidden = !t;
     $("token-mask").textContent = t ? `Token salvo ••••${t.slice(-4)} (${t.length} caracteres)` : "";
     $("token-test").disabled = !t || Boolean(busy);
+    $("need-token").hidden = Boolean(t);
   }
-  $("token-form").onsubmit = (e) => {
-    e.preventDefault();
-    const v = $("token-input").value.trim().replace(/^bearer\s+/i, "");
-    if (v.length < 10) { $("token-status").textContent = "Esse token parece curto demais. Cole o token inteiro."; return; }
-    ls.set("dup-token", v);
-    $("token-input").value = "";
-    $("token-status").textContent = "Token salvo neste celular.";
-    renderToken(); renderCat(); renderAuto();
-    setTimeout(() => autoCycle(true), 300);
-  };
+  $("token-form").onsubmit = (e) => { e.preventDefault(); if (saveToken($("token-input").value)) { $("token-input").value = ""; $("token-status").textContent = "Token salvo neste celular."; } };
+  $("quick-token").onsubmit = (e) => { e.preventDefault(); if (saveToken($("quick-input").value)) $("quick-input").value = ""; };
   $("token-change").onclick = () => { $("token-saved").hidden = true; $("token-form").hidden = false; $("token-input").focus(); };
   $("token-cancel").onclick = () => renderToken();
   $("token-eye").onclick = () => {
@@ -172,35 +250,10 @@
     } catch (e) {
       $("token-status").textContent = e.message || String(e);
     } finally {
-      busy = null; renderToken(); renderCat();
+      busy = null; renderToken(); renderPanel();
     }
   };
 
-  /* ---------- Leitura do catálogo ---------- */
-  function renderCat() {
-    $("cat-count").textContent = fmt(cat.works.size);
-    const p = cat.progress;
-    const when = cat.savedAt ? new Date(cat.savedAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : null;
-    const reading = busy === "catalog" || busy === "letters" || busy === "details" || busy === "recent";
-    if (!reading) {
-      $("cat-meta").textContent = !cat.works.size ? "Nada lido ainda. A leitura passa por todas as páginas da MediocreScan, uma de cada vez. Deixe o app aberto: a tela fica acesa."
-        : p && p.step !== "pronto" ? `Leitura parada em ${STEP_NAME[p.step] || p.step}, página ${p.page}. Toque em Continuar para seguir de onde parou. Salvo em ${when}.`
-        : `Leitura completa${p && p.buscaOk ? " pela busca geral" : " pelas listas"}, salva em ${when}.`;
-    }
-    $("cat-read").textContent = p && p.step !== "pronto" && cat.works.size ? "Continuar leitura" : cat.works.size ? "Ler de novo (atualizar)" : "Ler todas as obras";
-    $("cat-read").hidden = reading;
-    $("cat-stop").hidden = !reading;
-    $("cat-letters").hidden = reading || !cat.works.size;
-    $("cat-letters").textContent = cat.lettersNext ? `Continuar a busca por letra (de “${cat.lettersNext}”)` : "Completar buscando cada letra (mais demorado)";
-    $("find-run").disabled = !cat.works.size || reading;
-    $("deep-run").disabled = reading;
-    $("token-test").disabled = !getToken() || Boolean(busy);
-    $("auto-now").disabled = reading || autoBusy;
-  }
-  function elapsed() {
-    const s = Math.round((Date.now() - runStart) / 1000);
-    return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`;
-  }
   /* ---------- Diagnóstico: os últimos pedidos (caminho, status, tempo e começo da resposta; nunca o token) ---------- */
   const diag = ls.get("dup-diag", []);
   function addDiag(e) {
@@ -224,7 +277,16 @@
     return [`Duplicadas ${window.BM_VERSION || ""} — diagnóstico`, `Obras salvas: ${cat.works.size}; leitura: ${cat.progress ? JSON.stringify(cat.progress) : "nenhuma"}`, ""]
       .concat(diag.map((d) => `${new Date(d.at).toLocaleString("pt-BR")} ${d.status || "sem resposta"} ${d.path} ${d.ms} ms ${d.via}\n  ${d.text}`)).join("\n");
   }
+  $("diag-show").onclick = () => { const d = $("diag"); d.hidden = !d.hidden; $("diag-show").textContent = d.hidden ? "Ver diagnóstico" : "Esconder diagnóstico"; if (!d.hidden) renderDiag(); };
+  $("diag-copy").onclick = () => copyText(diagText(), "Diagnóstico copiado (sem o token).");
 
+  /* ---------- Andamento das leituras ---------- */
+  function elapsed() { return dur(Date.now() - runStart); }
+  function setBar(n, of) {
+    const bar = $("run-bar").parentElement;
+    bar.classList.toggle("indet", !of);
+    if (of) $("run-bar").style.width = `${Math.min(100, Math.round((n / of) * 100))}%`;
+  }
   function onEvent(e) {
     if (e.type === "req") { addDiag(e); return; }
     const run = $("run");
@@ -233,7 +295,7 @@
       run.classList.add("waiting");
       let left = e.seconds;
       const tick = () => {
-        $("run-text").textContent = `A MediocreScan recusou (${e.reason}). Esperando ${left >= 60 ? `${Math.floor(left / 60)} min ${String(left % 60).padStart(2, "0")} s` : `${left} s`} para tentar de novo (${e.attempt} de ${e.max}).`;
+        $("run-text").textContent = `A MediocreScan recusou (${e.reason}). Esperando ${dur(left * 1000)} para tentar de novo (${e.attempt} de ${e.max}).`;
         left = Math.max(0, left - 1);
       };
       tick(); waitTimer = setInterval(tick, 1000);
@@ -249,162 +311,325 @@
       return;
     }
     if (e.type === "page") {
-      const bar = $("run-bar").parentElement;
-      bar.classList.toggle("indet", !e.pages);
-      if (e.pages) $("run-bar").style.width = `${Math.min(100, Math.round((e.page / e.pages) * 100))}%`;
+      setBar(e.page, e.pages);
       $("run-text").textContent = `${STEP_NAME[e.step] || e.step}${e.letter ? ` “${e.letter}”` : ""}: página ${fmt(e.page)}${e.pages ? ` de ${fmt(e.pages)}` : ""} · +${e.added} nova${e.added === 1 ? "" : "s"}`;
-      if (!/A busca geral/.test($("run-sub").textContent) || e.step !== "busca") $("run-sub").textContent = `${fmt(e.count)} obras lidas · ${elapsed()}`;
-      else $("run-sub").textContent = `${fmt(e.count)} de ${fmt(e.totalItems)} obras · ${elapsed()}`;
-      $("cat-count").textContent = fmt(e.count);
+      $("run-sub").textContent = `${fmt(e.count)} obras lidas${e.totalItems ? ` de ${fmt(e.totalItems)}` : ""} · ${elapsed()}`;
+      $("st-works").textContent = fmt(e.count);
       return;
     }
-    if (e.type === "detail") {
-      $("run-bar").parentElement.classList.remove("indet");
-      $("run-bar").style.width = `${Math.round((e.n / e.of) * 100)}%`;
-      $("run-text").textContent = `Detalhes: ${e.n} de ${e.of} · ${e.title}`;
-      $("run-sub").textContent = elapsed();
+    if (e.type === "detail" || e.type === "cover") {
+      setBar(e.n, e.of);
+      $("run-text").textContent = `${e.type === "cover" ? "Capas" : "Detalhes"}: ${fmt(e.n)} de ${fmt(e.of)} · ${e.title}`;
+      const left = (e.of - e.n) * (e.type === "cover" ? 1.3 : Math.max(1, Number(settings.gap) || 2.5)) * 1000;
+      $("run-sub").textContent = `${elapsed()}${left > 5000 ? ` · falta uns ${dur(left)}` : ""}`;
     }
   }
+  /** Roda uma leitura (uma de cada vez), mostrando o andamento no painel. Devolve true se terminou. */
   async function runTask(kind, fn) {
-    if (busy) return;
-    if (!getToken()) { toast("Coloque o token da MediocreScan primeiro."); $("token-input").focus(); return; }
+    if (busy) return false;
+    if (!getToken()) { toast("Coloque o token da MediocreScan primeiro."); showTab("painel"); return false; }
     busy = kind; runStart = Date.now();
     reader = makeReader();
     $("run").hidden = false; $("run").classList.remove("waiting");
-    $("run-bar").style.width = "0%"; $("run-bar").parentElement.classList.add("indet");
+    setBar(0, 0);
     $("run-text").textContent = "Começando…"; $("run-sub").textContent = "";
-    $("cat-meta").textContent = "Deixe o app aberto enquanto lê: a tela fica acesa. Parar guarda o que já foi lido.";
-    renderCat(); renderToken();
+    renderPanel(); renderToken();
     let ok = false;
     try { await fn(reader); ok = true; }
     catch (e) {
-      if (e && e.stopped) toast("Leitura parada. O que já foi lido está salvo.");
+      if (e && e.stopped) toast("Parado. O que já foi lido está salvo.");
       else {
         toast(e.message || String(e));
         $("run-text").textContent = e.message || String(e);
         const d = diag[0];
         $("run-sub").textContent = d ? `Último pedido: ${d.status || "sem resposta"} em ${d.path}${d.text ? ` — ${d.text.slice(0, 140)}` : ""}` : "";
+        lastError = e.message || String(e);
       }
     } finally {
       clearInterval(waitTimer);
       busy = null; reader = null;
       await saveCatalog();
       $("run").hidden = ok || !$("run-text").textContent || /Começando/.test($("run-text").textContent);
-      renderCat(); renderToken();
+      renderPanel(); renderToken();
     }
     return ok;
   }
-  $("cat-read").onclick = async () => {
-    // Leitura completa feita: recomeça do zero (mantém as obras e soma as novas).
-    if (cat.progress && cat.progress.step === "pronto") cat.progress = null;
-    const ok = await runTask("catalog", (r) => r.readCatalog(cat, saveCatalog));
-    if (ok) { toast(`Leitura completa: ${fmt(cat.works.size)} obras.`); find(); }
-  };
-  $("cat-letters").onclick = async () => {
-    const ok = await runTask("letters", (r) => r.readLetters(cat, saveCatalog, cat.lettersNext));
-    if (ok) { toast(`Busca por letra completa: ${fmt(cat.works.size)} obras.`); find(); }
-  };
   $("cat-stop").onclick = () => { if (reader) reader.stop(); $("run-text").textContent = "Parando…"; };
 
   /* ---------- Procurar ---------- */
   function suspects() {
     if (!result) return [];
     const ids = new Set();
-    for (const g of result.groups) for (const w of g.works) if (!cat.works.get(w.id) || !cat.works.get(w.id).detailed) ids.add(w.id);
+    for (const g of result.groups) for (const w of g.works) if (!full(w).detailed) ids.add(w.id);
     return Array.from(ids);
   }
-  function find() {
-    if (!cat.works.size) return;
-    result = Dup.findDuplicates(Array.from(cat.works.values()), { min: Number(settings.min) || 55, ignore: settings.ignore, dismissed });
-    const n = { alta: 0, provavel: 0, talvez: 0 };
-    result.groups.forEach((g) => n[g.level]++);
-    $("levels").hidden = false;
-    for (const k of Object.keys(n)) $("n-" + k).textContent = fmt(n[k]);
-    $("find-meta").textContent = `${fmt(result.groups.length)} grupo(s) em ${fmt(cat.works.size)} obras · ${fmt(result.compared)} comparações em ${result.ms < 1000 ? `${result.ms} ms` : `${(result.ms / 1000).toFixed(1)} s`}.`;
-    const tc = $("tab-count");
-    tc.hidden = !result.groups.length; tc.textContent = fmt(result.groups.length);
-    const sus = suspects();
-    $("deep").hidden = !sus.length;
-    const secs = Math.round(sus.length * Math.max(1, Number(settings.gap) || 2.5));
-    $("deep-text").textContent = sus.length ? `Para confirmar com nomes alternativos, sinopse e número de capítulos, o app lê os detalhes das ${fmt(sus.length)} obras suspeitas (1 pedido cada, uns ${secs < 120 ? `${secs} s` : `${Math.round(secs / 60)} min`}).` : "";
-    gShown = PAGE; renderGroups();
+  function suspectCovers() {
+    if (!result) return [];
+    const ids = new Set();
+    for (const g of result.groups) for (const w of g.works) { const f = full(w); if (f.cover && f.coverHash === undefined) ids.add(w.id); }
+    return Array.from(ids);
   }
+  /** Obras ainda sem detalhes, as mais novas primeiro (são as que mais costumam ser repostadas). */
+  function undetailed() {
+    return Array.from(cat.works.values()).filter((w) => !w.detailed).sort((a, b) => Number(b.id) - Number(a.id)).map((w) => w.id);
+  }
+  function find() {
+    if (!cat.works.size) { result = null; renderPanel(); return; }
+    result = Dup.findDuplicates(Array.from(cat.works.values()), { min: Number(settings.min) || 55, ignore: settings.ignore, dismissed });
+    $("find-meta").textContent = `${fmt(result.groups.length)} grupo(s) em ${fmt(cat.works.size)} obras · ${fmt(result.compared)} comparações em ${result.ms < 1000 ? `${result.ms} ms` : `${(result.ms / 1000).toFixed(1)} s`}.`;
+    gShown = PAGE;
+    renderPanel();
+    if (tab === "grupos") renderGroups(false);
+  }
+  const newGroups = () => (result ? result.groups.filter((g) => !seen.has(g.key)) : []);
+
+  /* ---------- Painel ---------- */
+  function renderStats() {
+    const total = cat.works.size, det = Array.from(cat.works.values()).filter((w) => w.detailed).length;
+    const pct = total ? Math.round((det / total) * 100) : 0;
+    $("st-works").textContent = fmt(total);
+    $("st-detail").textContent = `${pct}%`;
+    $("st-detail-bar").style.width = `${pct}%`;
+    $("st-groups").textContent = fmt(result ? result.groups.length : 0);
+  }
+  function renderPanel() {
+    renderStats();
+    const n = { alta: 0, provavel: 0, talvez: 0 };
+    if (result) result.groups.forEach((g) => n[g.level]++);
+    for (const k of Object.keys(n)) $("n-" + k).textContent = fmt(n[k]);
+    const fresh = newGroups();
+    const tc = $("tab-count");
+    const total = result ? result.groups.length : 0;
+    tc.hidden = !total;
+    tc.textContent = fresh.length ? `${fmt(fresh.length)} nova${fresh.length === 1 ? "" : "s"}` : fmt(total);
+    tc.classList.toggle("fresh", fresh.length > 0);
+    // Novidades.
+    $("news").hidden = !fresh.length;
+    const nl = $("news-list"); nl.innerHTML = "";
+    fresh.slice(0, 3).forEach((g) => {
+      const b = el("button", { type: "button", className: `mini-row ${g.level}` },
+        el("span", { className: "mini-score", text: String(g.score) }),
+        el("span", { className: "mini-t", text: g.works.map((w) => full(w).title).join("  ×  ") }));
+      b.onclick = () => { setFilter("todas"); $("g-q").value = String(g.works[0].id); showTab("grupos"); };
+      nl.append(el("li", {}, b));
+    });
+    // Histórico.
+    const hl = $("hist"); hl.innerHTML = "";
+    $("hist-empty").hidden = history.length > 0;
+    history.slice(0, 6).forEach((h) => {
+      const parts = [];
+      if (h.err) parts.push(h.err);
+      else {
+        if (h.novas) parts.push(`+${fmt(h.novas)} obra${h.novas === 1 ? "" : "s"}`);
+        if (h.detalhes) parts.push(`${fmt(h.detalhes)} detalhe${h.detalhes === 1 ? "" : "s"}`);
+        if (h.capas) parts.push(`${fmt(h.capas)} capa${h.capas === 1 ? "" : "s"}`);
+        parts.push(h.novos ? `${fmt(h.novos)} grupo${h.novos === 1 ? "" : "s"} novo${h.novos === 1 ? "" : "s"} (${fmt(h.grupos)} no total)` : `${fmt(h.grupos)} grupo${h.grupos === 1 ? "" : "s"}`);
+      }
+      hl.append(el("li", { className: h.err ? "err" : null }, el("b", { text: when(h.at) }), el("span", { text: `${parts.join(" · ")}${h.ms ? ` · ${dur(h.ms)}` : ""}` })));
+    });
+    // Ferramentas.
+    const p = cat.progress;
+    const reading = Boolean(busy) && busy !== "test";
+    $("cat-meta").textContent = !cat.works.size ? "Nada lido ainda." : p && p.step !== "pronto" ? `Leitura parada em ${STEP_NAME[p.step] || p.step}, página ${p.page}: a próxima procura continua dali.`
+      : `Leitura completa${p && p.buscaOk ? " pela busca geral" : " pelas listas"}${p && p.finished ? ` em ${when(p.finished)}` : ""}.`;
+    $("cat-read").textContent = p && p.step !== "pronto" && cat.works.size ? "Continuar a leitura do catálogo" : cat.works.size ? "Ler o catálogo de novo" : "Ler o catálogo";
+    $("cat-letters").textContent = cat.lettersNext ? `Continuar a busca por letra (de “${cat.lettersNext}”)` : "Completar buscando por letras";
+    for (const id of ["cat-read", "cat-letters", "find-run", "deep-run", "cover-run"]) $(id).disabled = reading || (!cat.works.size && id !== "cat-read");
+    $("cat-stop").hidden = !reading;
+    $("auto-now").hidden = reading;
+    renderHero();
+  }
+
+  /* ---------- Automático ---------- */
+  const AUTO_EVERY_MS = 6 * 3600_000, DEEP_AGAIN_MS = 15 * 60_000, FULL_EVERY_MS = 3 * 24 * 3600_000, SUSPECT_MAX = 400, COVER_MAX = 300;
+  const STEPS = ["catalogo", "suspeitas", "capas", "detalhes"];
+  let autoBusy = false, autoStep = null, lastError = null;
+  function nextRun() { return ls.get("dup-auto-next", 0); }
+  function renderHero() {
+    $("set-auto").checked = Boolean(settings.auto);
+    const hero = $("hero");
+    hero.classList.toggle("on", autoBusy);
+    const offline = navigator.onLine === false;
+    const title = autoBusy ? { catalogo: "Lendo o catálogo", suspeitas: "Conferindo suspeitas", capas: "Comparando capas", detalhes: "Lendo detalhes" }[autoStep] || "Procurando"
+      : busy ? "Trabalhando" : !getToken() ? "Falta o token" : offline ? "Sem internet" : !settings.auto ? "Automático desligado"
+      : !cat.works.size ? "Pronto para começar" : "Tudo em dia";
+    $("hero-title").textContent = title;
+    $("hero-kicker").textContent = settings.auto ? "Procurar sozinho" : "Procurar sozinho (desligado)";
+    // Etapas: feitas, a atual e as que faltam.
+    // Parado depois de uma procura que deu certo: etapas feitas; Detalhes mostra quanto do catálogo já tem detalhes.
+    const cur = autoBusy ? STEPS.indexOf(autoStep) : -1;
+    const left = undetailed().length, total = cat.works.size;
+    const idleDone = cur < 0 && total > 0 && history.length > 0 && !history[0].err;
+    document.querySelectorAll("#steps li").forEach((li) => {
+      const i = STEPS.indexOf(li.dataset.s);
+      const part = idleDone && li.dataset.s === "detalhes" && left > 0;
+      li.className = cur >= 0 ? (i < cur ? "done" : i === cur ? "now" : "") : idleDone ? (part ? "part" : "done") : "";
+      li.style.setProperty("--p", part ? `${Math.round(((total - left) / total) * 100)}%` : "0%");
+      li.toggleAttribute("aria-current", i === cur);
+    });
+    const nr = nextRun();
+    $("hero-next").textContent = autoBusy ? "Deixe o app aberto: a tela fica acesa. Parar guarda o que já foi feito."
+      : !getToken() ? "Cole o token acima: o app lê o catálogo, procura as duplicadas e confere tudo sozinho."
+      : offline ? "Volta sozinho quando a conexão voltar."
+      : !settings.auto ? "Ligue para ele procurar ao abrir o app e de tempos em tempos."
+      : [nr ? `Próxima procura às ${hhmm(nr)}` : "A próxima procura começa já", settings.deep && left && cat.works.size ? `faltam detalhes de ${fmt(left)} obra${left === 1 ? "" : "s"}` : null, lastError ? `último erro: ${lastError}` : null].filter(Boolean).join(" · ") + ".";
+  }
+  function addHistory(h) {
+    history.unshift(h);
+    history.length = Math.min(history.length, 20);
+    ls.set("dup-history", history);
+  }
+  async function autoCycle(force) {
+    if (autoBusy || busy || !settings.auto || !getToken()) return;
+    if (navigator.onLine === false) { renderHero(); return; }
+    if (!force && Date.now() < nextRun()) return;
+    autoBusy = true; lastError = null;
+    const t0 = Date.now(), before = cat.works.size, beforeKeys = new Set(result ? result.groups.map((g) => g.key) : []);
+    const h = { at: t0, novas: 0, detalhes: 0, capas: 0, grupos: 0, novos: 0 };
+    const step = (s) => { autoStep = s; renderHero(); };
+    let ok = false;
+    try {
+      // 1) Catálogo: continua a leitura parada, relê tudo a cada 3 dias, senão só as obras novas.
+      step("catalogo");
+      const p = cat.progress;
+      const fullAge = p && p.finished ? Date.now() - p.finished : Infinity;
+      if (!cat.works.size || !p || p.step !== "pronto" || fullAge > FULL_EVERY_MS) {
+        if (p && p.step === "pronto") cat.progress = null;
+        if (!(await runTask("catalog", (r) => r.readCatalog(cat, saveCatalog)))) return;
+        if (!(cat.progress && cat.progress.buscaOk) && (!cat.lettersDone || (cat.progress && cat.progress.finished && cat.lettersDone < cat.progress.finished))) {
+          if (!(await runTask("letters", (r) => r.readLetters(cat, saveCatalog, cat.lettersNext)))) return;
+        }
+      } else if (!(await runTask("recent", (r) => r.readRecent(cat, saveCatalog)))) return;
+      h.novas = Math.max(0, cat.works.size - before);
+      find();
+      // 2) Suspeitas: detalhes das obras dos grupos (nomes alternativos, sinopse, capítulos).
+      step("suspeitas");
+      const sus = suspects().slice(0, SUSPECT_MAX);
+      if (sus.length) {
+        if (!(await runTask("details", (r) => r.readDetails(cat, sus, saveCatalog)))) return;
+        h.detalhes += sus.length;
+        find();
+      }
+      // 3) Capas das suspeitas: a mesma imagem com outro nome de arquivo.
+      step("capas");
+      const cov = settings.covers ? suspectCovers().slice(0, COVER_MAX) : [];
+      if (cov.length) {
+        if (!(await runTask("covers", (r) => r.readCovers(cat, cov, saveCatalog, coverHash)))) return;
+        h.capas = cov.length;
+        find();
+      }
+      // 4) Detalhes de todas, aos poucos (acha duplicadas com títulos diferentes).
+      step("detalhes");
+      const rest = settings.deep ? undetailed().slice(0, Math.max(20, Number(settings.deepPer) || 250)) : [];
+      if (rest.length) {
+        if (!(await runTask("details", (r) => r.readDetails(cat, rest, saveCatalog)))) return;
+        h.detalhes += rest.length;
+        find();
+      }
+      ok = true;
+    } finally {
+      const after = result ? result.groups : [];
+      h.grupos = after.length;
+      h.novos = after.filter((g) => !beforeKeys.has(g.key) && !seen.has(g.key)).length;
+      h.ms = Date.now() - t0;
+      if (!ok && lastError) h.err = lastError;
+      if (ok || lastError) addHistory(h);
+      // Próxima: 15 min se a leitura parou no meio ou ainda faltam detalhes; senão 6 h. Erro: tenta de novo em 30 min.
+      const more = !(cat.progress && cat.progress.step === "pronto") || (settings.deep && undetailed().length > 0);
+      ls.set("dup-auto-next", Date.now() + (!ok && lastError ? 30 * 60_000 : more ? DEEP_AGAIN_MS : AUTO_EVERY_MS));
+      if (ok) ls.set("dup-auto-last", Date.now());
+      autoBusy = false; autoStep = null;
+      renderPanel();
+      if (ok) toast(h.novos ? `${fmt(h.novos)} grupo(s) novo(s) de possíveis duplicadas.` : `Procura feita: ${fmt(h.grupos)} grupo(s), nenhum novo.`);
+    }
+  }
+  $("set-auto").onchange = () => {
+    settings.auto = $("set-auto").checked; saveSettings();
+    if (settings.auto) autoCycle(true); else if (reader) reader.stop();
+    renderHero();
+  };
+  $("auto-now").onclick = () => { if (!settings.auto) { settings.auto = true; saveSettings(); } autoCycle(true); };
+  setInterval(() => { autoCycle(false); if (!autoBusy) renderHero(); }, 60_000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") autoCycle(false); });
+  window.addEventListener("online", () => { renderHero(); autoCycle(true); });
+  window.addEventListener("offline", () => renderHero());
+
+  /* ---------- Ferramentas (à mão) ---------- */
+  $("cat-read").onclick = async () => {
+    if (cat.progress && cat.progress.step === "pronto") cat.progress = null;
+    if (await runTask("catalog", (r) => r.readCatalog(cat, saveCatalog))) { toast(`Leitura completa: ${fmt(cat.works.size)} obras.`); find(); }
+  };
+  $("cat-letters").onclick = async () => {
+    if (await runTask("letters", (r) => r.readLetters(cat, saveCatalog, cat.lettersNext))) { toast(`Busca por letra completa: ${fmt(cat.works.size)} obras.`); find(); }
+  };
   $("find-run").onclick = () => { find(); toast(result && result.groups.length ? `${fmt(result.groups.length)} grupo(s) de possíveis duplicadas.` : "Nenhuma duplicada encontrada."); };
   $("deep-run").onclick = async () => {
     const ids = suspects();
-    if (!ids.length) return;
-    const ok = await runTask("details", (r) => r.readDetails(cat, ids, saveCatalog));
-    if (ok) { find(); toast("Suspeitas conferidas: a lista foi atualizada."); }
+    if (!ids.length) { toast("As suspeitas já estão conferidas."); return; }
+    if (await runTask("details", (r) => r.readDetails(cat, ids, saveCatalog))) { find(); toast("Suspeitas conferidas."); }
+  };
+  $("cover-run").onclick = async () => {
+    const ids = suspectCovers();
+    if (!ids.length) { toast("As capas das suspeitas já foram comparadas."); return; }
+    if (await runTask("covers", (r) => r.readCovers(cat, ids, saveCatalog, coverHash))) { find(); toast("Capas comparadas."); }
   };
   document.querySelectorAll(".levels [data-go]").forEach((b) => { b.onclick = () => { setFilter(b.dataset.go); showTab("grupos"); }; });
+  $("news-all").onclick = () => { setFilter("novas"); showTab("grupos"); };
 
-  /* ---------- Grupos ---------- */
-  const PAGE = 30;
-  let gFilter = "todas", gShown = PAGE;
+  /* ---------- Duplicadas ---------- */
+  const PAGE = 25;
+  let gFilter = "todas", gShown = PAGE, freshKeys = new Set();
   function setFilter(f) {
     gFilter = f; gShown = PAGE;
     document.querySelectorAll(".filters [data-f]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.f === f)));
   }
-  document.querySelectorAll(".filters [data-f]").forEach((b) => { b.onclick = () => { setFilter(b.dataset.f); renderGroups(); }; });
-  $("g-q").oninput = () => { gShown = PAGE; renderGroups(); };
+  document.querySelectorAll(".filters [data-f]").forEach((b) => { b.onclick = () => { setFilter(b.dataset.f); renderGroups(false); }; });
+  $("g-q").oninput = () => { gShown = PAGE; renderGroups(false); };
+  $("g-sort").onchange = () => { gShown = PAGE; renderGroups(false); };
   function filteredGroups() {
     if (!result) return [];
     // Link colado (mediocrescan.com/obra/123) vale como o ID.
     const raw = $("g-q").value, fromLink = /obra\/(\d+)/.exec(raw);
     const q = fromLink ? fromLink[1] : Dup.normalize(raw);
-    return result.groups.filter((g) => (gFilter === "todas" || g.level === gFilter) && (!q || g.works.some((w) => String(w.id) === q || Dup.normalize([w.title].concat(w.alts || []).join(" ")).includes(q))));
+    const gs = result.groups.filter((g) => (gFilter === "todas" || (gFilter === "novas" ? freshKeys.has(g.key) : g.level === gFilter))
+      && (!q || g.works.some((w) => String(w.id) === q || Dup.normalize([full(w).title].concat(full(w).alts || []).join(" ")).includes(q))));
+    const caps = (g) => Math.max(...g.works.map((w) => Number(full(w).chapters) || 0));
+    const sort = $("g-sort").value;
+    if (sort === "novas") gs.sort((a, b) => (freshKeys.has(b.key) ? 1 : 0) - (freshKeys.has(a.key) ? 1 : 0) || b.score - a.score);
+    else if (sort === "obras") gs.sort((a, b) => b.works.length - a.works.length || b.score - a.score);
+    else if (sort === "caps") gs.sort((a, b) => caps(b) - caps(a) || b.score - a.score);
+    return gs;
   }
-  function el(tag, props, ...kids) {
-    const n = document.createElement(tag);
-    if (props) for (const [k, v] of Object.entries(props)) { if (v == null) continue; if (k === "className") n.className = v; else if (k === "text") n.textContent = v; else n.setAttribute(k, v); }
-    for (const c of kids) if (c != null) n.append(c);
-    return n;
-  }
-  function cover(w, style) {
-    if (w.cover) {
-      const img = el("img", { src: w.cover, alt: "", loading: "lazy", style });
-      img.onerror = () => img.replaceWith(el("span", { className: "ph", style, text: (w.title || "?").slice(0, 1) }));
-      return img;
-    }
-    return el("span", { className: "ph", style, text: (w.title || "?").slice(0, 1) });
-  }
-  /** Link da obra no site da MediocreScan (o dono quer o link, não só o ID). */
-  const OBRA_URL = "https://mediocrescan.com/obra/";
-  const workUrl = (w) => OBRA_URL + encodeURIComponent(String(w.id));
-  function linkEl(w) {
-    // Link comum (sem target): o app abre no navegador do celular.
-    return el("a", { className: "lnk", href: workUrl(w), rel: "noopener", text: workUrl(w).replace(/^https:\/\//, "") });
-  }
-  function meta(w) {
-    const full = cat.works.get(w.id) || w;
-    return [full.format, full.chapters != null ? `${fmt(full.chapters)} cap.` : null, full.status].filter(Boolean).join(" · ");
+  /** Uma obra do grupo: capa, título, link, dados e se é a sugerida para manter. */
+  function workCol(w, g, compact) {
+    const f = full(w), keep = g.keep && g.keep.id === w.id;
+    const alts = (f.alts || []).slice(0, 2).join(" · ");
+    const m = meta(f);
+    return el("div", { className: `wcol${keep ? " keep" : ""}${compact ? " row-mode" : ""}` },
+      cover(f, "wcover"),
+      el("div", { className: "wbody" },
+        keep ? el("span", { className: "keep-tag", text: `Manter: ${g.keep.why}` }) : null,
+        el("p", { className: "t", text: f.title }),
+        linkEl(f),
+        m ? el("p", { className: "m", text: m }) : null,
+        alts ? el("p", { className: "m alt", text: `Também: ${alts}` }) : null));
   }
   function groupCard(g) {
     const li = el("li", { className: `group ${g.level}` });
     li.append(el("div", { className: "g-head" },
       el("span", { className: "badge" }, el("b", { text: String(g.score) }), LEVEL_NAME[g.level]),
+      freshKeys.has(g.key) ? el("span", { className: "new-tag", text: "Nova" }) : null,
       el("span", { className: "g-n", text: `${g.works.length} obras` })));
-    const stack = el("div", { className: "stack", "aria-hidden": "true" });
-    g.works.slice(0, 5).forEach((w, i) => stack.append(cover(cat.works.get(w.id) || w, `left:${i * 34}px;transform:rotate(${i % 2 ? 2 : -2}deg) translateY(${i % 2 ? 3 : 0}px);z-index:${10 - i}`)));
-    li.append(stack);
-    const ol = el("ol", { className: "g-works" });
-    for (const w of g.works) {
-      const full = cat.works.get(w.id) || w;
-      const alts = (full.alts || []).slice(0, 3).join(" · ");
-      const m = meta(full);
-      ol.append(el("li", {}, el("div", {}, el("p", { className: "t", text: full.title }), linkEl(full), m ? el("p", { className: "m", text: m }) : null, alts ? el("p", { className: "m", text: `Também: ${alts}` }) : null)));
-    }
-    li.append(ol);
-    const why = el("ul", { className: "why" });
-    const idx = new Map(g.works.map((w, i) => [String(w.id), i + 1]));
-    for (const p of g.pairs.slice(0, 4)) {
-      const tag = g.works.length > 2 ? el("span", { className: "pair", text: `${idx.get(String(p.a.id))} e ${idx.get(String(p.b.id))}: ` }) : null;
-      why.append(el("li", {}, tag, p.reasons.slice(0, 3).join("; ") + "."));
-      for (const n of p.notes) why.append(el("li", { className: "warn" }, tag ? tag.cloneNode(true) : null, n + "."));
-    }
-    li.append(why);
+    // Duas obras: lado a lado. Três ou mais: uma por linha.
+    const two = g.works.length === 2;
+    li.append(el("div", { className: two ? "compare" : "rows" }, ...g.works.map((w) => workCol(w, g, !two))));
+    // Motivos em etiquetas; avisos em amarelo.
+    const reasons = new Set(), notes = new Set();
+    g.pairs.slice(0, 4).forEach((p) => { p.reasons.slice(0, 4).forEach((r) => reasons.add(r)); p.notes.forEach((n) => notes.add(n)); });
+    li.append(el("ul", { className: "chips-why" }, ...Array.from(reasons).slice(0, 6).map((r) => el("li", { text: r }))));
+    if (notes.size) li.append(el("ul", { className: "why" }, ...Array.from(notes).map((n) => el("li", { className: "warn", text: n + "." }))));
     const copy = el("button", { type: "button", className: "btn ghost small", text: "Copiar links" });
-    copy.onclick = () => copyText(g.works.map((w) => `${(cat.works.get(w.id) || w).title}\n${workUrl(w)}`).join("\n\n"), "Links copiados.");
+    copy.onclick = () => copyText(g.works.map((w) => `${full(w).title}${g.keep && g.keep.id === w.id ? " (manter)" : ""}\n${workUrl(w)}`).join("\n\n"), "Links copiados.");
     const no = el("button", { type: "button", className: "btn ghost small", text: "Não é duplicada" });
     no.onclick = () => {
       const keys = g.pairs.map((p) => Dup.pairKey(String(p.a.id), String(p.b.id)));
@@ -414,36 +639,37 @@
     li.append(el("div", { className: "g-acts" }, copy, no));
     return li;
   }
-  function renderGroups() {
+  /** opening: ao abrir a aba, guarda quais eram novas (para marcar) e passa a considerar todas como vistas. */
+  function renderGroups(opening) {
+    if (opening && result) {
+      freshKeys = new Set(newGroups().map((g) => g.key));
+      result.groups.forEach((g) => seen.add(g.key));
+      ls.set("dup-seen", Array.from(seen).slice(-5000));
+      renderPanel();
+    }
     const list = $("g-list");
     list.innerHTML = "";
     const gs = filteredGroups();
     $("g-empty").hidden = gs.length > 0;
-    $("g-empty").textContent = !cat.works.size ? "Leia o catálogo na aba Análise e toque em Procurar agora." : !result ? "Toque em Procurar agora na aba Análise." : "Nenhum grupo com esse filtro.";
-    $("g-meta").textContent = result ? `${fmt(gs.length)} grupo(s)${dismissed.size ? ` · ${fmt(dismissed.size)} par(es) dispensado(s)` : ""}` : "";
+    $("g-empty").textContent = !cat.works.size ? "Ainda não há catálogo: o Painel lê sozinho assim que o token estiver salvo." : !result ? "Toque em Atualizar agora no Painel." : "Nenhum grupo com esse filtro.";
+    $("g-meta").textContent = result ? `${fmt(gs.length)} grupo(s)${freshKeys.size ? ` · ${fmt(freshKeys.size)} nova(s)` : ""}${dismissed.size ? ` · ${fmt(dismissed.size)} par(es) dispensado(s)` : ""}` : "";
     gs.slice(0, gShown).forEach((g) => list.append(groupCard(g)));
     $("g-more").hidden = gs.length <= gShown;
     $("g-more").textContent = `Mostrar mais (${fmt(gs.length - gShown)})`;
     $("g-copy").hidden = !gs.length;
   }
-  $("g-more").onclick = () => { gShown += PAGE; renderGroups(); };
+  $("g-more").onclick = () => { gShown += PAGE; renderGroups(false); };
   $("g-copy").onclick = () => {
     const gs = filteredGroups();
     const lines = [`Duplicadas da MediocreScan — ${new Date().toLocaleString("pt-BR")}`, `${gs.length} grupo(s) em ${cat.works.size} obras`, ""];
     gs.forEach((g, i) => {
       lines.push(`${i + 1}. ${LEVEL_NAME[g.level]} (${g.score})`);
-      g.works.forEach((w) => lines.push(`   ${(cat.works.get(w.id) || w).title} — ${workUrl(w)}`));
+      g.works.forEach((w) => lines.push(`   ${full(w).title}${g.keep && g.keep.id === w.id ? " (manter)" : ""} — ${workUrl(w)}`));
       lines.push(`   Por quê: ${g.pairs[0].reasons.join("; ")}${g.pairs[0].notes.length ? ` | ${g.pairs[0].notes.join("; ")}` : ""}`);
       lines.push("");
     });
     copyText(lines.join("\n"), "Relatório copiado.");
   };
-  async function copyText(text, msg) {
-    try { await navigator.clipboard.writeText(text); toast(msg); return; } catch (_) { /* tenta do jeito antigo */ }
-    const ta = el("textarea", { style: "position:fixed;opacity:0" }); ta.value = text; document.body.append(ta); ta.select();
-    try { document.execCommand("copy"); toast(msg); } catch (_) { toast("Não deu para copiar."); }
-    ta.remove();
-  }
 
   /* ---------- Catálogo ---------- */
   let cShown = 50;
@@ -455,7 +681,7 @@
     const all = Array.from(cat.works.values());
     const list = $("c-list");
     list.innerHTML = "";
-    if (!all.length) { $("c-meta").textContent = "Leia o catálogo na aba Análise primeiro."; $("c-more").hidden = true; return; }
+    if (!all.length) { $("c-meta").textContent = "Ainda não há catálogo: o Painel lê sozinho assim que o token estiver salvo."; $("c-more").hidden = true; return; }
     const hits = !q ? [] : /^\d+$/.test(q) ? all.filter((w) => String(w.id) === q) : Dup.search(all, q, { ignore: settings.ignore });
     $("c-meta").textContent = !q ? `${fmt(all.length)} obras salvas. Digite uma palavra-chave para achar obras parecidas à mão.` : `${fmt(hits.length)} obra(s) com “${q}”.`;
     hits.slice(0, cShown).forEach((w) => {
@@ -471,85 +697,33 @@
   }
   $("c-more").onclick = () => { cShown += 50; renderCatalog(); };
 
-  $("diag-show").onclick = () => { const d = $("diag"); d.hidden = !d.hidden; $("diag-show").textContent = d.hidden ? "Ver diagnóstico" : "Esconder diagnóstico"; if (!d.hidden) renderDiag(); };
-  $("diag-copy").onclick = () => copyText(diagText(), "Diagnóstico copiado (sem o token).");
-
   /* ---------- Ajustes ---------- */
-  $("set-gap").value = String(settings.gap);
-  $("set-min").value = String(settings.min);
-  $("set-ignore").value = settings.ignore;
-  $("set-gap").onchange = () => { const v = Number($("set-gap").value); settings.gap = Number.isFinite(v) ? Math.max(1, Math.min(60, v)) : 2.5; $("set-gap").value = String(settings.gap); saveSettings(); find(); };
+  function renderSettings() {
+    renderToken();
+    $("set-gap").value = String(settings.gap);
+    $("set-min").value = String(settings.min);
+    $("set-ignore").value = settings.ignore;
+    $("set-deep").checked = Boolean(settings.deep);
+    $("set-deep-n").value = String(settings.deepPer);
+    $("set-covers").checked = Boolean(settings.covers);
+    $("app-version").textContent = `Versão ${window.BM_VERSION || "de teste"} · pedidos pelo ${DupHttp && !dupHttpBroken ? "plugin nativo" : CapHttp ? "HTTP do Capacitor" : "navegador"} · ${fmt(cat.works.size)} obras salvas.`;
+  }
+  $("set-gap").onchange = () => { const v = Number($("set-gap").value); settings.gap = Number.isFinite(v) ? Math.max(1, Math.min(60, v)) : 2.5; $("set-gap").value = String(settings.gap); saveSettings(); };
   $("set-min").onchange = () => { settings.min = Number($("set-min").value) || 55; saveSettings(); find(); };
   $("set-ignore").onchange = () => { settings.ignore = $("set-ignore").value; saveSettings(); find(); };
+  $("set-deep").onchange = () => { settings.deep = $("set-deep").checked; saveSettings(); renderHero(); };
+  $("set-deep-n").onchange = () => { const v = Math.round(Number($("set-deep-n").value)); settings.deepPer = Number.isFinite(v) ? Math.max(20, Math.min(2000, v)) : 250; $("set-deep-n").value = String(settings.deepPer); saveSettings(); };
+  $("set-covers").onchange = () => { settings.covers = $("set-covers").checked; saveSettings(); };
   $("set-reset-dismissed").onclick = () => { const n = dismissed.size; dismissed = new Set(); saveDismissed(); find(); toast(n ? `${n} par(es) de volta na lista.` : "Nenhum par dispensado."); };
   $("set-clear").onclick = async () => {
     if (busy) return;
-    if (!confirm("Apagar o catálogo salvo neste celular? O token continua salvo.")) return;
+    if (!confirm("Apagar o catálogo salvo neste celular? O token e o papel de parede continuam.")) return;
     cat.works = new Map(); cat.progress = null; cat.lettersNext = null; cat.savedAt = null; result = null;
     cat.pagers = {}; cat.prevIds = {}; cat.lettersBigrams = false; cat.lettersDone = null;
     await store.del("catalog");
-    $("levels").hidden = true; $("deep").hidden = true; $("find-meta").textContent = ""; $("tab-count").hidden = true;
-    renderCat(); toast("Catálogo apagado.");
+    ls.del("dup-auto-next");
+    renderPanel(); renderSettings(); toast("Catálogo apagado.");
   };
-
-  /* ---------- Automático: procura sozinho ---------- */
-  // Ao abrir (e a cada 6 h com o app aberto): lê o que falta do catálogo (ou só as obras novas), procura as
-  // duplicadas e confere as suspeitas na API. Leitura completa de novo a cada 3 dias.
-  const AUTO_EVERY_MS = 6 * 3600_000, FULL_EVERY_MS = 3 * 24 * 3600_000, AUTO_DETAILS_MAX = 400;
-  let autoBusy = false;
-  function autoLine(text) { $("auto-text").textContent = text; }
-  function renderAuto() {
-    $("set-auto").checked = Boolean(settings.auto);
-    const last = ls.get("dup-auto-last", 0);
-    if (autoBusy) return;
-    autoLine(!settings.auto ? "Desligado: use os botões abaixo." : !getToken() ? "Coloque o token para ele começar sozinho."
-      : last ? `Última procura às ${new Date(last).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}. A próxima vem sozinha em até 6 h (ou ao abrir o app).` : "Vai começar sozinho.");
-  }
-  async function autoCycle(force) {
-    if (autoBusy || busy || !settings.auto || !getToken()) return;
-    const last = ls.get("dup-auto-last", 0);
-    if (!force && last && Date.now() - last < AUTO_EVERY_MS && cat.progress && cat.progress.step === "pronto") return;
-    autoBusy = true;
-    $("auto-card").classList.add("on");
-    try {
-      const p = cat.progress;
-      const fullAge = p && p.finished ? Date.now() - p.finished : Infinity;
-      if (!cat.works.size || !p || p.step !== "pronto" || fullAge > FULL_EVERY_MS) {
-        autoLine(cat.works.size && p && p.step !== "pronto" ? "Continuando a leitura do catálogo de onde parou…" : "Lendo o catálogo inteiro da MediocreScan…");
-        if (p && p.step === "pronto") cat.progress = null;
-        if (!(await runTask("catalog", (r) => r.readCatalog(cat, saveCatalog)))) return;
-        // Sem a busca geral, as listas podem não mostrar tudo: completa buscando por letra (uma vez por leitura).
-        if (!(cat.progress && cat.progress.buscaOk) && (!cat.lettersDone || (cat.progress && cat.progress.finished && cat.lettersDone < cat.progress.finished))) {
-          autoLine("Completando o catálogo pela busca de cada letra…");
-          if (!(await runTask("letters", (r) => r.readLetters(cat, saveCatalog, cat.lettersNext)))) return;
-        }
-      } else {
-        autoLine("Procurando obras novas na MediocreScan…");
-        let novas = 0;
-        if (!(await runTask("recent", async (r) => { novas = await r.readRecent(cat, saveCatalog); }))) return;
-        if (novas) toast(`${fmt(novas)} obra(s) nova(s) no catálogo.`);
-      }
-      autoLine("Procurando duplicadas…");
-      find();
-      const sus = suspects().slice(0, AUTO_DETAILS_MAX);
-      if (sus.length) {
-        autoLine(`Conferindo ${fmt(sus.length)} suspeita(s) na API (nomes alternativos e sinopse)…`);
-        if (!(await runTask("details", (r) => r.readDetails(cat, sus, saveCatalog)))) return;
-        find();
-      }
-      ls.set("dup-auto-last", Date.now());
-      const n = result ? result.groups.length : 0;
-      toast(n ? `Procura automática: ${fmt(n)} grupo(s) de possíveis duplicadas.` : "Procura automática: nenhuma duplicada encontrada.");
-    } finally {
-      autoBusy = false;
-      $("auto-card").classList.remove("on");
-      renderAuto();
-    }
-  }
-  $("set-auto").onchange = () => { settings.auto = $("set-auto").checked; saveSettings(); renderAuto(); if (settings.auto) autoCycle(true); else if (reader) reader.stop(); };
-  $("auto-now").onclick = () => { if (!settings.auto) { settings.auto = true; saveSettings(); } autoCycle(true); };
-  setInterval(() => autoCycle(false), 60_000);
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") autoCycle(false); });
 
   /* ---------- Papel de parede: imagem da galeria, reduzida e guardada no celular ---------- */
   let wallUrl = null;
@@ -574,7 +748,7 @@
     $("wp-dim-v").textContent = `${settings.wpDim}%`; $("wp-blur-v").textContent = Number(settings.wpBlur) ? `${settings.wpBlur}` : "nada";
   }
   async function loadWall() {
-    let v = await store.get("wallpaper");
+    const v = await store.get("wallpaper");
     if (wallUrl) { URL.revokeObjectURL(wallUrl); wallUrl = null; }
     let src = null;
     if (v instanceof Blob) src = wallUrl = URL.createObjectURL(v);
@@ -594,13 +768,7 @@
     $("wp-file").value = "";
     if (!f) return;
     try {
-      const blob = await shrinkImage(f);
-      try { await store.set("wallpaper", blob); }
-      catch (_) {
-        // Sem IndexedDB: guarda como texto (pode não caber).
-        const data = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
-        ls.set("dup-wallpaper", data);
-      }
+      await store.set("wallpaper", await shrinkImage(f));
       await loadWall();
       toast("Papel de parede salvo.");
     } catch (e) { toast(e.message || "Não deu para usar essa imagem."); }
@@ -615,10 +783,8 @@
     renderToken();
     loadWall().catch(() => {});
     await loadCatalog();
-    renderCat();
-    renderAuto();
-    if (cat.works.size) find();
-    if (window.BM_VERSION) $("app-version").textContent = `Versão ${window.BM_VERSION} · pedidos pelo ${DupHttp ? "plugin nativo" : CapHttp ? "HTTP do Capacitor" : "navegador"}.`;
+    if (cat.works.size) find(); else renderPanel();
+    renderSettings();
     setTimeout(() => autoCycle(false), 1200);
   })();
 })();
