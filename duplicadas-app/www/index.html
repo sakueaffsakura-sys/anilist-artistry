@@ -47,6 +47,16 @@
         </div>
       </article>
 
+      <article id="auto-card" class="card auto">
+        <div class="auto-head">
+          <h2>Procurar sozinho</h2>
+          <label class="switch"><input id="set-auto" type="checkbox" /><span class="track" aria-hidden="true"></span><span class="sr">Procurar sozinho</span></label>
+        </div>
+        <p id="auto-text" class="note" role="status"></p>
+        <p class="note">Ao abrir o app (e a cada 6 h com ele aberto) lê o que falta do catálogo ou só as obras novas, procura as duplicadas e confere as suspeitas na API. Leitura completa de novo a cada 3 dias.</p>
+        <button id="auto-now" type="button" class="btn ghost small">Atualizar tudo agora</button>
+      </article>
+
       <article id="cat-card" class="card">
         <h2>Catálogo</h2>
         <p class="big"><strong id="cat-count">0</strong> <span>obras lidas</span></p>
@@ -98,6 +108,16 @@
           <textarea id="set-ignore" rows="3" placeholder="remake, temporada…"></textarea>
         </label>
         <p class="note">Já ignoradas: artigos, “manhwa”, “manga”, “novel”, “colorido”, “oficial”, “IA” e parecidas. Separe com vírgula.</p>
+        <div class="row tight">
+          <button id="diag-show" type="button" class="link">Ver diagnóstico</button>
+          <button id="diag-copy" type="button" class="link">Copiar diagnóstico</button>
+        </div>
+        <div id="diag" hidden>
+          <p class="note">Os últimos pedidos à MediocreScan: resposta, caminho, tempo e o começo do que ela devolveu. O token não aparece.</p>
+          <p id="diag-empty" class="note">Nenhum pedido ainda.</p>
+          <ol id="diag-list" class="diag"></ol>
+        </div>
+        <p id="app-version" class="note"></p>
         <div class="row">
           <button id="set-reset-dismissed" type="button" class="btn ghost small">Mostrar de novo as dispensadas</button>
           <button id="set-clear" type="button" class="btn ghost small danger">Apagar catálogo salvo</button>

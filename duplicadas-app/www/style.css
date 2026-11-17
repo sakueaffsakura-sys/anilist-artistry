@@ -171,6 +171,27 @@ main { padding: 14px 16px 0; max-width: 640px; margin: 0 auto; }
 .work .m { margin: 1px 0 0; font-size: 12.5px; color: var(--muted); }
 .work .dupe { margin-top: 4px; border: 0; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 800; background: var(--magenta-wash); color: #8e1f4d; }
 
+/* Procurar sozinho. */
+.auto-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.auto-head h2 { margin: 0; }
+.auto.on { border-color: var(--cyan); box-shadow: inset 4px 0 0 var(--cyan); }
+.auto .btn { margin-top: 10px; }
+.switch { position: relative; display: inline-block; width: 50px; height: 30px; flex: none; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.switch .track { position: absolute; inset: 0; border-radius: 15px; background: var(--line); transition: background 0.15s; pointer-events: none; }
+.switch .track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); transition: transform 0.15s; }
+.switch input:checked + .track { background: var(--ink); }
+.switch input:checked + .track::after { transform: translateX(20px); }
+.switch input:focus-visible + .track { outline: 3px solid var(--cyan); outline-offset: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Diagnóstico. */
+.diag { list-style: none; margin: 8px 0 0; padding: 0; }
+.diag li { padding: 7px 0 7px 10px; border-left: 3px solid #1a9d5b; border-bottom: 1px solid var(--line); }
+.diag li.bad { border-left-color: var(--magenta); }
+.d-h { margin: 0; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.d-h b { color: var(--ink); }
+.d-t { margin: 3px 0 0; font: 11.5px/1.35 ui-monospace, monospace; color: var(--ink); overflow-wrap: anywhere; }
+
 .toast {
   position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 10;
   padding: 12px 14px; border-radius: 8px; background: var(--ink); color: #fff; font-weight: 700; font-size: 14px;
