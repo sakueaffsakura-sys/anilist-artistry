@@ -6,8 +6,16 @@
  * outra ordem, título quase igual (erro de digitação), um título começando com o outro, palavras-chave raras em
  * comum (peso maior para palavras que quase nenhuma obra usa), mesma capa (arquivo ou imagem parecida, pelo
  * hash da capa) e sinopse igual ou parecida (quando os detalhes foram lidos). Obras com sinopses que dividem
- * várias palavras raras também viram candidatas, mesmo com títulos diferentes (outra língua, nome trocado). Números diferentes no título (2, II, temporada 3) e formatos diferentes (novel × quadrinho)
- * baixam a nota, porque costumam ser continuação ou adaptação, não cópia.
+ * várias palavras raras também viram candidatas, mesmo com títulos diferentes (outra língua, nome trocado).
+ *
+ * Para não errar (baixam a nota): números diferentes no título (2, II, temporada 3), formatos diferentes (novel ×
+ * quadrinho), marca de história paralela/especial ou de outra língua num título só, sinopses bem diferentes na mesma
+ * língua, autores diferentes e capas bem diferentes quando o título só é parecido. Sinopse e capa repetidas em
+ * muitas obras (texto ou imagem padrão) não contam. Pares fracos ("talvez") não juntam grupos.
+ *
+ * Também acha problemas de cada obra (findProblems): sinopse zuada (vazia, de enfeite, letras quebradas, link ou
+ * propaganda, outra língua, curta, cortada, repetida, igual à de outra obra) e capa quebrada (sem capa, não abre,
+ * não é imagem, arquivo estragado, vazia, pequena, deitada, imagem padrão).
  */
 (function (root) {
   "use strict";
@@ -28,6 +36,20 @@
   // Palavras de sequência: com número diferente costuma ser continuação.
   const SEQ_WORDS = new Set("season temporada temp parte part arco arc volume vol livro book capitulo capítulo chapter ato act fase".split(" ").map(fold));
   const ROMAN = { ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10, xi: 11, xii: 12 };
+  // Marca de história paralela/especial e de outra língua: com a marca num título só, costuma ser outra obra.
+  const SIDE_RE = /\b(side ?story|side ?stories|gaiden|spin ?off|one ?shot|after ?story|historias? paralelas?|especial|special|extras?|prequel|prequela|prologo|epilogo)\b/;
+  const LANG_MARK_RE = /\b(english|ingles|eng|espanol|spanish|en espanol|em espanhol)\b/;
+  // Palavras que só aparecem numa língua (para saber a língua da sinopse).
+  const LANG_WORDS = {
+    pt: "nao ele ela um uma para com em do da dos das ao aos voce sao tambem depois quando seu sua mas muito isso entao ate apos onde porem pelo pela dele dela seus suas nossa",
+    en: "the and of is his her with when after who that was but they this from into their has have will",
+    es: "los las del una un con en al lo pero cuando ella el y muy sus desde hasta donde tambien despues entonces nuestra",
+  };
+  const LANG_SETS = Object.fromEntries(Object.entries(LANG_WORDS).map(([k, v]) => [k, new Set(v.split(" "))]));
+  const LANG_NAME = { en: "inglês", es: "espanhol", ko: "coreano", ja: "japonês", zh: "chinês" };
+  // Capa (hash) ou sinopse usada por tantas obras ou mais é padrão ("sem capa", "sinopse em breve").
+  const PLACEHOLDER_MIN = 5;
+  const GENERIC_AUTHOR = /^(desconhecido|desconhecida|unknown|anonimo|autor|author|n a|na|nenhum|none|null|undefined|varios|various)$/;
   // Uma palavra usada por mais obras que isso não serve para achar candidatas (é comum demais).
   const MAX_BLOCK = 120;
   // Palavra "rara" (distintiva): usada por no máximo tantas obras.
@@ -65,7 +87,7 @@
   function kindClass(format) {
     const f = normalize(format);
     if (!f) return null;
-    return /novel/.test(f) ? "novel" : "comic";
+    return /novel/.test(f) ? "novel" : /ingles|english/.test(f) ? "comic-en" : "comic";
   }
   function coverKey(url) {
     if (typeof url !== "string" || !url) return null;
@@ -84,6 +106,54 @@
     for (let i = 0; i + 2 < words.length; i++) shingles.add(words[i] + " " + words[i + 1] + " " + words[i + 2]);
     out.shingles = shingles;
     return out;
+  }
+  /** Chave da sinopse inteira (para achar o mesmo texto em várias obras). */
+  function descKey(desc) {
+    const n = normalize(desc);
+    return n.length >= 40 ? n.slice(0, 300) : null;
+  }
+  /**
+   * Língua da sinopse: pt, en, es, ko, ja, zh ou null (não dá para saber). names: títulos da obra, que não contam
+   * (um título em inglês dentro de uma sinopse em português não a faz "inglesa").
+   */
+  function langOf(desc, names) {
+    if (typeof desc !== "string" || desc.length < 40) return null;
+    const letters = (desc.match(/\p{L}/gu) || []).length || 1;
+    const ko = (desc.match(/[\uAC00-\uD7AF\u1100-\u11FF]/g) || []).length;
+    const ja = (desc.match(/[\u3040-\u30FF]/g) || []).length;
+    const zh = (desc.match(/[\u4E00-\u9FFF]/g) || []).length;
+    if (ko / letters > 0.3) return "ko";
+    if ((ja + zh) / letters > 0.3) return ja > 0 ? "ja" : "zh";
+    let text = " " + normalize(desc) + " ";
+    for (const n of names || []) { const k = normalize(n); if (k.length >= 3) text = text.split(" " + k + " ").join(" "); }
+    const words = text.trim().split(" ");
+    if (words.length < 12) return null;
+    const hits = {};
+    for (const [k, set] of Object.entries(LANG_SETS)) hits[k] = words.reduce((n, w) => n + (set.has(w) ? 1 : 0), 0);
+    const order = Object.keys(hits).sort((a, b) => hits[b] - hits[a]);
+    const best = order[0], second = order[1];
+    return hits[best] >= 4 && hits[best] >= 2 * hits[second] ? best : null;
+  }
+  /** Autores e artistas da obra, normalizados (sem os genéricos como "desconhecido"). */
+  function authorSet(w) {
+    const out = new Set();
+    for (const a of Array.isArray(w.authors) ? w.authors : []) {
+      const n = normalize(a);
+      if (n.length >= 2 && !GENERIC_AUTHOR.test(n)) out.add(n);
+    }
+    return out;
+  }
+  /**
+   * Hash da capa que serve para comparar: imagem que abriu, não vazia (uma cor só, minúscula) e com desenho (hash de
+   * imagem lisa é quase todo zero e seria "igual" ao de qualquer outra capa vazia).
+   */
+  function usableHash(w) {
+    const h = w.coverHash;
+    if (typeof h !== "string" || !/^[0-9a-f]{16}$/.test(h)) return null;
+    const c = w.coverInfo;
+    if (c && (!c.ok || (c.std != null && c.std < 8) || (c.w && c.w <= 16) || (c.h && c.h <= 16))) return null;
+    const bits = hamming(h, "0000000000000000");
+    return bits < 4 || bits > 60 ? null : h;
   }
   /** Distância entre dois hashes de capa (16 caracteres hexadecimais = 64 bits). */
   function hamming(a, b) {
@@ -160,21 +230,31 @@
       const names = [analyze(w.title, ignore)].concat(alts.map((s) => analyze(s, ignore))).filter((n, k) => k === 0 || n.norm);
       const tokens = new Set();
       names.forEach((n) => n.tokens.forEach((t) => tokens.add(t)));
-      const hash = typeof w.coverHash === "string" && /^[0-9a-f]{16}$/.test(w.coverHash) ? w.coverHash : null;
-      return { i, w, names, main: names[0], tokens, kind: kindClass(w.format), cover: coverKey(w.cover), hash, desc: descWords(w.desc, ignore) };
+      const hash = usableHash(w);
+      const desc = descWords(w.desc, ignore);
+      return {
+        i, w, names, main: names[0], tokens, kind: kindClass(w.format), cover: coverKey(w.cover), hash, desc,
+        descKey: desc ? descKey(w.desc) : null, lang: desc ? langOf(w.desc, [w.title].concat(alts)) : null, authors: authorSet(w),
+        side: SIDE_RE.test(names[0].norm), langMark: LANG_MARK_RE.test(names[0].norm),
+      };
     });
   }
 
   function idfTable(prepared) {
-    const df = new Map(), ddf = new Map(), hdf = new Map();
+    const df = new Map(), ddf = new Map(), hdf = new Map(), dkc = new Map();
     for (const p of prepared) {
       for (const t of p.tokens) df.set(t, (df.get(t) || 0) + 1);
       if (p.desc) for (const t of p.desc) ddf.set(t, (ddf.get(t) || 0) + 1);
       if (p.hash) hdf.set(p.hash, (hdf.get(p.hash) || 0) + 1);
+      if (p.descKey) dkc.set(p.descKey, (dkc.get(p.descKey) || 0) + 1);
     }
     const n = prepared.length || 1;
-    // Capa usada por muitas obras é imagem padrão ("sem capa"): não conta.
-    return { df, ddf, hdf, idf: (t) => Math.log(1 + n / (df.get(t) || 1)), placeholder: (h) => (hdf.get(h) || 0) > 3 };
+    // Capa ou sinopse usada por muitas obras é padrão ("sem capa", "sinopse em breve"): não conta.
+    return {
+      df, ddf, hdf, dkc, idf: (t) => Math.log(1 + n / (df.get(t) || 1)),
+      placeholder: (h) => (hdf.get(h) || 0) >= PLACEHOLDER_MIN,
+      descOk: (p) => Boolean(p.desc) && (dkc.get(p.descKey) || 0) < 3,
+    };
   }
 
   /** Pares candidatos: obras que dividem uma palavra-chave não comum, a mesma capa ou o mesmo começo de título. */
@@ -202,7 +282,7 @@
     // Sinopses: as 10 palavras mais raras de cada uma (usadas por 2 a 40 obras); 3 ou mais em comum = candidatas.
     const dBuckets = new Map();
     for (const p of prepared) {
-      if (!p.desc) continue;
+      if (!table.descOk(p)) continue;
       const keys = Array.from(p.desc).filter((t) => { const d = table.ddf.get(t) || 0; return d >= 2 && d <= 40; })
         .sort((x, y) => (table.ddf.get(x) || 0) - (table.ddf.get(y) || 0)).slice(0, 10);
       for (const k of keys) { let l = dBuckets.get(k); if (!l) dBuckets.set(k, (l = [])); l.push(p.i); }
@@ -257,15 +337,18 @@
       const kw = (score) => sig(score, `Palavras-chave em comum: ${sorted.join(", ")}`);
       if (wj >= 0.8) kw(82); else if (wj >= 0.65 && shared.length >= 2) kw(70); else if (wj >= 0.5 && shared.length >= 2) kw(55);
     }
+    let coverDist = null;
     if (A.cover && A.cover === B.cover) sig(90, "Mesmo arquivo de capa");
     else if (A.hash && B.hash && !table.placeholder(A.hash) && !table.placeholder(B.hash)) {
-      const d = hamming(A.hash, B.hash);
-      if (d <= 5) sig(92, "Mesma imagem de capa");
-      else if (d <= 10) sig(72, "Capa muito parecida");
+      coverDist = hamming(A.hash, B.hash);
+      if (coverDist <= 5) sig(92, "Mesma imagem de capa");
+      else if (coverDist <= 10) sig(72, "Capa muito parecida");
     }
-    if (A.desc && B.desc) {
+    let descSim = null;
+    if (table.descOk(A) && table.descOk(B)) {
       const sh = A.desc.shingles.size && B.desc.shingles.size ? jaccard(A.desc.shingles, B.desc.shingles) : 0;
       const j = jaccard(A.desc, B.desc);
+      descSim = { sh, j };
       if (sh >= 0.7 || j >= 0.85) sig(96, "Mesma sinopse");
       else if (sh >= 0.4 || j >= 0.6) sig(88, `Sinopse quase igual (${Math.round(Math.max(sh, j) * 100)}%)`);
       else if (j >= 0.4) sig(70, `Sinopse parecida (${Math.round(j * 100)}%)`);
@@ -284,21 +367,53 @@
       notes.push(`Números diferentes no título (${A.main.seq || "nenhum"} × ${B.main.seq || "nenhum"}): pode ser continuação`);
     }
     if (A.kind && B.kind && A.kind !== B.kind) {
-      score -= 25;
-      notes.push(`Formatos diferentes (${A.w.format} × ${B.w.format}): pode ser adaptação`);
+      score -= 35;
+      notes.push(`Formatos diferentes (${A.w.format} × ${B.w.format}): pode ser adaptação ou outra edição`);
+    }
+    if (A.side !== B.side) {
+      score -= 20;
+      notes.push("Só um dos títulos tem marca de história paralela ou especial");
+    }
+    if (A.langMark !== B.langMark) {
+      score -= 20;
+      notes.push("Só um dos títulos tem marca de outra língua");
+    }
+    const exactName = bestName >= 95;
+    // Sinopses longas, na mesma língua e sem quase nada em comum: histórias diferentes.
+    if (descSim && descSim.sh === 0 && descSim.j < 0.06 && A.lang && A.lang === B.lang && A.desc.size >= 20 && B.desc.size >= 20) {
+      score -= exactName ? 15 : 25;
+      notes.push("Sinopses bem diferentes: podem ser histórias diferentes com nome parecido");
+    }
+    // Autores: iguais ajudam; diferentes (sem nenhuma palavra em comum) baixam a nota se o título não for o mesmo.
+    if (A.authors.size && B.authors.size) {
+      const same = Array.from(A.authors).find((x) => B.authors.has(x));
+      const words = (set) => new Set(Array.from(set).join(" ").split(" ").filter((x) => x.length > 2));
+      const wa = words(A.authors), wb = words(B.authors);
+      if (same) { score += 3; reasons.push(`Mesmo autor (${same})`); }
+      else if (!Array.from(wa).some((x) => wb.has(x))) {
+        if (!exactName) score -= 15;
+        notes.push(`Autores diferentes (${Array.from(A.authors)[0]} × ${Array.from(B.authors)[0]})`);
+      }
+    }
+    // Capas bem diferentes quando o título só é parecido (e a sinopse não confirma).
+    if (coverDist != null && coverDist >= 28 && bestName < 90 && !(descSim && (descSim.sh >= 0.4 || descSim.j >= 0.6))) {
+      score -= 8;
+      notes.push("Capas bem diferentes");
     }
     return { score: Math.max(0, Math.min(100, Math.round(score))), reasons, notes };
   }
 
   /**
-   * Qual manter: a mais completa (mais capítulos); empate, a que tem detalhes lidos; depois a mais antiga (menor ID).
-   * Devolve {id, why}.
+   * Qual manter: a mais completa (mais capítulos); empate, a sem problema grave de capa ou sinopse (bad: Set de IDs
+   * com problema); depois a que tem detalhes lidos; depois a mais antiga (menor ID). Devolve {id, why}.
    */
-  function keepOf(works) {
+  function keepOf(works, bad) {
+    const isBad = (w) => (bad instanceof Set && (bad.has(w.id) || bad.has(String(w.id))) ? 1 : 0);
     const ch = (w) => (Number.isFinite(Number(w.chapters)) && w.chapters != null ? Number(w.chapters) : -1);
-    const sorted = works.slice().sort((a, b) => ch(b) - ch(a) || (b.detailed ? 1 : 0) - (a.detailed ? 1 : 0) || Number(a.id) - Number(b.id));
+    const sorted = works.slice().sort((a, b) => ch(b) - ch(a) || isBad(a) - isBad(b) || (b.detailed ? 1 : 0) - (a.detailed ? 1 : 0) || Number(a.id) - Number(b.id));
     const best = sorted[0], second = sorted[1];
-    const why = ch(best) > (second ? ch(second) : -1) ? `mais capítulos (${ch(best)})` : "mais antiga no site";
+    const why = ch(best) > (second ? ch(second) : -1) ? `mais capítulos (${ch(best)})`
+      : second && !isBad(best) && isBad(second) ? "capa e sinopse sem problemas" : "mais antiga no site";
     return { id: best.id, why };
   }
 
@@ -329,14 +444,25 @@
       const r = scorePair(A, B, table);
       if (r && r.score >= min) pairs.push({ a: A.w, b: B.w, score: r.score, level: levelOf(r.score), reasons: r.reasons, notes: r.notes });
     }
-    // Grupos: obras ligadas por pares acima da nota mínima.
+    // Grupos: obras ligadas por pares de 70 ou mais. Um par "talvez" vira grupo à parte (não junta grupos: A≈B
+    // forte e B≈C fraco não põe C junto de A).
     const parent = new Map();
     const find = (x) => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
     const join = (x, y) => { for (const z of [x, y]) if (!parent.has(z)) parent.set(z, z); const rx = find(x), ry = find(y); if (rx !== ry) parent.set(rx, ry); };
-    for (const p of pairs) join(String(p.a.id), String(p.b.id));
+    const strong = (p) => p.score >= 70;
+    for (const p of pairs) if (strong(p)) join(String(p.a.id), String(p.b.id));
     const byRoot = new Map();
     for (const p of pairs) {
-      const r = find(String(p.a.id));
+      const a = String(p.a.id), b = String(p.b.id);
+      if (!strong(p) && parent.has(a) && parent.has(b) && find(a) === find(b)) {
+        // Par fraco dentro de um grupo forte: só entra como mais um motivo.
+        byRoot.get(find(a)) ? byRoot.get(find(a)).pairs.push(p) : null;
+        continue;
+      }
+      // Par fraco com uma ponta num grupo forte: um grupo só por obra de fora (o par com a nota maior).
+      const ra = parent.has(a) ? find(a) : null, rb = parent.has(b) ? find(b) : null;
+      const r = strong(p) ? find(a) : ra && !rb ? `fraco:${ra}:${b}` : rb && !ra ? `fraco:${rb}:${a}` : `fraco:${pairKey(a, b)}`;
+      if (!strong(p) && byRoot.has(r)) { if (byRoot.get(r).score >= p.score) continue; byRoot.delete(r); }
       let g = byRoot.get(r);
       if (!g) byRoot.set(r, (g = { works: new Map(), pairs: [], score: 0 }));
       g.works.set(String(p.a.id), p.a); g.works.set(String(p.b.id), p.b);
@@ -372,7 +498,164 @@
     return out.sort((x, y) => y.rank - x.rank || String(x.w.title).localeCompare(String(y.w.title))).map((x) => x.w);
   }
 
-  const api = { normalize, analyze, ignoreSet, similarity, hamming, keepOf, findDuplicates, search, levelOf, pairKey, FORMAT_WORDS };
+  /* ---------- Problemas de cada obra: sinopse zuada e capa quebrada ---------- */
+
+  const P_PLACEHOLDER = /^(sem (sinopse|descricao|resumo)( (disponivel|ainda|no momento))?|sinopse|descricao|resumo|em breve|sinopse em breve|em atualizacao|aguarde|indisponivel|nao (ha|tem|possui) (sinopse|descricao)( disponivel)?|null|undefined|none|nan|n a|tbd|tba|teste?|test|lorem ipsum.*|no (description|synopsis).*|coming soon|description|synopsis|sinopse nao disponivel|\?+)$/;
+  const P_MOJIBAKE = /Ã[\u00A0-\u00BF\u0152\u0153\u0160\u0161\u0178\u017D\u017E\u0192\u02C6\u02DC\u2013\u2014\u2018-\u2022\u2026\u2030\u2039\u203A\u20AC\u2122]|â€|Â[\u00A0-\u00BF]|\uFFFD/;
+  const P_QMARK = /\p{L}\?\p{L}/gu;
+  const P_ESCAPED = /&amp;(#?\w+);|&lt;\/?[a-z]+|\[\/?(b|i|u|url|img|color|size)(=[^\]]*)?\]/i;
+  const P_HTML = /<\/?(p|br|div|span|strong|em|b|i|a|ul|ol|li|h[1-6]|font)\b[^>]*>|&(nbsp|amp|quot|lt|gt|#\d+|#x[0-9a-f]+);/i;
+  const P_LINK = /https?:\/\/|www\.\S|discord\.(gg|com)|t\.me\/|wa\.me\/|bit\.ly|\b[\w-]+\.(com|net|org|io|xyz|site|online|top|cc|me)(\.br)?\b/i;
+  const P_ADS = /\b(pix|patreon|ko-?fi|apoia\.se|catarse|doacao|doacoes|apoie (o|a|nosso|nossa|a scan)|entre (no|em) nosso|siga (a|o|nosso|nossa)|leia (em|no|na) (nosso|nossa|site)|nosso (site|discord|grupo))\b/;
+  const P_CREDITS = /\b(traducao|tradutor|revisao|revisor|edicao|editor|creditos|cleaner|typesetter|redraw|qc|scan)\s*[:\-–]/;
+  const P_CUT_END = /(,|;|:|\s(e|de|da|do|das|dos|que|a|o|as|os|para|com|em|um|uma|no|na|por|se|mas|the|and|of|to|a))$/i;
+  const G = (code, text, extra) => Object.assign({ code, level: "grave", text }, extra || {});
+  const W = (code, text, extra) => Object.assign({ code, level: "aviso", text }, extra || {});
+
+  /** Problemas da sinopse de uma obra. ctx: dados do catálogo todo (ver findProblems). */
+  function descIssues(w, ctx) {
+    const raw = typeof w.desc === "string" ? w.desc : "";
+    const t = raw.replace(/\s+/g, " ").trim();
+    if (!t) {
+      // Só com os detalhes lidos dá para dizer que falta (e só se a API costuma mandar sinopse).
+      return w.detailed && (w.descField || ctx.descRate >= 0.5) ? [G("vazia", "Sem sinopse")] : [];
+    }
+    const out = [];
+    const n = normalize(t);
+    const letters = (t.match(/\p{L}/gu) || []).length;
+    if (!n) return [G("simbolos", `Sinopse só com símbolos (“${t.slice(0, 30)}”)`)];
+    if (P_PLACEHOLDER.test(n) || (t.length < 60 && /\b(sem sinopse|sinopse em breve|sem descricao)\b/.test(n))) return [G("enfeite", `Sinopse de enfeite (“${t.slice(0, 40)}”)`)];
+    const names = [w.title].concat(Array.isArray(w.alts) ? w.alts : []).map(normalize).filter(Boolean);
+    if (names.includes(n)) return [G("titulo", "A sinopse é só o título")];
+    if (P_MOJIBAKE.test(t) || (t.match(P_QMARK) || []).length >= 2) out.push(G("codificacao", "Letras quebradas (Ã©, â€™, n?o…)"));
+    if (P_ESCAPED.test(t) || (!ctx.htmlNormal && P_HTML.test(t))) out.push(G("codigo", "Restos de código na sinopse (HTML, &amp;…)"));
+    const folded = fold(t);
+    if (P_LINK.test(t) || P_ADS.test(folded)) out.push(G("link", "Link ou propaganda na sinopse"));
+    else if (P_CREDITS.test(folded)) out.push(W("creditos", "Créditos da scan na sinopse"));
+    const lang = langOf(t, names);
+    if (lang && lang !== "pt") out.push(W("idioma", `Sinopse em ${LANG_NAME[lang] || lang}`));
+    const words = n.split(" ").length;
+    if (t.length < 60 || words < 10) out.push(W("curta", `Sinopse curta demais (${words} palavra${words === 1 ? "" : "s"})`));
+    else if (w.detailed && !w.descCut && P_CUT_END.test(t)) out.push(W("cortada", "Sinopse parece cortada no meio"));
+    // Frase repetida (5+ palavras) ou texto colado duas vezes.
+    const sentences = t.split(/[.!?]+\s+/).map(normalize).filter((x) => x.split(" ").length >= 5);
+    if (sentences.length !== new Set(sentences).size) out.push(W("repetida", "Texto repetido na sinopse"));
+    if (letters >= 40) {
+      const upper = (t.match(/\p{Lu}/gu) || []).length;
+      if (upper / letters > 0.8) out.push(W("maiusculas", "Sinopse toda em maiúsculas"));
+    }
+    const odd = (t.match(/[^\p{L}\p{N}\s.,;:!?'"()\[\]\-–—…«»“”‘’\/%ºª°#&*+=]/gu) || []).length;
+    if (t.length >= 40 && odd / t.length > 0.12) out.push(W("simbolos", "Muitos símbolos estranhos na sinopse"));
+    // A mesma sinopse em outras obras (sem ser a mesma obra repetida nem continuação/adaptação).
+    const key = descKey(t);
+    const same = key ? (ctx.descIds.get(key) || []).filter((id) => String(id) !== String(w.id)) : [];
+    if (same.length) {
+      const family = (id) => {
+        const o = ctx.byId.get(String(id));
+        if (!o) return true;
+        if (ctx.groupOf.get(String(id)) && ctx.groupOf.get(String(id)) === ctx.groupOf.get(String(w.id))) return true;
+        const a = analyze(w.title, ctx.ignore), b = analyze(o.title, ctx.ignore);
+        return (a.core && a.core === b.core) || kindClass(w.format) !== kindClass(o.format) || (a.core && b.core && (a.core.startsWith(b.core) || b.core.startsWith(a.core)));
+      };
+      const strangers = same.filter((id) => !family(id));
+      if (strangers.length >= 2) out.push(G("padrao", `A mesma sinopse está em ${strangers.length + 1} obras diferentes (texto padrão)`, { refs: strangers.slice(0, 5) }));
+      else if (strangers.length === 1) out.push(G("copiada", "Sinopse igual à de outra obra (uma das duas está errada)", { refs: strangers }));
+    }
+    return out;
+  }
+
+  /** Problemas da capa de uma obra (w.coverInfo vem da conferência: {s, t, b, w, h, std, ok, err}). */
+  function coverIssues(w, ctx) {
+    if (!w.cover) return ctx.coverRate >= 0.5 ? [G("sem-capa", "Sem capa")] : [];
+    const c = w.coverInfo;
+    if (!c) return [];
+    if (c.s === -1) return [W("fora", `Capa guardada fora da MediocreScan (${c.err || "outro site"})`)];
+    if (c.s >= 400) return ctx.cdnBlocked ? [] : [G("nao-abre", `Capa não abre (erro ${c.s})`)];
+    if (!c.s) return ctx.cdnBlocked ? [] : [G("sem-resposta", "Capa não respondeu (3 tentativas)")];
+    if (!c.ok && c.t && !/^image\//i.test(c.t)) return [G("nao-imagem", `O endereço da capa devolve ${String(c.t).split(";")[0]}, não uma imagem`)];
+    if (!c.ok && c.err && /grande demais/.test(c.err)) return [W("enorme", "Capa enorme (mais de 8 MB)")];
+    if (!c.ok) return [G("estragada", "Arquivo da capa estragado (não abre como imagem)")];
+    const out = [];
+    if (c.w <= 16 || c.h <= 16) out.push(G("vazia", `Capa vazia (${c.w}×${c.h} px)`));
+    else if (c.std != null && c.std < 3) out.push(G("uma-cor", "Capa vazia (uma cor só)"));
+    else {
+      if (c.w < 150 || c.h < 200) out.push(W("pequena", `Capa pequena demais (${c.w}×${c.h} px)`));
+      if (c.std != null && c.std < 8) out.push(W("apagada", "Capa quase sem imagem (quase uma cor só)"));
+      if (c.w > c.h * 1.15) out.push(W("deitada", `Capa deitada (${c.w}×${c.h} px): parece banner`));
+    }
+    const same = w.coverHash ? (ctx.hashIds.get(w.coverHash) || []) : [];
+    if (same.length >= PLACEHOLDER_MIN) {
+      const cores = new Set(same.map((id) => { const o = ctx.byId.get(String(id)); return o ? analyze(o.title, ctx.ignore).core : ""; }));
+      if (cores.size > 1) out.push(G("padrao", `Capa padrão (a mesma imagem em ${same.length} obras)`));
+    }
+    return out;
+  }
+
+  /**
+   * Problemas de todas as obras. opts: {groups (de findDuplicates, para não acusar sinopse copiada entre cópias da
+   * mesma obra), ignore, ignored (Set de "id:desc" / "id:cover" dispensados)}.
+   * Devolve {items: [{w, kind: "desc"|"cover", issues, grave}], counts, warnings, ms}.
+   */
+  function findProblems(works, opts) {
+    const t0 = Date.now();
+    opts = opts || {};
+    const ignored = opts.ignored instanceof Set ? opts.ignored : new Set(opts.ignored || []);
+    const byId = new Map(), groupOf = new Map(), descIds = new Map(), hashIds = new Map();
+    let detailed = 0, withDesc = 0, withField = 0, html = 0, withCover = 0, checked = 0, failed = 0;
+    const fails = new Map();
+    for (const w of works) {
+      if (!w || w.id == null) continue;
+      byId.set(String(w.id), w);
+      if (w.detailed) { detailed++; if (w.desc) withDesc++; if (w.descField) withField++; }
+      if (w.desc) {
+        if (P_HTML.test(w.desc)) html++;
+        const k = descKey(w.desc);
+        if (k) { let l = descIds.get(k); if (!l) descIds.set(k, (l = [])); l.push(w.id); }
+      }
+      if (w.cover) withCover++;
+      if (w.coverInfo) {
+        checked++;
+        const s = w.coverInfo.s;
+        if (s >= 400 || s === 0) { failed++; fails.set(s, (fails.get(s) || 0) + 1); }
+      }
+      if (w.coverHash && w.coverInfo && w.coverInfo.ok) { let l = hashIds.get(w.coverHash); if (!l) hashIds.set(w.coverHash, (l = [])); l.push(w.id); }
+    }
+    (opts.groups || []).forEach((g) => g.works.forEach((w) => groupOf.set(String(w.id), g.key)));
+    const descCount = Array.from(byId.values()).filter((w) => w.desc).length;
+    const ctx = {
+      byId, groupOf, descIds, hashIds, ignore: ignoreSet(opts.ignore),
+      descRate: detailed ? withDesc / detailed : 0,
+      htmlNormal: descCount >= 20 && html / descCount > 0.2,
+      coverRate: byId.size ? withCover / byId.size : 0,
+      cdnBlocked: checked >= 20 && failed / checked >= 0.6,
+    };
+    void withField;
+    const warnings = [];
+    if (ctx.cdnBlocked) {
+      const top = Array.from(fails.entries()).sort((a, b) => b[1] - a[1])[0];
+      warnings.push(`A maioria das capas não abriu (${top && top[0] ? `erro ${top[0]}` : "sem resposta"} em ${failed} de ${checked}). Parece bloqueio do servidor de imagens, não capa quebrada: essas não entram na lista. Veja o Diagnóstico em Ajustes.`);
+    }
+    if (detailed >= 30 && ctx.descRate < 0.5) warnings.push("A maioria das obras veio sem sinopse nos detalhes: o app não acusa \"Sem sinopse\" (pode ser o jeito da API responder).");
+    const items = [];
+    const counts = { desc: 0, cover: 0, grave: 0, descChecked: 0, coverChecked: checked, total: byId.size };
+    for (const w of byId.values()) {
+      if (w.detailed || w.desc) counts.descChecked++;
+      if (!w.cover) counts.coverChecked++;
+      for (const [kind, fn] of [["desc", descIssues], ["cover", coverIssues]]) {
+        const issues = fn(w, ctx);
+        if (!issues.length || ignored.has(`${w.id}:${kind}`)) continue;
+        issues.sort((a, b) => (a.level === b.level ? 0 : a.level === "grave" ? -1 : 1));
+        const grave = issues.some((x) => x.level === "grave");
+        items.push({ w, kind, issues, grave, key: `${w.id}:${kind}` });
+        counts[kind]++;
+        if (grave) counts.grave++;
+      }
+    }
+    items.sort((a, b) => (b.grave ? 1 : 0) - (a.grave ? 1 : 0) || Number(b.w.id) - Number(a.w.id));
+    return { items, counts, warnings, ms: Date.now() - t0 };
+  }
+
+  const api = { normalize, analyze, ignoreSet, similarity, hamming, keepOf, findDuplicates, search, levelOf, pairKey, langOf, descIssues, coverIssues, findProblems, FORMAT_WORDS };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.Dup = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

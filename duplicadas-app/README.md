@@ -1,6 +1,7 @@
 # Duplicadas (app Android)
 
-App separado do Estúdio que só procura **obras duplicadas na MediocreScan**. Não envia nada ao site.
+App separado do Estúdio que procura **obras duplicadas na MediocreScan** e aponta **sinopses zuadas e capas
+quebradas** (aba Problemas). Não envia nada ao site.
 
 - **Pedidos (1.3+):** no celular passam pelo plugin nativo `DupHttp` (`android-src/DupHttpPlugin.java`, o mesmo
   caminho do Estúdio: HttpURLConnection sem o User-Agent do navegador, só para `https://api.mediocretoons.net/`). A
@@ -8,13 +9,15 @@ App separado do Estúdio que só procura **obras duplicadas na MediocreScan**. N
   navegador, no `fetch`. Ajustes → "Ver diagnóstico" mostra os últimos 20 pedidos (status, caminho, tempo, via e o
   começo da resposta; nunca o token) e "Copiar diagnóstico" copia para mandar.
 - **Procurar sozinho (padrão ligado, em 4 etapas):** ao abrir o app, ao salvar o token, quando a internet
-  volta e no horário marcado (`dup-auto-next`: 15 min se a leitura parou no meio ou faltam detalhes, senão 6 h; 30 min
-  depois de um erro). 1) Catálogo: continua a leitura parada (ou relê tudo a cada 3 dias), senão só lê o começo das
+  volta e no horário marcado (`dup-auto-next`: 15 min se a leitura parou no meio ou faltam capas ou detalhes, senão
+  6 h; 30 min depois de um erro). 1) Catálogo: continua a leitura parada (ou relê tudo a cada 3 dias), senão só lê o começo das
   listas até repetir (`readRecent`); se a busca geral não serviu, completa pela busca por letra. 2) Suspeitas: lê os
-  detalhes de até 400 obras dos grupos. 3) Capas: baixa a capa das suspeitas do CDN (`DupHttp` com `binary`, 1,2 s
-  entre imagens) e guarda o dHash de 64 bits (`coverHash`). 4) Detalhes: lê os detalhes de mais 250 obras ainda sem
-  detalhes (as mais novas primeiro) até completar o catálogo; "Detalhes por procura" e os interruptores ficam em
-  Ajustes → Automação. Cada procura entra no Histórico (`dup-history`); grupos ainda não vistos aparecem em "Novas"
+  detalhes de até 400 obras dos grupos. 3) Capas: confere as capas das suspeitas e mais 300 de todas por procura (as
+  mais novas primeiro; "Capas por procura"). O plugin `DupHttp.cover` baixa a imagem (só da MediocreScan, sem o token,
+  com Referer do site, até 8 MB), abre no Android e devolve só status, tipo, bytes, largura, altura, variação de
+  brilho e o dHash de 64 bits (`coverInfo`, `coverHash`); 0,8 s entre capas; sem resposta tenta de novo nas próximas
+  procuras e só na 3ª vez registra. 4) Detalhes: sinopse, nomes alternativos e autores de mais 250 obras ainda sem
+  detalhes (as mais novas primeiro) até completar o catálogo. Os interruptores ficam em Ajustes → Automação. Cada procura entra no Histórico (`dup-history`); grupos ainda não vistos aparecem em "Novas"
   (`dup-seen`).
 - **Token:** o dono cola o token da API na tela (fica só no celular, em `localStorage`, nunca no repositório).
   "Testar token" lê a primeira página das atualizadas.
@@ -35,8 +38,25 @@ App separado do Estúdio que só procura **obras duplicadas na MediocreScan**. N
   padrão e não conta), sinopse igual/quase igual (trechos de 3 palavras e palavras em comum; obras com 3+ palavras
   raras da sinopse em comum também são comparadas) e número de capítulos parecido. Números diferentes no título (2,
   II, temporada 3) e formatos diferentes (novel × quadrinho) baixam a nota. Notas: 90+ certeza alta, 70+ provável,
-  55+ talvez. Cada grupo sugere qual manter (`keepOf`: mais capítulos, depois a mais antiga no site). "Não é
-  duplicada" guarda os pares dispensados no celular.
+  55+ talvez. Cada grupo sugere qual manter (`keepOf`: mais capítulos, depois a sem problema grave de capa ou
+  sinopse, depois a mais antiga no site). "Não é duplicada" guarda os pares dispensados no celular.
+- **Precisão (pedido do dono):** baixam a nota: formatos diferentes (−35, novel × quadrinho fica em "talvez"), marca
+  de história paralela/especial ou de outra língua num título só (−20), sinopses longas na mesma língua sem quase
+  nada em comum (−15 com o mesmo título, −25 com título parecido), autores sem nenhuma palavra em comum (−15 se o
+  título não for o mesmo; só aviso se for) e capas bem diferentes quando só o título é parecido (−8). Mesmo autor
+  soma 3. Sinopse repetida em 3+ obras (texto padrão) e capa vazia, lisa ou padrão não contam como sinal. Grupos só
+  juntam pares de 70+; um par "talvez" vira grupo à parte (um por obra de fora), sem encadear grupos.
+- **Problemas** (`findProblems` em `www/dup.js`): sinopse (só das obras com detalhes ou com sinopse na lista):
+  vazia, de enfeite ("sem sinopse", "em breve"…), só símbolos, igual ao título, letras quebradas (Ã©, â€™, n?o),
+  restos de código (entidades escapadas, BBCode; tags HTML só se menos de 20 % das sinopses usam HTML), link ou
+  propaganda, créditos da scan, outra língua (inglês, espanhol, coreano, japonês, chinês; o título não conta), curta,
+  cortada no meio, frase repetida, toda em maiúsculas, muitos símbolos, igual à de outra obra (sem ser cópia da mesma
+  obra, continuação ou adaptação) ou texto padrão em 3+ obras. Capa: sem capa, não abre (4xx/5xx), sem resposta
+  (3 tentativas), devolve página em vez de imagem, arquivo estragado, vazia (≤ 16 px ou uma cor só), pequena
+  (< 150×200), quase sem imagem, deitada (banner), enorme (> 8 MB), fora da MediocreScan e imagem padrão em 5+ obras
+  de títulos diferentes. Para não acusar à toa: se 60 %+ das capas conferidas falham, é bloqueio do servidor e vira
+  aviso; se a maioria das obras com detalhes vem sem sinopse, "Sem sinopse" não é acusado. "Conferir de novo" relê
+  a obra; "Ignorar" guarda no celular (`dup-ok`).
 - **Links (1.6+, pedido do dono):** cada obra mostra o link `https://mediocrescan.com/obra/{id}` (toque abre no
   navegador); "Copiar links" e o relatório levam título + link; os filtros aceitam um link colado.
 - **Tema preto e papel de parede (1.8+, pedido do dono):** fundo preto (também nas barras do Android, via
@@ -46,7 +66,8 @@ App separado do Estúdio que só procura **obras duplicadas na MediocreScan**. N
 - **Telas:** navegação embaixo. Painel (token no primeiro uso, cartão da procura automática com as 4 etapas e o
   andamento, números, níveis, novas desde a última vez, histórico e ferramentas manuais), Duplicadas (2 obras lado a
   lado com capa, link e "Manter"; 3+ uma por linha; motivos em etiquetas; filtros Todas/Novas/níveis; ordenar por
-  nota, novas, obras ou capítulos; copiar links e relatório), Catálogo (busca por palavra-chave) e Ajustes (token,
-  automação, análise, papel de parede, diagnóstico e dados).
+  nota, novas, obras ou capítulos; copiar links e relatório), Problemas (filtros Todos/Graves/Sinopse/Capa, trecho da
+  sinopse, medidas da capa, conferir de novo, ignorar, relatório), Catálogo (busca por palavra-chave, com etiqueta de
+  duplicada e de problema) e Ajustes (token, automação, análise, papel de parede, diagnóstico e dados).
 - **Build:** `.github/workflows/duplicadas-apk.yml` (Capacitor 7, plugin `DupHttp`, tela acesa) publica
   `duplicadas.apk` na release `duplicadas-apk`, assinado com a mesma chave do Estúdio.

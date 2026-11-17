@@ -67,6 +67,14 @@
         <button type="button" class="lvl talvez" data-go="talvez"><strong id="n-talvez">0</strong><span>Talvez</span></button>
       </div>
 
+      <article class="card probs-card">
+        <div class="card-h"><h2>Problemas</h2><button id="pr-grave" type="button" class="link" data-gp="graves" hidden></button></div>
+        <div class="probs">
+          <button type="button" class="pbtn" data-gp="desc"><strong id="pr-desc">0</strong><span>sinopses zuadas</span><small id="pr-desc-sub"></small></button>
+          <button type="button" class="pbtn" data-gp="cover"><strong id="pr-cover">0</strong><span>capas quebradas</span><small id="pr-cover-sub"></small></button>
+        </div>
+      </article>
+
       <article id="news" class="card" hidden>
         <div class="card-h"><h2>Novas desde a última vez</h2><button id="news-all" type="button" class="link">Ver todas</button></div>
         <ol id="news-list" class="mini"></ol>
@@ -86,7 +94,7 @@
           <button id="cat-letters" type="button" class="btn ghost small">Completar buscando por letras</button>
           <button id="find-run" type="button" class="btn ghost small">Procurar agora (sem pedidos)</button>
           <button id="deep-run" type="button" class="btn ghost small">Conferir as suspeitas</button>
-          <button id="cover-run" type="button" class="btn ghost small">Comparar as capas das suspeitas</button>
+          <button id="cover-run" type="button" class="btn ghost small">Conferir capas agora</button>
         </div>
         <p id="find-meta" class="note"></p>
       </details>
@@ -117,6 +125,26 @@
       <ol id="g-list" class="groups"></ol>
       <button id="g-more" type="button" class="btn ghost wide" hidden>Mostrar mais</button>
       <p id="g-empty" class="empty" hidden></p>
+    </section>
+
+    <!-- Problemas: sinopses zuadas e capas quebradas. -->
+    <section id="v-problemas" class="view" hidden>
+      <div class="filters pfilters" role="group" aria-label="Filtrar problemas">
+        <button type="button" class="chip" data-p="todas" aria-pressed="true">Todos</button>
+        <button type="button" class="chip" data-p="graves" aria-pressed="false">Graves</button>
+        <button type="button" class="chip" data-p="desc" aria-pressed="false">Sinopse</button>
+        <button type="button" class="chip" data-p="cover" aria-pressed="false">Capa</button>
+      </div>
+      <input id="p-q" class="search" type="search" placeholder="Título, ID ou link" />
+      <div id="p-warn" class="warn-box" hidden></div>
+      <p id="p-cover-meta" class="note"></p>
+      <div class="row tight">
+        <p id="p-meta" class="note grow"></p>
+        <button id="p-copy" type="button" class="link">Copiar relatório</button>
+      </div>
+      <ol id="p-list" class="problems"></ol>
+      <button id="p-more" type="button" class="btn ghost wide" hidden>Mostrar mais</button>
+      <p id="p-empty" class="empty" hidden></p>
     </section>
 
     <!-- Catálogo: busca por palavra-chave em todas as obras lidas. -->
@@ -162,9 +190,12 @@
           <input id="set-deep-n" type="number" inputmode="numeric" min="20" max="2000" step="10" />
         </label>
         <div class="set-line">
-          <div><strong>Comparar as capas das suspeitas</strong><span>Baixa a capa das obras suspeitas e acha a mesma imagem com outro nome de arquivo.</span></div>
-          <label class="switch"><input id="set-covers" type="checkbox" /><span class="track" aria-hidden="true"></span><span class="sr">Comparar as capas</span></label>
+          <div><strong>Conferir as capas de todas as obras</strong><span>Abre cada capa: acha capa quebrada, vazia ou padrão e a mesma imagem com outro nome de arquivo. Começa pelas suspeitas e confere um pouco a cada procura.</span></div>
+          <label class="switch"><input id="set-covers" type="checkbox" /><span class="track" aria-hidden="true"></span><span class="sr">Conferir as capas</span></label>
         </div>
+        <label class="field">Capas por procura
+          <input id="set-cover-n" type="number" inputmode="numeric" min="20" max="3000" step="10" />
+        </label>
         <label class="field">Intervalo entre pedidos (segundos)
           <input id="set-gap" type="number" inputmode="decimal" min="1" max="60" step="0.5" />
         </label>
@@ -184,7 +215,10 @@
           <textarea id="set-ignore" rows="3" placeholder="remake, temporada…"></textarea>
         </label>
         <p class="note">Já ignoradas: artigos, “manhwa”, “manga”, “novel”, “colorido”, “oficial”, “IA” e parecidas. Separe com vírgula.</p>
-        <button id="set-reset-dismissed" type="button" class="btn ghost small">Mostrar de novo as dispensadas</button>
+        <div class="row tight">
+          <button id="set-reset-dismissed" type="button" class="btn ghost small">Mostrar de novo as dispensadas</button>
+          <button id="set-reset-ok" type="button" class="btn ghost small">Mostrar de novo os problemas ignorados</button>
+        </div>
       </article>
 
       <article id="wp-card" class="card">
@@ -231,6 +265,10 @@
     <button type="button" data-tab="grupos">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="11" height="13" rx="2" /><rect x="10" y="4" width="11" height="13" rx="2" /></svg>
       <span>Duplicadas</span><b id="tab-count" class="count" hidden></b>
+    </button>
+    <button type="button" data-tab="problemas">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3z" /><path d="M12 10v4.5" /><circle cx="12" cy="17.3" r="0.6" /></svg>
+      <span>Problemas</span><b id="tab-prob" class="count" hidden></b>
     </button>
     <button type="button" data-tab="catalogo">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5" /></svg>

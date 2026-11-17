@@ -64,7 +64,7 @@ main { padding: 14px 16px 0; max-width: 640px; margin: 0 auto; }
 /* Navegação embaixo. */
 .bottom {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 8;
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
   padding: 0 4px env(safe-area-inset-bottom);
   background: rgba(0, 0, 0, 0.88); border-top: 1px solid var(--line);
   -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
@@ -72,8 +72,9 @@ main { padding: 14px 16px 0; max-width: 640px; margin: 0 auto; }
 .bottom button {
   position: relative; height: var(--nav); border: 0; background: none; color: var(--muted);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  font-size: 11.5px; font-weight: 700;
+  font-size: 10.5px; font-weight: 700;
 }
+.bottom button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-stretch: 82%; letter-spacing: -0.1px; }
 .bottom svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .bottom button[aria-current="page"] { color: var(--ink); }
 .bottom button[aria-current="page"]::before {
@@ -158,6 +159,17 @@ main { padding: 14px 16px 0; max-width: 640px; margin: 0 auto; }
 .lvl.alta { background: var(--magenta-wash); color: var(--magenta-ink); }
 .lvl.provavel { background: var(--cyan-wash); color: var(--cyan-ink); }
 .lvl.talvez { background: var(--yellow-wash); color: var(--yellow-ink); }
+
+/* Problemas no painel: sinopses e capas. */
+.probs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.pbtn {
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: rgba(255, 255, 255, 0.03);
+  text-align: left; display: flex; flex-direction: column; gap: 2px; min-width: 0;
+}
+.pbtn strong { font-size: 28px; font-weight: 900; font-stretch: 70%; line-height: 1; font-variant-numeric: tabular-nums; }
+.pbtn span { font-size: 12.5px; font-weight: 800; }
+.pbtn small { font-size: 11.5px; color: var(--muted); }
+#pr-grave { color: var(--magenta-ink); padding: 2px 0; font-size: 13px; }
 
 /* Novidades e histórico. */
 .mini, .hist { list-style: none; margin: 8px 0 0; padding: 0; }
@@ -261,12 +273,44 @@ main { padding: 14px 16px 0; max-width: 640px; margin: 0 auto; }
 .g-acts { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .empty { margin: 24px 0; text-align: center; color: var(--muted); }
 
+/* Problemas: uma obra por cartão, com o que está errado. */
+.problems { list-style: none; margin: 0; padding: 0; }
+.prob-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 12px; border-left: 6px solid var(--yellow); }
+.prob-card.grave { border-left-color: var(--magenta); }
+.prob-card + .prob-card { margin-top: 10px; }
+.has-wall .prob-card { -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.p-top { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 10px; align-items: start; }
+.pcover { display: block; width: 52px; height: 74px; border-radius: 5px; object-fit: cover; background: var(--line); }
+.p-head { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+.kind { padding: 1px 7px; border-radius: 5px; background: rgba(255, 255, 255, 0.08); font-size: 11.5px; font-weight: 800; }
+.grave-tag { padding: 1px 7px; border-radius: 5px; background: var(--magenta-wash); color: var(--magenta-ink); font-size: 11.5px; font-weight: 800; }
+.issues { list-style: none; margin: 10px 0 0; padding: 0; font-size: 13.5px; }
+.issues li { position: relative; padding: 2px 0 2px 16px; overflow-wrap: anywhere; }
+.issues li::before { content: ""; position: absolute; left: 2px; top: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--yellow); }
+.issues li.grave { font-weight: 700; }
+.issues li.grave::before { background: var(--magenta); }
+.issues .ref .lnk { font-size: 13px; }
+.snip {
+  margin: 8px 0 0; padding: 8px 10px; border-left: 3px solid var(--line); border-radius: 0 6px 6px 0; background: rgba(255, 255, 255, 0.04);
+  font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; white-space: pre-line;
+}
+.prob-card > .m { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+.prob-card .g-acts { gap: 6px; }
+.prob-card .g-acts .btn.small { padding: 0 10px; font-size: 12.5px; }
+.ph.wcover, .ph.pcover { display: grid; }
+.warn-box { padding: 10px 12px; border-radius: 8px; background: var(--yellow-wash); color: var(--yellow-ink); font-size: 13px; font-weight: 700; }
+.warn-box p { margin: 0; }
+.warn-box p + p { margin-top: 6px; }
+
 /* Catálogo. */
 .work { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .work img, .work .ph { width: 44px; height: 62px; border-radius: 4px; object-fit: cover; display: block; }
 .work .t { margin: 0; font-weight: 800; overflow-wrap: anywhere; }
 .work .m { margin: 1px 0 0; font-size: 12.5px; color: var(--muted); }
-.work .dupe { margin-top: 4px; border: 0; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 800; background: var(--magenta-wash); color: var(--magenta-ink); }
+.work .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.work .dupe { border: 0; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 800; background: var(--magenta-wash); color: var(--magenta-ink); }
+.work .dupe.prob { background: var(--yellow-wash); color: var(--yellow-ink); }
+.work .dupe.prob.grave { background: rgba(255, 255, 255, 0.08); color: var(--magenta-ink); }
 
 /* Interruptor. */
 .switch { position: relative; display: inline-block; width: 50px; height: 30px; flex: none; }
