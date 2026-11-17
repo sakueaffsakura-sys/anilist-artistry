@@ -348,7 +348,9 @@
   $("g-q").oninput = () => { gShown = PAGE; renderGroups(); };
   function filteredGroups() {
     if (!result) return [];
-    const q = Dup.normalize($("g-q").value);
+    // Link colado (mediocrescan.com/obra/123) vale como o ID.
+    const raw = $("g-q").value, fromLink = /obra\/(\d+)/.exec(raw);
+    const q = fromLink ? fromLink[1] : Dup.normalize(raw);
     return result.groups.filter((g) => (gFilter === "todas" || g.level === gFilter) && (!q || g.works.some((w) => String(w.id) === q || Dup.normalize([w.title].concat(w.alts || []).join(" ")).includes(q))));
   }
   function el(tag, props, ...kids) {
@@ -365,9 +367,16 @@
     }
     return el("span", { className: "ph", style, text: (w.title || "?").slice(0, 1) });
   }
+  /** Link da obra no site da MediocreScan (o dono quer o link, não só o ID). */
+  const OBRA_URL = "https://mediocrescan.com/obra/";
+  const workUrl = (w) => OBRA_URL + encodeURIComponent(String(w.id));
+  function linkEl(w) {
+    // Link comum (sem target): o app abre no navegador do celular.
+    return el("a", { className: "lnk", href: workUrl(w), rel: "noopener", text: workUrl(w).replace(/^https:\/\//, "") });
+  }
   function meta(w) {
     const full = cat.works.get(w.id) || w;
-    return [`#${full.id}`, full.format, full.chapters != null ? `${fmt(full.chapters)} cap.` : null, full.status].filter(Boolean).join(" · ");
+    return [full.format, full.chapters != null ? `${fmt(full.chapters)} cap.` : null, full.status].filter(Boolean).join(" · ");
   }
   function groupCard(g) {
     const li = el("li", { className: `group ${g.level}` });
@@ -381,7 +390,8 @@
     for (const w of g.works) {
       const full = cat.works.get(w.id) || w;
       const alts = (full.alts || []).slice(0, 3).join(" · ");
-      ol.append(el("li", {}, el("div", {}, el("p", { className: "t", text: full.title }), el("p", { className: "m", text: meta(full) }), alts ? el("p", { className: "m", text: `Também: ${alts}` }) : null)));
+      const m = meta(full);
+      ol.append(el("li", {}, el("div", {}, el("p", { className: "t", text: full.title }), linkEl(full), m ? el("p", { className: "m", text: m }) : null, alts ? el("p", { className: "m", text: `Também: ${alts}` }) : null)));
     }
     li.append(ol);
     const why = el("ul", { className: "why" });
@@ -392,8 +402,8 @@
       for (const n of p.notes) why.append(el("li", { className: "warn" }, tag ? tag.cloneNode(true) : null, n + "."));
     }
     li.append(why);
-    const copy = el("button", { type: "button", className: "btn ghost small", text: "Copiar IDs" });
-    copy.onclick = () => copyText(g.works.map((w) => `${w.id} — ${(cat.works.get(w.id) || w).title}`).join("\n"), "IDs copiados.");
+    const copy = el("button", { type: "button", className: "btn ghost small", text: "Copiar links" });
+    copy.onclick = () => copyText(g.works.map((w) => `${(cat.works.get(w.id) || w).title}\n${workUrl(w)}`).join("\n\n"), "Links copiados.");
     const no = el("button", { type: "button", className: "btn ghost small", text: "Não é duplicada" });
     no.onclick = () => {
       const keys = g.pairs.map((p) => Dup.pairKey(String(p.a.id), String(p.b.id)));
@@ -421,7 +431,7 @@
     const lines = [`Duplicadas da MediocreScan — ${new Date().toLocaleString("pt-BR")}`, `${gs.length} grupo(s) em ${cat.works.size} obras`, ""];
     gs.forEach((g, i) => {
       lines.push(`${i + 1}. ${LEVEL_NAME[g.level]} (${g.score})`);
-      g.works.forEach((w) => lines.push(`   ${w.id} — ${(cat.works.get(w.id) || w).title}`));
+      g.works.forEach((w) => lines.push(`   ${(cat.works.get(w.id) || w).title} — ${workUrl(w)}`));
       lines.push(`   Por quê: ${g.pairs[0].reasons.join("; ")}${g.pairs[0].notes.length ? ` | ${g.pairs[0].notes.join("; ")}` : ""}`);
       lines.push("");
     });
@@ -439,7 +449,8 @@
   $("c-q").oninput = () => { cShown = 50; renderCatalog(); };
   function groupOf(id) { return result ? result.groups.find((g) => g.works.some((w) => w.id === id)) : null; }
   function renderCatalog() {
-    const q = $("c-q").value.trim();
+    const typed = $("c-q").value.trim(), fromLink = /obra\/(\d+)/.exec(typed);
+    const q = fromLink ? fromLink[1] : typed;
     const all = Array.from(cat.works.values());
     const list = $("c-list");
     list.innerHTML = "";
@@ -450,7 +461,8 @@
       const g = groupOf(w.id);
       const dupe = g ? el("button", { type: "button", className: "dupe", text: `${LEVEL_NAME[g.level]}: ${g.works.length} obras parecidas` }) : null;
       if (dupe) dupe.onclick = () => { setFilter("todas"); $("g-q").value = String(w.id); showTab("grupos"); };
-      list.append(el("li", { className: "work" }, cover(w), el("div", {}, el("p", { className: "t", text: w.title }), el("p", { className: "m", text: meta(w) }),
+      const m = meta(w);
+      list.append(el("li", { className: "work" }, cover(w), el("div", {}, el("p", { className: "t", text: w.title }), linkEl(w), m ? el("p", { className: "m", text: m }) : null,
         w.alts && w.alts.length ? el("p", { className: "m", text: `Também: ${w.alts.slice(0, 3).join(" · ")}` }) : null, dupe)));
     });
     $("c-more").hidden = hits.length <= cShown;

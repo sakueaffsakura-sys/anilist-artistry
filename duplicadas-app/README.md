@@ -29,6 +29,8 @@ App separado do Estúdio que só procura **obras duplicadas na MediocreScan**. N
   igual/parecida e mesmo número de capítulos. Números diferentes no título (2, II, temporada 3) e formatos diferentes
   (novel × quadrinho) baixam a nota. Notas: 90+ certeza alta, 70+ provável, 55+ talvez. "Não é duplicada" guarda os
   pares dispensados no celular.
+- **Links (1.6+, pedido do dono):** cada obra mostra o link `https://mediocrescan.com/obra/{id}` (toque abre no
+  navegador); "Copiar links" e o relatório levam título + link; os filtros aceitam um link colado.
 - **Telas:** Análise (token, catálogo, procurar, conferir, ajustes), Duplicadas (grupos com motivos, filtros, copiar
   IDs e relatório) e Catálogo (busca por palavra-chave em todas as obras lidas).
 - **Build:** `.github/workflows/duplicadas-apk.yml` (Capacitor 7, HTTP nativo via `CapacitorHttp`, tela acesa) publica
