@@ -107,6 +107,8 @@
    Preto puro, laranja #f97316, cartões #111, fonte Inter, cantos grandes e selos sobre as capas; o brilho laranja
    só existe atrás do destaque da home. Botões em caixa normal; números no padrão brasileiro. */
 :root {
+  --translation-paper: #ffffff;
+  --translation-ink: #111111;
   --radius: 0.75rem;
   --page-max: 1560px;
   --page-pad: 32px;
@@ -458,7 +460,14 @@ mark.search-hit { background: color-mix(in oklab, var(--primary) 30%, transparen
 .admin-work-row img { border-radius: 4px; }
 .admin-work-info { flex-basis: calc(100% - 84px); }
 @media (min-width: 1280px) { .admin-work-info { flex-basis: 240px; } }
-.admin-body { min-height: calc(100dvh - 140px); }
+.admin-body { min-height: 0; }
+.admin-metrics .admin-stat { align-items: flex-start; flex-direction: column; gap: 12px; padding: 16px; }
+.admin-metrics .admin-stat-icon { background: var(--surface-2); color: var(--muted-foreground); }
+.admin-metrics .admin-stat:first-child .admin-stat-icon { background: color-mix(in oklab, var(--primary) 14%, transparent); color: var(--primary); }
+.admin-stat-value { overflow-wrap: anywhere; }
+.admin-import-form { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) { .admin-import-form { grid-template-columns: minmax(0, 1fr) minmax(180px, 230px) auto; } }
+@media (max-width: 639px) { .admin-import-form { grid-template-columns: minmax(0, 1fr) auto; } .admin-import-form > div:first-child { grid-column: 1 / -1; } .admin-metrics .admin-stat { padding: 12px; gap: 8px; } }
 .admin-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin: 0 24px; padding: 16px 0; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted-foreground); }
 .admin-clock { display: flex; align-items: center; gap: 8px; padding: 0 6px; font-size: 12px; font-weight: 600; }
 .admin-live-dot { width: 6px; height: 6px; border-radius: 999px; background: var(--new); }

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { BookMarked, BookPlus, ChevronDown, Headset, History, LogOut, Search, Shield, Trash2, User2 } from "lucide-react";
 import { WorkNotifications } from "@/components/WorkNotifications";
+import { CoinMenuItem } from "@/components/CoinMenuItem";
 import { supabase } from "@/integrations/supabase/client";
 import { MobileNav } from "@/components/MobileNav";
 import { openSupportChat } from "@/components/SupportChat";
@@ -31,7 +32,6 @@ const MORE = [
   { to: "/historico", label: "Histórico" },
   { to: "/listas", label: "Listas" },
   { to: "/ranking-leitores", label: "Leitores" },
-  { to: "/reels", label: "Reels" },
   { to: "/pedidos", label: "Pedir uma obra" },
 ] as const;
 
@@ -157,6 +157,7 @@ export function SiteHeader() {
                       <User2 className="h-4 w-4" /> Meu perfil
                     </Link>
                   </DropdownMenuItem>
+                  <CoinMenuItem />
                   <DropdownMenuItem asChild>
                     <Link to="/biblioteca" className="flex items-center gap-2">
                       <BookMarked className="h-4 w-4" /> Coleção
