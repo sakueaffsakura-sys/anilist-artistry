@@ -1,8 +1,9 @@
 import { Link } from "@tanstack/react-router";
 
-/** Formatos que a home mostra, na ordem das abas (cada aba filtra exatamente o formato gravado na obra). */
-export const HOME_FORMATS = ["Comic", "Comic2", "Shoujo", "Shoujo2", "Manga", "Yaoi", "Yuri", "Hentai", "English", "Novel"] as const;
-export type HomeFormat = (typeof HOME_FORMATS)[number];
+import { HOME_FORMATS, type HomeFormat } from "@/lib/home-formats";
+
+export { HOME_FORMATS };
+export type { HomeFormat };
 
 /** Abas de formato logo abaixo do cabeçalho da home. */
 export function FormatTabs({ active }: { active: HomeFormat }) {

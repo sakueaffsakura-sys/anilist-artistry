@@ -6,6 +6,7 @@ import { z } from "zod";
 import { RotateCw } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
 import { FormatTabs, HOME_FORMATS } from "@/components/FormatTabs";
+import { HOME_KINDS } from "@/lib/home-formats";
 import { HeroCarousel } from "@/components/HeroCarousel";
 import { ContinueReading } from "@/components/ContinueReading";
 import { FavoritesUpdated } from "@/components/FavoritesUpdated";
@@ -55,15 +56,15 @@ function Home() {
   const { formato: kind } = Route.useSearch();
   const updated = useQuery({
     queryKey: ["series", "updated", kind],
-    queryFn: () => fetchSeries({ kind, order: "updated_at", limit: RECENT_UPDATES_LIMIT, pinnedFirst: true }),
+    queryFn: () => fetchSeries({ kinds: HOME_KINDS[kind], order: "updated_at", limit: RECENT_UPDATES_LIMIT, pinnedFirst: true }),
   });
   const releases = useQuery({
     queryKey: ["series", "created", kind],
-    queryFn: () => fetchSeries({ kind, order: "created_at", limit: 8 }),
+    queryFn: () => fetchSeries({ kinds: HOME_KINDS[kind], order: "created_at", limit: 8 }),
   });
   const slider = useQuery({
     queryKey: ["series", "slider", kind],
-    queryFn: () => fetchSeries({ kind, order: "updated_at", limit: HERO_LIMIT, inSlider: true }),
+    queryFn: () => fetchSeries({ kinds: HOME_KINDS[kind], order: "updated_at", limit: HERO_LIMIT, inSlider: true }),
     staleTime: 30_000,
   });
   const favorites = useQuery({

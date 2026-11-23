@@ -98,7 +98,7 @@ export function SiteHeader() {
       <header className="site-header">
         <div className="site-header-inner">
           <Link to="/" className="site-logo" aria-label="Better Mangá — início">
-            <img src={SITE_LOGO} alt="Better Mangá" />
+            <img src={SITE_LOGO_TRIM} alt="Better Mangá" onError={fallbackToOriginalLogo} />
           </Link>
 
           <nav aria-label="Navegação principal" className="site-nav">
@@ -193,6 +193,14 @@ export function SiteHeader() {
 
 export const SITE_LOGO =
   "https://cdn.mediocrescan.com/usuarios/156358/056c603c2288529c82b19ad4906b02c7f5a67be8.webp";
+/** O mesmo logo sem a margem transparente em volta (o arquivo acima tem muito espaço vazio e o desenho aparecia minúsculo). */
+export const SITE_LOGO_TRIM = "/logo-better-manga.png";
+/** Se o arquivo aparado não carregar, volta para o logo original. */
+function fallbackToOriginalLogo(event: { currentTarget: HTMLImageElement }) {
+  const img = event.currentTarget;
+  img.onerror = null;
+  img.src = SITE_LOGO;
+}
 
 function PrefSwitch({ pref, title, hint }: { pref: "lite" | "tint"; title: string; hint: string }) {
   const [on, setOn] = useSitePref(pref);
@@ -234,8 +242,7 @@ export function SiteFooter() {
         <div className="footer-grid">
           <div>
             <Link to="/" className="footer-brand" aria-label="Better Mangá — início">
-              <img src={SITE_LOGO} alt="" />
-              <span>Better Mangá</span>
+              <img src={SITE_LOGO_TRIM} alt="Better Mangá" onError={fallbackToOriginalLogo} />
             </Link>
             <p className="footer-tagline">Organize sua coleção e acompanhe o que você curte — tudo num só lugar.</p>
           </div>

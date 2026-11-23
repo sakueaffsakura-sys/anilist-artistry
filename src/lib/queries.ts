@@ -44,6 +44,8 @@ function normalize(rows: unknown): SeriesRow[] {
 
 export async function fetchSeries(options: {
   kind?: string;
+  /** Vários formatos gravados de uma vez (a home usa para as abas); tem prioridade sobre `kind`. */
+  kinds?: string[];
   order?: "updated_at" | "created_at" | "rating" | "views";
   limit?: number;
   search?: string;
@@ -54,7 +56,8 @@ export async function fetchSeries(options: {
   const kidsAges = allowedAgeRatings();
   if (kidsAges) query = query.in("age_rating", kidsAges);
 
-  if (options.kind && options.kind !== "Todos") query = query.eq("kind", options.kind);
+  if (options.kinds?.length) query = query.in("kind", options.kinds);
+  else if (options.kind && options.kind !== "Todos") query = query.eq("kind", options.kind);
   if (options.search) query = query.ilike("title", `%${options.search}%`);
   if (options.inSlider) query = query.eq("in_slider", true);
   if (options.pinnedFirst) query = query.order("pinned", { ascending: false });
