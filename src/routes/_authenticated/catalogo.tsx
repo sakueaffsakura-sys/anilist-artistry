@@ -110,7 +110,11 @@ function Pesquisar() {
         .eq("published", true);
       const kidsAges = allowedAgeRatings();
       if (kidsAges) q = q.in("age_rating", kidsAges);
-      if (s.q) q = q.ilike("title", `%${s.q}%`);
+      if (s.q) {
+        // Título, autor ou artista; vírgulas e parênteses do termo quebrariam o filtro, então saem.
+        const term = s.q.replace(/[%,()*\\]/g, " ").trim();
+        if (term) q = q.or(`title.ilike.%${term}%,author.ilike.%${term}%,artist.ilike.%${term}%`);
+      }
       if (s.kind !== "Todos") q = q.in("kind", kindValues(s.kind));
       if (s.status) q = q.in("status", STATUS_DB[s.status] ?? [s.status]);
       if (s.tag) q = q.overlaps("genres", genreAliases(s.tag));
@@ -175,7 +179,7 @@ function Pesquisar() {
             value={term}
             onChange={(e) => setTerm(e.target.value)}
             aria-label="Buscar obras ou leitores"
-            placeholder="Buscar obras ou @leitor…"
+            placeholder="Buscar obra, autor ou @leitor…"
             enterKeyHint="search"
           />
           {term ? <button type="button" aria-label="Limpar busca" onClick={() => setTerm("")}><X className="h-4 w-4" /></button> : null}

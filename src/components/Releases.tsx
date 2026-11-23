@@ -1,43 +1,29 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Sparkles } from "lucide-react";
 import type { SeriesRow } from "@/lib/queries";
-import { formatChapter, timeAgo } from "@/lib/media";
-import { HScroll, SectionRow, shelfItem } from "@/components/SectionRow";
-import { SeriesCard } from "@/components/SeriesCard";
+import { timeAgo } from "@/lib/media";
+import { PosterCard } from "@/components/PosterCard";
 
-/** Obra que chegou nos últimos 7 dias. */
-const isNew = (iso: string) => Date.now() - new Date(iso).getTime() < 7 * 24 * 60 * 60 * 1000;
-
-/** Lançamentos: as obras que acabaram de chegar ao site. */
-export function Releases({ rows, favoriteIds }: { rows: SeriesRow[]; favoriteIds: Set<string> }) {
+/** Lançamentos: as obras que acabaram de chegar ao site (8 capas; em telas menores cabem 6, 4 ou 3 por linha). */
+export function Releases({ rows, kind }: { rows: SeriesRow[]; kind: string }) {
   if (rows.length === 0) return null;
   return (
-    <SectionRow
-      icon={<Sparkles />}
-      title="Lançamentos"
-      count={rows.length}
-      subtitle="Obras que acabaram de chegar"
-      action={<Link to="/catalogo" search={{ sort: "recent" }} className="see-all">Ver todas <ArrowRight className="h-3.5 w-3.5" /></Link>}
-    >
-      <HScroll>
-        {rows.map((item) => {
+    <section className="home-section" aria-labelledby="releases-title">
+      <div className="home-section-head">
+        <div className="home-section-title"><h2 id="releases-title">Lançamentos</h2></div>
+        <div className="home-section-actions">
+          <Link to="/catalogo" search={{ sort: "novas", kind }} className="see-all">Ver todos →</Link>
+        </div>
+      </div>
+      <div className="release-grid">
+        {rows.slice(0, 8).map((item) => {
           const latest = item.chapters[0];
           return (
-            <div key={item.id} className={shelfItem}>
-              <SeriesCard
-                slug={item.slug}
-                title={item.title}
-                cover={item.cover_url}
-                ageRating={item.age_rating}
-                seriesId={item.id}
-                favorite={favoriteIds.has(item.id)}
-                isNew={isNew(item.created_at)}
-                meta={<p className="card-meta mt-1">{latest ? <span>Cap. {formatChapter(latest.number)} · {timeAgo(latest.created_at)}</span> : <span>Chegou {timeAgo(item.created_at)}</span>}</p>}
-              />
-            </div>
+            <PosterCard key={item.id} item={item}>
+              <p className="poster-time">{timeAgo(latest?.created_at ?? item.created_at)}</p>
+            </PosterCard>
           );
         })}
-      </HScroll>
-    </SectionRow>
+      </div>
+    </section>
   );
 }

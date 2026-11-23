@@ -76,7 +76,7 @@ export function WorkNotifications() {
   if (!user) return null;
   const tabs = [["all", "Todas"], ["chapter", "Capítulos"], ["request", "Pedidos"]] as const;
   return <Popover>
-    <PopoverTrigger asChild><Button size="icon" variant="ghost" className="relative shrink-0" aria-label={unread.length ? `Notificações: ${unread.length} não lidas` : "Notificações"} title="Notificações"><Bell className="h-[18px] w-[18px]" />{unread.length ? <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">{unread.length > 9 ? "9+" : unread.length}</span> : null}</Button></PopoverTrigger>
+    <PopoverTrigger asChild><button type="button" className="site-icon-btn" aria-label={unread.length ? `Notificações: ${unread.length} não lidas` : "Notificações"} title="Notificações"><Bell aria-hidden="true" />{unread.length ? <i className="bell-dot" aria-hidden="true" /> : null}</button></PopoverTrigger>
     <PopoverContent align="end" className="w-[min(380px,calc(100vw-24px))] rounded-lg p-0">
       <div className="flex items-center justify-between px-4 pt-4"><h2 className="font-display text-lg font-bold">Notificações</h2>
         <div className="flex gap-1">

@@ -1,56 +1,81 @@
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Clock, Pin } from "lucide-react";
+import { ArrowRight, LayoutGrid, List, Sparkles, Star } from "lucide-react";
 import type { SeriesRow } from "@/lib/queries";
-import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
-import { SectionRow } from "@/components/SectionRow";
+import { formatChapter, isRecentChapter, timeAgoShort } from "@/lib/media";
+import { PosterCard } from "@/components/PosterCard";
 import { selectRecentUpdates } from "@/lib/recent-updates";
-import { kindLabel } from "@/lib/work-categories";
-import { chapterSubtitle } from "@/lib/format";
 
-/** Capítulo publicado há menos de 3 horas. */
-const isFresh = (iso: string) => Date.now() - new Date(iso).getTime() < 3 * 60 * 60 * 1000;
+const VIEW_KEY = "bm:atualizados-lista";
 
-/** Capítulos novos: lista compacta (capa pequena, obra, capítulo e quando saiu), em 1 a 3 colunas. */
-export function RecentlyUpdated({ rows }: { rows: SeriesRow[] }) {
+/** Atualizados: grade de capas com os dois capítulos mais novos de cada obra (fixadas primeiro). */
+export function RecentlyUpdated({ rows, kind }: { rows: SeriesRow[]; kind: string }) {
   const items = selectRecentUpdates(rows);
+  const [view, setView] = useState<"grid" | "list">("grid");
+
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(VIEW_KEY) === "1") setView("list");
+    } catch {
+      /* sem armazenamento: fica na grade */
+    }
+  }, []);
+
+  function choose(next: "grid" | "list") {
+    setView(next);
+    try {
+      if (next === "list") window.localStorage.setItem(VIEW_KEY, "1");
+      else window.localStorage.removeItem(VIEW_KEY);
+    } catch {
+      /* só vale até recarregar */
+    }
+  }
+
   if (items.length === 0) return null;
   return (
-    <SectionRow
-      icon={<Clock />}
-      title="Capítulos novos"
-      subtitle="Do mais recente para o mais antigo"
-      action={<Link to="/catalogo" search={{ sort: "recent" }} className="see-all">Ver mais <ArrowRight className="h-3.5 w-3.5" /></Link>}
-    >
-      <ul className="update-list">
-        {items.map((item) => {
-          const [latest, previous] = item.chapters ?? [];
-          const subtitle = latest ? chapterSubtitle(latest.title, latest.number) : null;
-          return (
-            <li key={item.id} className="update-row max-md:[&:nth-child(n+9)]:hidden">
-              <Link to="/obra/$slug" params={{ slug: item.slug }} tabIndex={-1} aria-hidden="true">
-                <img src={coverUrl(item.cover_url)} alt="" loading="lazy" decoding="async" />
-              </Link>
-              <div className="min-w-0">
-                <h3 className="flex min-w-0 items-center gap-1.5">
-                  {item.pinned ? <Pin className="h-3.5 w-3.5 shrink-0 fill-gold text-gold" aria-label="Fixada" /> : null}
-                  <Link to="/obra/$slug" params={{ slug: item.slug }} className="truncate">{item.title}</Link>
-                </h3>
-                {latest ? (
-                  <p className="update-chapter">
-                    <Link to="/obra/$slug/$chapter" params={{ slug: item.slug, chapter: formatChapter(latest.number) }}>Cap. {formatChapter(latest.number)}</Link>
-                    {subtitle ? <span>{subtitle}</span> : previous ? <span>· antes: <Link to="/obra/$slug/$chapter" params={{ slug: item.slug, chapter: formatChapter(previous.number) }} className="font-semibold text-muted-foreground hover:text-primary">Cap. {formatChapter(previous.number)}</Link></span> : null}
-                  </p>
-                ) : null}
-                <p className="card-meta mt-0.5">
-                  {latest && isFresh(latest.created_at) ? <span className="inline-flex items-center gap-1 font-semibold text-new"><span className="live-dot" />Novo</span> : null}
-                  <span>{latest ? timeAgo(latest.created_at) : timeAgo(item.updated_at)}</span>
-                  <span>{kindLabel(item.kind)}</span>
-                </p>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </SectionRow>
+    <section className="home-section" aria-labelledby="updated-title">
+      <div className="home-section-head">
+        <div className="home-section-title">
+          <h2 id="updated-title">Atualizados</h2>
+          <p>capítulos novos em {kind}</p>
+        </div>
+        <div className="home-section-actions">
+          {kind === "Comic" ? (
+            <Link to="/" search={{ formato: "Comic2" }} className="format-cross">
+              <Sparkles aria-hidden="true" />Comic 2 <em>NOVO</em><ArrowRight aria-hidden="true" />
+            </Link>
+          ) : null}
+          <Link to="/catalogo" search={{ sort: "recent", kind }} className="see-all">Ver todos →</Link>
+          <div className="icon-toggle" role="group" aria-label="Modo de exibição">
+            <button type="button" aria-label="Grade" aria-pressed={view === "grid"} onClick={() => choose("grid")}><LayoutGrid aria-hidden="true" /></button>
+            <button type="button" aria-label="Lista" aria-pressed={view === "list"} onClick={() => choose("list")}><List aria-hidden="true" /></button>
+          </div>
+        </div>
+      </div>
+      <div className="update-grid" data-view={view}>
+        {items.map((item) => (
+          <PosterCard key={item.id} item={item} pinned={item.pinned} className="update-card">
+            <div className="chapter-pills">
+              {item.chapters.slice(0, 2).map((chapter) => {
+                const fresh = isRecentChapter(chapter.created_at);
+                return (
+                  <Link
+                    key={chapter.id}
+                    to="/obra/$slug/$chapter"
+                    params={{ slug: item.slug, chapter: formatChapter(chapter.number) }}
+                    className="chapter-pill"
+                    data-fresh={fresh}
+                    title={chapter.title ?? `Capítulo ${formatChapter(chapter.number)}`}
+                  >
+                    <b>Cap. {formatChapter(chapter.number)}{fresh ? <Star aria-hidden="true" /> : null}</b>
+                    <span>{timeAgoShort(chapter.created_at)}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </PosterCard>
+        ))}
+      </div>
+    </section>
   );
 }

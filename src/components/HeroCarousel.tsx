@@ -1,39 +1,44 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { BookOpen, ChevronLeft, ChevronRight, Heart, Star } from "lucide-react";
-import { AgeRatingBadge } from "@/components/AgeRatingBadge";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight, Heart, Play } from "lucide-react";
 import type { SeriesRow } from "@/lib/queries";
-import { coverUrl, formatChapter, timeAgo } from "@/lib/media";
-import { Button } from "@/components/ui/button";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useSession } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { coverUrl, formatChapter } from "@/lib/media";
 import { selectHeroItems } from "@/lib/hero-policy";
-import { normalizeGenres } from "@/lib/work-genres";
 import { chapterCount } from "@/lib/series-summary";
-import { activeProfileId } from "@/lib/active-profile";
-import { formatRating } from "@/lib/format";
-import { kindLabel } from "@/lib/work-categories";
-import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useFavoriteIds } from "@/hooks/useFavoriteIds";
+import { useToggleFavorite } from "@/hooks/useToggleFavorite";
 
 const INTERVAL = 7000;
+/** Quantas obras aparecem na fila "Em destaque" ao lado. */
+const QUEUE_SIZE = 5;
 
-/** Destaques da home: faixa com a arte da obra desfocada ao fundo, capa, dados e os capítulos mais novos. */
-export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favoriteIds: Set<string> }) {
-  const { user } = useSession();
-  const queryClient = useQueryClient();
-  const toggleFavorite = useMutation({
-    mutationFn: async ({ id, saved }: { id: string; saved: boolean }) => {
-      if (!user) throw new Error("Entre na sua conta para favoritar.");
-      const { error } = saved
-        ? await supabase.from("favorites").delete().eq("user_id", user.id).eq("profile_id", activeProfileId()).eq("series_id", id)
-        : await supabase.from("favorites").insert({ user_id: user.id, profile_id: activeProfileId(), series_id: id });
+/** Primeiro capítulo publicado da obra (para o botão "Ler capítulo N"). */
+function useFirstChapter(seriesId: string | undefined) {
+  return useQuery({
+    queryKey: ["first-chapter", seriesId],
+    enabled: Boolean(seriesId),
+    staleTime: 10 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("chapters")
+        .select("number")
+        .eq("series_id", seriesId!)
+        .eq("published", true)
+        .order("number", { ascending: true })
+        .limit(1);
       if (error) throw error;
+      const number = data?.[0]?.number;
+      return typeof number === "number" ? number : null;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["favorites"] }); },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Não foi possível atualizar os favoritos."),
   });
+}
+
+/** Destaques da home: capa grande, dados da obra e a fila "Em destaque" com as próximas obras. */
+export function HeroCarousel({ items }: { items: SeriesRow[] }) {
+  const favoriteIds = useFavoriteIds();
+  const { toggle, pending } = useToggleFavorite();
   const slides = useMemo(() => selectHeroItems(items), [items]);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -63,17 +68,25 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
   }, [paused, visible, slides.length, index]);
 
   const active = slides[index] ?? slides[0] ?? null;
+  const first = useFirstChapter(active?.id);
   if (!active) return null;
+
   const go = (delta: number) => setIndex((current) => (current + delta + slides.length) % slides.length);
   const saved = favoriteIds.has(active.id);
-  const score = Number(active.rating ?? 0);
+  const total = chapterCount(active);
+  const firstNumber = first.data ?? 1;
+  const queue = Array.from({ length: Math.min(QUEUE_SIZE, slides.length) }, (_, offset) => {
+    const at = (index + offset) % slides.length;
+    return { at, item: slides[at]! };
+  });
+  const synopsis = (active.synopsis ?? "").replace(/<[^>]*>/g, "").trim();
 
   return (
     <section
       ref={sectionRef}
       aria-label="Destaques"
       aria-roledescription="carrossel"
-      className="home-banner"
+      className="home-hero"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onTouchStart={(event) => { touchStart.current = event.touches[0]?.clientX ?? null; }}
@@ -83,72 +96,73 @@ export function HeroCarousel({ items, favoriteIds }: { items: SeriesRow[]; favor
         touchStart.current = null;
       }}
     >
-      <img key={active.id} src={coverUrl(active.banner_url || active.cover_url)} alt="" aria-hidden="true" decoding="async" className="home-banner-bg" />
-      <div className="home-banner-shade" />
-      <div className="mx-auto max-w-7xl px-4 pb-5 pt-5 sm:px-6 md:pb-8 md:pt-9 lg:px-8">
-        <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-4 sm:grid-cols-[150px_minmax(0,1fr)] md:grid-cols-[190px_minmax(0,1fr)] md:gap-7">
-          <Link to="/obra/$slug" params={{ slug: active.slug }} className="self-start">
-            <img src={coverUrl(active.cover_url)} alt={`Capa de ${active.title}`} className="home-banner-cover aspect-[2/3] w-full object-cover" decoding="async" fetchPriority="high" draggable={false} />
-          </Link>
-          <div key={active.id} className="min-w-0">
-            <p className="text-xs font-semibold text-primary sm:text-[13px]">
-              Destaque{slides.length > 1 ? <span className="text-muted-foreground"> · {index + 1} de {slides.length}</span> : null}
-            </p>
-            <h2 className="mt-1 line-clamp-2 font-display text-lg font-bold leading-tight sm:text-2xl md:text-3xl">
-              <Link to="/obra/$slug" params={{ slug: active.slug }} className="hover:text-primary">{active.title}</Link>
-            </h2>
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground sm:text-[13px]">
-              {score > 0 ? <span className="inline-flex items-center gap-1 font-semibold text-foreground"><Star className="h-3.5 w-3.5 fill-gold text-gold" />{formatRating(score)}</span> : null}
-              <span>{chapterCount(active).toLocaleString("pt-BR")} capítulos</span>
-              <span>{kindLabel(active.kind)}</span>
-              <span>{active.status}</span>
-              <AgeRatingBadge value={active.age_rating} size="sm" variant="solid" />
-            </div>
-            <div className="mt-2.5 hidden flex-wrap gap-1.5 sm:flex">
-              {normalizeGenres(active.genres ?? []).slice(0, 4).map((genre) => (
-                <Link key={genre} to="/catalogo" search={{ tag: genre }} className="home-banner-tag">{genre}</Link>
-              ))}
-            </div>
-            {active.synopsis ? (
-              <p className="mt-3 hidden max-w-3xl text-sm leading-relaxed text-foreground/80 sm:[display:-webkit-box] sm:line-clamp-3">
-                {active.synopsis.replace(/<[^>]*>/g, "")}
+      <div className="home-hero-inner">
+        <div className="hero-glow" aria-hidden="true" />
+        <div className="home-hero-grid">
+          <div className="home-hero-main" key={active.id}>
+            <Link to="/obra/$slug" params={{ slug: active.slug }} className="home-hero-cover">
+              <img src={coverUrl(active.cover_url)} alt={`Capa de ${active.title}`} decoding="async" fetchPriority="high" draggable={false} />
+            </Link>
+            <div className="home-hero-info">
+              <p className="home-hero-eyebrow">
+                Destaque{slides.length > 1 ? <span style={{ color: "#737373" }}> · {index + 1} de {slides.length}</span> : null}
               </p>
-            ) : null}
-            {active.chapters.length ? (
-              <div className="mt-3 hidden flex-wrap gap-2 sm:flex">
-                {active.chapters.slice(0, 2).map((chapter) => (
-                  <Link key={chapter.id} to="/obra/$slug/$chapter" params={{ slug: active.slug, chapter: formatChapter(chapter.number) }} className="home-banner-chapter" title={chapter.title ?? `Capítulo ${formatChapter(chapter.number)}`}>
-                    Cap. {formatChapter(chapter.number)} <span>{timeAgo(chapter.created_at)}</span>
+              <h2 className="home-hero-title">
+                <Link to="/obra/$slug" params={{ slug: active.slug }}>{active.title}</Link>
+              </h2>
+              <p className="home-hero-meta">{total.toLocaleString("pt-BR")} {total === 1 ? "capítulo" : "capítulos"}</p>
+              {synopsis ? <p className="home-hero-synopsis">{synopsis}</p> : null}
+              <div className="home-hero-actions">
+                {first.data != null ? (
+                  <Link to="/obra/$slug/$chapter" params={{ slug: active.slug, chapter: formatChapter(firstNumber) }} className="hero-btn hero-btn-primary">
+                    <Play aria-hidden="true" />Ler capítulo {formatChapter(firstNumber)}
                   </Link>
+                ) : (
+                  <Link to="/obra/$slug" params={{ slug: active.slug }} className="hero-btn hero-btn-primary">
+                    <Play aria-hidden="true" />Ler capítulo {formatChapter(firstNumber)}
+                  </Link>
+                )}
+                <Link to="/obra/$slug" params={{ slug: active.slug }} className="hero-btn hero-btn-soft">Detalhes da obra</Link>
+                <button
+                  type="button"
+                  className="hero-icon-btn"
+                  aria-pressed={saved}
+                  aria-label={saved ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                  title={saved ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                  disabled={pending}
+                  onClick={() => toggle(active.id, saved)}
+                >
+                  <Heart aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {slides.length > 1 ? (
+            <aside className="home-hero-side" aria-label="Em destaque">
+              <div className="home-hero-side-head">
+                <span>Em destaque</span>
+                <div>
+                  <button type="button" className="circle-btn" aria-label="Destaque anterior" onClick={() => go(-1)}><ChevronLeft aria-hidden="true" /></button>
+                  <button type="button" className="circle-btn" aria-label="Próximo destaque" onClick={() => go(1)}><ChevronRight aria-hidden="true" /></button>
+                </div>
+              </div>
+              <div className="hero-queue">
+                {queue.map(({ at, item }) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="hero-queue-item"
+                    aria-current={at === index ? "true" : undefined}
+                    onClick={() => setIndex(at)}
+                  >
+                    <span className="hero-queue-thumb"><img src={coverUrl(item.cover_url)} alt="" loading="lazy" decoding="async" /></span>
+                    <span className="title">{item.title}</span>
+                  </button>
                 ))}
               </div>
-            ) : null}
-          </div>
-        </div>
-        {active.synopsis ? (
-          <p className="mt-3 line-clamp-2 text-[13px] leading-relaxed text-foreground/80 sm:hidden">{active.synopsis.replace(/<[^>]*>/g, "")}</p>
-        ) : null}
-        <div className="mt-4 flex items-center gap-2 md:mt-5">
-          <Button asChild className="h-10 px-4">
-            <Link to="/obra/$slug" params={{ slug: active.slug }}><BookOpen className="h-4 w-4" />Ver obra</Link>
-          </Button>
-          <Button
-            variant="secondary"
-            className="h-10 px-3 sm:px-4"
-            aria-pressed={saved}
-            disabled={toggleFavorite.isPending}
-            onClick={() => (user ? toggleFavorite.mutate({ id: active.id, saved }) : toast.info("Entre na sua conta para favoritar."))}
-          >
-            <Heart className={cn("h-4 w-4", saved && "fill-favorite text-favorite")} />
-            <span className="hidden min-[400px]:inline">{saved ? "Nos favoritos" : "Favoritar"}</span>
-          </Button>
-          {slides.length > 1 ? (
-            <div className="ml-auto flex items-center gap-1.5">
-              <span className="mr-1 hidden text-xs font-semibold text-muted-foreground tabular-nums sm:inline">{index + 1} / {slides.length}</span>
-              <Button size="icon" variant="secondary" className="h-10 w-10" aria-label="Destaque anterior" onClick={() => go(-1)}><ChevronLeft className="h-4 w-4" /></Button>
-              <Button size="icon" variant="secondary" className="h-10 w-10" aria-label="Próximo destaque" onClick={() => go(1)}><ChevronRight className="h-4 w-4" /></Button>
-            </div>
-          ) : null}
+            </aside>
+          ) : <div className="home-hero-side" />}
         </div>
       </div>
     </section>
