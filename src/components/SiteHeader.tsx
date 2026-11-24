@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { BookMarked, BookPlus, ChevronDown, Headset, History, LogOut, Search, Shield, Trash2, User2 } from "lucide-react";
 import { WorkNotifications } from "@/components/WorkNotifications";
 import { CoinMenuItem } from "@/components/CoinMenuItem";
+import { CommandPalette } from "@/components/CommandPalette";
 import { supabase } from "@/integrations/supabase/client";
 import { MobileNav } from "@/components/MobileNav";
 import { openSupportChat } from "@/components/SupportChat";
@@ -35,46 +36,47 @@ const MORE = [
   { to: "/pedidos", label: "Pedir uma obra" },
 ] as const;
 
-/** Busca do cabeçalho: obra ou autor; Ctrl/Cmd + K leva o cursor até ela. */
+/** Busca do cabeçalho: abre o painel de busca (também com Ctrl/Cmd + K), igual ao modelo. */
 function HeaderSearch() {
-  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [value, setValue] = useState("");
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        inputRef.current?.focus();
+        setOpen((value) => !value);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const close = () => {
+    setOpen(false);
+    inputRef.current?.blur();
+  };
+
   return (
-    <form
-      role="search"
-      className="site-search"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void navigate({ to: "/catalogo", search: { q: value.trim(), kind: "Todos" } });
-        inputRef.current?.blur();
-      }}
-    >
-      <Search aria-hidden="true" />
-      <input
-        ref={inputRef}
-        type="text"
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        placeholder="Buscar obra ou autor"
-        aria-label="Buscar obra ou autor"
-        autoComplete="off"
-        enterKeyHint="search"
-      />
-      <kbd aria-hidden="true">Ctrl K</kbd>
-    </form>
+    <>
+      <div role="search" className="site-search">
+        <Search aria-hidden="true" />
+        <input
+          ref={inputRef}
+          type="text"
+          readOnly
+          value=""
+          onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
+          placeholder="Buscar obra ou autor"
+          aria-label="Buscar obra ou autor"
+          aria-haspopup="dialog"
+          autoComplete="off"
+        />
+        <kbd aria-hidden="true">Ctrl K</kbd>
+      </div>
+      <CommandPalette open={open} onClose={close} />
+    </>
   );
 }
 

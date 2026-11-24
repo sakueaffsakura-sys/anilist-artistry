@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Heart, Library, Play, Search, Users } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
-import { kindLabel, sameKind } from "@/lib/work-categories";
-import { CollectionCard, FORMATS, PageTitle, STATUSES, TabButton } from "@/components/LibraryBits";
+import { STATUSES } from "@/components/LibraryBits";
+import { CollectionPager, CollectionPoster } from "@/components/CollectionPoster";
+import { COLLECTION_FORMATS, COLLECTION_PAGE_SIZE, collectionCaption, collectionFormatOf, type CollectionFormat } from "@/lib/collection";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useAuth";
-import { Pager } from "@/components/Pager";
 import { useActiveProfile } from "@/lib/active-profile";
 
 export const Route = createFileRoute("/_authenticated/biblioteca")({
@@ -28,7 +28,8 @@ export const Route = createFileRoute("/_authenticated/biblioteca")({
 
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 type Tab = "favoritos" | "continuando" | (typeof STATUSES)[number]["key"];
 
@@ -50,9 +51,10 @@ function Colecao() {
   const profile = useActiveProfile();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("favoritos");
-  const [kind, setKind] = useState("Todos");
+  const [format, setFormat] = useState<CollectionFormat | null>(null);
   const [sort, setSort] = useState("recent");
   const [page, setPage] = useState(1);
+  const [editing, setEditing] = useState(false);
 
   const favorites = useQuery({
     queryKey: ["col-fav", user?.id, profile.id],
@@ -132,9 +134,21 @@ function Colecao() {
         ? continuing
         : (statuses.data ?? []).filter((s) => s.status === tab).map((s) => ({ date: s.updated_at, series: s.series }));
 
+  const formatCounts = useMemo(() => {
+    const counts = new Map<CollectionFormat, number>();
+    for (const item of items) {
+      const key = collectionFormatOf(item.series.kind);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  }, [items]);
+  const formats: CollectionFormat[] = [...COLLECTION_FORMATS, ...(formatCounts.get("Outros") ? (["Outros"] as const) : [])];
+  // Sem escolha do leitor, abre a primeira aba que tem obras (a lista começa em Comic, como no modelo).
+  const activeFormat: CollectionFormat = format ?? formats.find((f) => (formatCounts.get(f) ?? 0) > 0) ?? "Comic";
+
   const filtered = items
+    .filter((i) => collectionFormatOf(i.series.kind) === activeFormat)
     .filter((i) => i.series.title.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
-    .filter((i) => kind === "Todos" || sameKind(i.series.kind, kind))
     .sort((a, b) =>
       sort === "rating"
         ? Number(b.series.rating) - Number(a.series.rating)
@@ -142,6 +156,10 @@ function Colecao() {
           ? a.series.title.localeCompare(b.series.title)
           : b.date.localeCompare(a.date),
     );
+  const pages = Math.max(1, Math.ceil(filtered.length / COLLECTION_PAGE_SIZE));
+  const currentPage = Math.min(page, pages);
+  const visible = filtered.slice((currentPage - 1) * COLLECTION_PAGE_SIZE, currentPage * COLLECTION_PAGE_SIZE);
+  const source = tab === "favoritos" ? favorites : tab === "continuando" ? history : statuses;
 
   const remove = useMutation({
     mutationFn: async (seriesId: string) => {
@@ -163,77 +181,126 @@ function Colecao() {
   });
 
   const countFor = (k: string) => (statuses.data ?? []).filter((s) => s.status === k).length;
+  const choose = (next: Tab) => {
+    setTab(next);
+    setFormat(null);
+    setPage(1);
+    setEditing(false);
+  };
+  const sectionTitle = tab === "favoritos" ? "Favoritos" : tab === "continuando" ? "Continue lendo" : (STATUSES.find((st) => st.key === tab)?.label ?? "Coleção");
+  const sortLabel = sort === "rating" ? "Melhor avaliadas" : sort === "title" ? "A–Z" : "Mais recentes";
 
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <main className="site-content collection-layout mx-auto max-w-7xl px-4 py-6 sm:px-6 md:py-8 lg:px-8">
-        <PageTitle
-          icon={<Library />}
-          title="Biblioteca"
-          subtitle={`Perfil ${profile.name} · ${(favorites.data?.length ?? 0).toLocaleString("pt-BR")} favoritos · ${continuing.length.toLocaleString("pt-BR")} em leitura`}
-          right={<Button asChild variant="secondary" size="sm"><Link to="/perfis"><Users className="h-4 w-4" /> Trocar perfil</Link></Button>}
-        />
+      <main className="coll-page">
+        <aside className="coll-side">
+          <h1>Coleção</h1>
+          <nav className="coll-nav" aria-label="Seções da coleção">
+            <button type="button" className="coll-item" aria-current={tab === "continuando"} onClick={() => choose("continuando")}>Continue lendo</button>
+            <button type="button" className="coll-item" aria-current={tab === "favoritos"} onClick={() => choose("favoritos")}>Favoritos</button>
+            <p className="coll-label">Status</p>
+            {STATUSES.map((st) => {
+              const count = countFor(st.key);
+              return (
+                <button key={st.key} type="button" className="coll-item" aria-current={tab === st.key} onClick={() => choose(st.key)}>
+                  {st.key === "planejo" ? "Planejo Ler" : st.label}
+                  {count > 0 ? <small>{count.toLocaleString("pt-BR")}</small> : null}
+                </button>
+              );
+            })}
+            <p className="coll-label">Mais</p>
+            <Link to="/listas" className="coll-item">Listas</Link>
+            <button type="button" className="coll-item" disabled title="Em breve">Baixados</button>
+          </nav>
+        </aside>
 
-        <div className="chip-row" role="tablist" aria-label="Seções da biblioteca">
-          <TabButton active={tab === "favoritos"} onClick={() => { setPage(1); setTab("favoritos"); }} icon={<Heart />} label="Favoritos" count={favorites.data?.length} />
-          <TabButton active={tab === "continuando"} onClick={() => { setPage(1); setTab("continuando"); }} icon={<Play />} label="Continuar lendo" count={continuing.length} />
-          {STATUSES.map((s) => (
-            <TabButton key={s.key} active={tab === s.key} onClick={() => { setPage(1); setTab(s.key); }} icon={<s.icon />} label={s.label} count={countFor(s.key)} />
-          ))}
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <div className="relative min-w-0 flex-1 basis-56">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input aria-label="Buscar na biblioteca" placeholder="Buscar na biblioteca…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="h-9 pl-9" />
+        <section className="coll-main" aria-label={sectionTitle}>
+          <div className="coll-head">
+            <h2>{sectionTitle} <small>{items.length.toLocaleString("pt-BR")}</small></h2>
+            <div className="coll-head-spacer" />
+            <label className="coll-search">
+              <Search aria-hidden="true" />
+              <input
+                type="search"
+                aria-label={tab === "favoritos" ? "Buscar nos favoritos" : "Buscar nesta lista"}
+                placeholder={tab === "favoritos" ? "Buscar nos favoritos" : "Buscar nesta lista"}
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                autoComplete="off"
+              />
+            </label>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="coll-pill coll-sort" aria-label={`Ordenar: ${sortLabel}`}>
+                  {sortLabel}
+                  <ChevronDown aria-hidden="true" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuRadioGroup value={sort} onValueChange={(value) => { setSort(value); setPage(1); }}>
+                  <DropdownMenuRadioItem value="recent">Mais recentes</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="rating">Melhor avaliadas</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="title">A–Z</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <button type="button" className="coll-pill" aria-pressed={editing} onClick={() => setEditing((value) => !value)}>
+              {editing ? "Concluir" : "Editar"}
+            </button>
           </div>
-          <select
-            aria-label="Ordenar biblioteca"
-            value={sort}
-            onChange={(e) => { setSort(e.target.value); setPage(1); }}
-            className="h-9 rounded-md border border-border bg-surface-2 px-3 text-[13px]"
-          >
-            <option value="recent">Mais recentes</option>
-            <option value="rating">Melhor avaliadas</option>
-            <option value="title">A–Z</option>
-          </select>
-        </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <div className="chip-row min-w-0 flex-1" role="group" aria-label="Formato">
-            {FORMATS.map((k) => <button key={k} type="button" className="chip chip-sm" aria-pressed={kind === k} onClick={() => { setKind(k); setPage(1); }}>{k === "Todos" ? "Todos" : kindLabel(k)}</button>)}
+          <div className="updates-tabs coll-tabs" role="tablist" aria-label="Formato">
+            {formats.map((f) => (
+              <button key={f} type="button" role="tab" aria-selected={f === activeFormat} className="updates-tab" data-active={f === activeFormat} onClick={() => { setFormat(f); setPage(1); }}>
+                {f}
+              </button>
+            ))}
           </div>
-        </div>
-        <p className="mt-3 text-[13px] text-muted-foreground">{filtered.length.toLocaleString("pt-BR")} {filtered.length === 1 ? "obra" : "obras"}</p>
 
-        {(tab === "favoritos" ? favorites : tab === "continuando" ? history : statuses).isPending ? <p role="status" className="py-8 text-muted-foreground">Carregando coleção…</p> : null}
-        {(tab === "favoritos" ? favorites : tab === "continuando" ? history : statuses).isError ? <div role="alert" className="py-8"><p className="mb-3 text-muted-foreground">Não foi possível carregar a coleção.</p><Button variant="secondary" onClick={() => void (tab === "favoritos" ? favorites : tab === "continuando" ? history : statuses).refetch()}>Tentar novamente</Button></div> : null}
-        <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-          {filtered.slice((page - 1) * 24, page * 24).map((i) => (
-            <CollectionCard
-              key={i.series.id}
-              slug={i.series.slug}
-              title={i.series.title}
-              cover={i.series.cover_url}
-              rating={i.series.rating}
-              chapters={i.series.chapter_count}
-              kind={i.series.kind}
-              progress={progressBySeries.get(i.series.id) ?? 0}
-              resumeChapter={tab === "continuando" ? history.data?.find((r) => r.series_id === i.series.id)?.chapters?.number : undefined}
-              onRemove={() => remove.mutate(i.series.id)}
-            />
-          ))}
-        </div>
-        <Pager page={page} pages={Math.max(1, Math.ceil(filtered.length / 24))} onChange={setPage} />
-        {filtered.length === 0 && !(tab === "favoritos" ? favorites : tab === "continuando" ? history : statuses).isPending && !(tab === "favoritos" ? favorites : tab === "continuando" ? history : statuses).isError ? (
-          <p className="mt-10 text-center text-sm text-muted-foreground">
-            Nada por aqui ainda.{" "}
-            <Link to="/catalogo" search={{ q: "", kind: "Todos" }} className="text-primary">
-              Explorar obras
-            </Link>
-          </p>
-        ) : null}
+          {source.isPending ? (
+            <div className="coll-grid" role="status" aria-label="Carregando coleção">
+              {Array.from({ length: 10 }, (_, i) => <Skeleton key={i} className="aspect-[2/3] rounded-xl" />)}
+            </div>
+          ) : null}
+          {source.isError ? (
+            <div role="alert" className="coll-empty">
+              <p>Não foi possível carregar a coleção.</p>
+              <Button variant="secondary" onClick={() => void source.refetch()}>Tentar novamente</Button>
+            </div>
+          ) : null}
+
+          {!source.isPending && !source.isError ? (
+            visible.length > 0 ? (
+              <div className="coll-grid">
+                {visible.map((i) => {
+                  const progress = progressBySeries.get(i.series.id) ?? 0;
+                  return (
+                    <CollectionPoster
+                      key={i.series.id}
+                      slug={i.series.slug}
+                      title={i.series.title}
+                      cover={i.series.cover_url}
+                      caption={collectionCaption(progress, i.series.chapter_count, i.series.latest_chapter_number)}
+                      progress={progress}
+                      heart={tab === "favoritos"}
+                      editing={editing}
+                      resumeChapter={tab === "continuando" ? history.data?.find((r) => r.series_id === i.series.id)?.chapters?.number : undefined}
+                      onRemove={() => remove.mutate(i.series.id)}
+                    />
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="coll-empty">
+                Nada por aqui ainda.{" "}
+                <Link to="/catalogo" search={{ q: "", kind: "Todos" }} className="text-primary">Explorar obras</Link>
+              </p>
+            )
+          ) : null}
+
+          <CollectionPager page={currentPage} pages={pages} onChange={(next) => { setPage(next); window.scrollTo({ top: 0 }); }} />
+        </section>
       </main>
       <SiteFooter />
     </div>

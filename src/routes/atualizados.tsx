@@ -41,7 +41,7 @@ function UpdatesPage() {
     queryKey: ["series", "updates-page", formato, pagina],
     // Uma obra a mais que a página: se ela vier, existe próxima página.
     queryFn: () =>
-      fetchSeries({ kinds: HOME_KINDS[formato], order: "updated_at", limit: UPDATES_PAGE_SIZE + 1, offset: updatesOffset(pagina) }),
+      fetchSeries({ kinds: HOME_KINDS[formato], order: "updated_at", pinnedFirst: true, limit: UPDATES_PAGE_SIZE + 1, offset: updatesOffset(pagina) }),
   });
   const { items, hasNext } = splitUpdatesPage(works.data ?? []);
   const novels = formato === "Novel";
@@ -120,7 +120,7 @@ function UpdatesPage() {
         ) : (
           <div className="update-grid updates-grid" data-view={view}>
             {items.map((item) => (
-              <UpdateCard key={item.id} item={item} />
+              <UpdateCard key={item.id} item={item} pinned={item.pinned} />
             ))}
           </div>
         )}
