@@ -769,7 +769,7 @@ html[data-lite] .home-hero-cover { box-shadow: none; }
 .updates-page { --accent-rgb: 249 115 22; width: min(1116px, 100% - 2 * var(--page-pad)); margin: 0 auto; padding: 35px 0 65px; }
 .updates-page[data-accent="violet"] { --accent-rgb: 139 92 246; --pill-time: #7a7685; }
 .updates-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 24px; }
-.updates-head h1 { font-size: 28px; font-weight: 800; line-height: 36px; letter-spacing: -0.02em; color: #fff; }
+.updates-head h1 { font-size: 28px; font-weight: 800; line-height: 36px; letter-spacing: -0.025em; color: #fff; }
 .updates-head p { margin-top: 8px; font-size: 14px; line-height: 20px; color: #8a8a8a; }
 .updates-switch { display: inline-flex; flex-shrink: 0; gap: 2px; height: 41px; padding: 3px; border-radius: 999px; background: #0d0d0d; }
 .updates-switch a { display: inline-flex; align-items: center; height: 35px; padding: 0 14.5px; border-radius: 999px; font-size: 13px; font-weight: 600; line-height: 1; color: #aaa; white-space: nowrap; }
