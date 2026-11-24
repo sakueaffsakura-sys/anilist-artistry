@@ -151,6 +151,8 @@ const PAGES = [
   { group: "leitura", name: "inicio", path: "/", steps: s(8, 5) },
   { group: "leitura", name: "inicio-logado", path: "/", signedIn: true, steps: s(2) },
   { group: "leitura", name: "atualizados", path: "/atualizados", steps: s(2, 2) },
+  { group: "leitura", name: "busca-painel", path: "/", press: "Control+K", steps: s(1) },
+  { group: "leitura", name: "busca-painel-texto", path: "/", press: "Control+K", type: "solo", steps: s(1) },
   { group: "leitura", name: "atualizados-comic2", path: "/atualizados?formato=Comic2", steps: s(1) },
   { group: "leitura", name: "catalogo", path: "/catalogo", signedIn: true, steps: s(3, 2) },
   { group: "leitura", name: "busca", path: "/catalogo?q=solo&view=lista", signedIn: true, steps: s(2) },
@@ -225,6 +227,15 @@ for (const [viewName, view] of Object.entries(VIEWS)) {
       if (p.click) {
         await page.getByRole(p.role ?? "button", { name: p.click }).first().click({ timeout: 15000 });
         await settle(page);
+      }
+      // Atalho de teclado e digitação (painel de busca Ctrl+K).
+      if (p.press) {
+        await page.keyboard.press(p.press);
+        await settle(page);
+      }
+      if (p.type) {
+        await page.keyboard.type(p.type, { delay: 40 });
+        await page.waitForTimeout(1200);
       }
       log.push(`[${viewName} ${p.name}] ${page.url()} título: ${await page.title()}`);
       // Página mais larga que a tela = rolagem para o lado no celular.
