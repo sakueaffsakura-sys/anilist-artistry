@@ -150,6 +150,8 @@ const PAGES = [
   // leitura
   { group: "leitura", name: "inicio", path: "/", steps: s(8, 5) },
   { group: "leitura", name: "inicio-logado", path: "/", signedIn: true, steps: s(2) },
+  { group: "leitura", name: "atualizados", path: "/atualizados", steps: s(2, 2) },
+  { group: "leitura", name: "atualizados-comic2", path: "/atualizados?formato=Comic2", steps: s(1) },
   { group: "leitura", name: "catalogo", path: "/catalogo", signedIn: true, steps: s(3, 2) },
   { group: "leitura", name: "busca", path: "/catalogo?q=solo&view=lista", signedIn: true, steps: s(2) },
   { group: "leitura", name: "obra", path: `/obra/${WORK}`, signedIn: true, steps: s(6, 3) },
