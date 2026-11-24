@@ -51,6 +51,8 @@ export async function fetchSeries(options: {
   search?: string;
   pinnedFirst?: boolean;
   inSlider?: boolean;
+  /** Quantas obras pular antes de começar (páginas seguintes de /atualizados). */
+  offset?: number;
 }) {
   let query = supabase.from("series").select(SERIES_SELECT).eq("published", true);
   const kidsAges = allowedAgeRatings();
@@ -62,7 +64,14 @@ export async function fetchSeries(options: {
   if (options.inSlider) query = query.eq("in_slider", true);
   if (options.pinnedFirst) query = query.order("pinned", { ascending: false });
 
-  query = query.order(options.order ?? "updated_at", { ascending: false }).limit(options.limit ?? 24);
+  const limit = options.limit ?? 24;
+  query = query.order(options.order ?? "updated_at", { ascending: false });
+  if (options.offset !== undefined) {
+    // Páginas: desempate por id para uma obra não aparecer em duas páginas quando a data é igual.
+    query = query.order("id", { ascending: false }).range(options.offset, options.offset + limit - 1);
+  } else {
+    query = query.limit(limit);
+  }
   query = query.eq("recent_chapters.published", true);
   query = query
     .order("number", { referencedTable: "recent_chapters", ascending: false })
