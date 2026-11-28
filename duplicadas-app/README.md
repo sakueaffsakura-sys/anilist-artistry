@@ -3,6 +3,23 @@
 App separado do Estúdio que procura **obras duplicadas na MediocreScan** e aponta **sinopses zuadas e capas
 quebradas** (aba Problemas). Não envia nada ao site.
 
+- **Procura em segundo plano (nov. 2026, pedido do dono: "continuar rodando mesmo após fechar"):** no celular o
+  trabalho demorado roda no motor nativo `android-src/DupEngine.java` (Java puro, testado por
+  `test/DupEngineTest.java` no GitHub antes do build), dentro do serviço em primeiro plano `DupBgService`
+  ("uso especial", notificação com andamento e botão Parar, trava de energia e de Wi-Fi). Ele lê o catálogo
+  (completo ou só as obras novas a cada 6 h), os detalhes de todas as obras e confere as capas, e continua com o app
+  fechado; o vigia `DupBgWatch` (JobScheduler, 15 min com internet) religa ou acorda, e `DupBgBoot` religa depois de
+  reiniciar o celular ou atualizar o app. O app manda um plano (`bgStart`: token, ritmo, filas com as suspeitas e
+  quase suspeitas primeiro, títulos para o aviso de duplicada nova) e junta os resultados numerados que o motor
+  guardou em `files/dupbg/res-*.jsonl` (`bgPull` a cada 2–5 s com o app aberto; guarda o catálogo e confirma com
+  `bgAck` no máximo a cada 30 s, ao ir para trás e ao terminar). A procura de duplicadas e de problemas roda no app.
+  Eficiência: ritmo da API que se ajusta (começa no "Começar com", acelera 0,1 s a cada 25 acertos até o "Acelerar
+  até"; recusa = mais devagar por 24 h e espera 1, 2, 5, 10, 15 min, depois 30 min, sem desistir; sem internet
+  espera e tenta de novo), capas em paralelo (1–6 linhas, 0,25 s entre começos, pausa geral se o servidor de imagens
+  pedir calma) ao mesmo tempo que os detalhes, listas de capítulos trocadas pelo tamanho (`__len_capitulos`).
+  Avisos: "Conferência completa" e "Possível duplicada nova" (obra nova com o mesmo título normalizado). No
+  navegador (testes) a tela lê sozinha, como antes.
+
 - **Pedidos (1.3+):** no celular passam pelo plugin nativo `DupHttp` (`android-src/DupHttpPlugin.java`, o mesmo
   caminho do Estúdio: HttpURLConnection sem o User-Agent do navegador, só para `https://api.mediocretoons.net/`). A
   1.2 usava o `CapacitorHttp` e o dono relatou que não puxava nada. Se o plugin faltar, cai no `CapacitorHttp` e, no
@@ -57,17 +74,33 @@ quebradas** (aba Problemas). Não envia nada ao site.
   de títulos diferentes. Para não acusar à toa: se 60 %+ das capas conferidas falham, é bloqueio do servidor e vira
   aviso; se a maioria das obras com detalhes vem sem sinopse, "Sem sinopse" não é acusado. "Conferir de novo" relê
   a obra; "Ignorar" guarda no celular (`dup-ok`).
+- **Sinopse na análise (nov. 2026):** além do texto igual ou parecido, os nomes próprios raros da sinopse
+  (personagens, lugares; maiúscula no meio da frase, fora do título, usados por poucas obras) são sinal e
+  candidato: 3+ em comum = 88, 2 = 76, vale entre línguas ("Sung Jinwoo" em português e em inglês). Várias pessoas
+  raras em cada sinopse e nenhuma em comum = "Personagens diferentes" (−15/−20). Cada par traz `parts` (como a nota
+  foi feita) e `desc` (trechos, palavras e nomes em comum); `near` lista quase suspeitas (35+ sem detalhes) para
+  ler primeiro.
+- **Blocos (nov. 2026, pedido do dono):** cada grupo é um bloco com caixinha de seleção; com algum selecionado
+  aparece a barra "Copiar" (links de todas, só as para apagar, ou relatório) e "Deletar" (com confirmação). Os
+  deletados saem da lista e não voltam (`dup-deleted`, os pares entram como dispensados) e ficam no filtro
+  "Apagados", de onde dá para restaurar ou copiar. Nada é apagado no site.
 - **Links (1.6+, pedido do dono):** cada obra mostra o link `https://mediocrescan.com/obra/{id}` (toque abre no
   navegador); "Copiar links" e o relatório levam título + link; os filtros aceitam um link colado.
 - **Tema preto e papel de parede (1.8+, pedido do dono):** fundo preto (também nas barras do Android, via
   `styles.xml` no `patch-android.mjs`), cartões translúcidos. Cartão "Papel de parede": escolhe uma imagem da galeria
   (`<input type="file">`), reduz para no máximo 1800 px em JPEG e guarda no IndexedDB (`wallpaper`); "Escurecer"
   (0–90 %) e "Desfocar" (0–20 px) ficam nos ajustes (`wpDim`, `wpBlur`).
-- **Telas:** navegação embaixo. Painel (token no primeiro uso, cartão da procura automática com as 4 etapas e o
-  andamento, números, níveis, novas desde a última vez, histórico e ferramentas manuais), Duplicadas (2 obras lado a
-  lado com capa, link e "Manter"; 3+ uma por linha; motivos em etiquetas; filtros Todas/Novas/níveis; ordenar por
-  nota, novas, obras ou capítulos; copiar links e relatório), Problemas (filtros Todos/Graves/Sinopse/Capa, trecho da
+- **Telas:** navegação embaixo. Painel (token no primeiro uso, cartão da procura com as faixas Catálogo, Detalhes e
+  sinopses, Capas, ritmo e previsão, aviso para liberar a bateria e os avisos, números que contam, níveis, novas
+  desde a última vez, histórico e ferramentas manuais), Duplicadas (blocos com a nota em anel, 2 obras lado a
+  lado com capa, link e "Manter"; 3+ uma por linha; motivos em etiquetas; "Ver detalhes da nota e as sinopses" com
+  a conta da nota e as duas sinopses com as palavras e nomes em comum marcados; filtros Todas/Novas/níveis/Apagados;
+  ordenar por nota, novas, obras ou capítulos; seleção, copiar e deletar), Problemas (filtros Todos/Graves/Sinopse/Capa, trecho da
   sinopse, medidas da capa, conferir de novo, ignorar, relatório), Catálogo (busca por palavra-chave, com etiqueta de
   duplicada e de problema) e Ajustes (token, automação, análise, papel de parede, diagnóstico e dados).
+- **Animações:** as chapas do nome "respiram" fora de registro enquanto procura; o painel aparece em sequência ao
+  abrir; troca de aba desliza; listas entram em cascata; números contam; a nota enche o anel; faixa ativa com
+  brilho correndo; seleção, barra de ações, folha de escolhas e avisos deslizam; bloco deletado sai de lado. Tudo
+  desliga com "reduzir movimento".
 - **Build:** `.github/workflows/duplicadas-apk.yml` (Capacitor 7, plugin `DupHttp`, tela acesa) publica
   `duplicadas.apk` na release `duplicadas-apk`, assinado com a mesma chave do Estúdio.

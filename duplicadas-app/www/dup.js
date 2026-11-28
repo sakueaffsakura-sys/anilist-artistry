@@ -8,6 +8,10 @@
  * hash da capa) e sinopse igual ou parecida (quando os detalhes foram lidos). Obras com sinopses que dividem
  * várias palavras raras também viram candidatas, mesmo com títulos diferentes (outra língua, nome trocado).
  *
+ * Sinopse: além do texto igual ou parecido, os nomes próprios raros (personagens, lugares, clãs) que aparecem nas
+ * duas: "Sung Jinwoo" e "Cha Hae-In" na sinopse em português e na em inglês = mesma história, mesmo com os títulos
+ * em línguas diferentes. Duas sinopses com vários nomes raros e nenhum em comum = histórias diferentes.
+ *
  * Para não errar (baixam a nota): números diferentes no título (2, II, temporada 3), formatos diferentes (novel ×
  * quadrinho), marca de história paralela/especial ou de outra língua num título só, sinopses bem diferentes na mesma
  * língua, autores diferentes e capas bem diferentes quando o título só é parecido. Sinopse e capa repetidas em
@@ -66,6 +70,14 @@
     if (typeof extra === "string") extra.split(/[\s,;]+/).map((w) => normalize(w)).filter(Boolean).forEach((w) => set.add(w));
     return set;
   }
+  /** Palavras que não entram no título normalizado (para o aviso de duplicada nova no motor do celular). */
+  function skipWords(extra) {
+    const out = new Set(ignoreSet(extra));
+    STOP.forEach((w) => out.add(w));
+    SEQ_WORDS.forEach((w) => out.add(w));
+    Object.keys(ROMAN).forEach((w) => out.add(w));
+    return out;
+  }
   const isNum = (w) => /^\d+$/.test(w) || Object.prototype.hasOwnProperty.call(ROMAN, w);
   const numOf = (w) => (/^\d+$/.test(w) ? String(Number(w)) : String(ROMAN[w]));
 
@@ -106,6 +118,28 @@
     for (let i = 0; i + 2 < words.length; i++) shingles.add(words[i] + " " + words[i + 1] + " " + words[i + 2]);
     out.shingles = shingles;
     return out;
+  }
+  /**
+   * Nomes próprios da sinopse: palavras com maiúscula no meio da frase (o começo da frase não conta), sem artigos e
+   * sem as palavras do título. "Sung Jin-Woo" vira "sung", "jin", "woo". Só os raros no catálogo contam depois.
+   */
+  function descNames(desc, titleTokens) {
+    if (typeof desc !== "string" || desc.length < 40) return null;
+    const out = new Set();
+    const re = /(^|[\s([“"'«—–-])(\p{Lu}[\p{L}'’-]{2,})/gu;
+    let m;
+    while ((m = re.exec(desc))) {
+      const before = desc.slice(0, m.index + m[1].length).replace(/\s+$/, "");
+      // Começo de frase: maiúscula por regra, não por ser nome.
+      if (!before || /[.!?…:]["”»)]?$/.test(before)) continue;
+      const parts = normalize(m[2]).split(" ");
+      // "Jin-Woo" também vale como "jinwoo" (outra grafia do mesmo nome).
+      if (parts.length > 1) parts.push(parts.join(""));
+      for (const part of parts) {
+        if (part.length >= 3 && !STOP.has(part) && !(titleTokens && titleTokens.has(part)) && !/^\d+$/.test(part)) out.add(part);
+      }
+    }
+    return out.size ? out : null;
   }
   /** Chave da sinopse inteira (para achar o mesmo texto em várias obras). */
   function descKey(desc) {
@@ -234,6 +268,7 @@
       const desc = descWords(w.desc, ignore);
       return {
         i, w, names, main: names[0], tokens, kind: kindClass(w.format), cover: coverKey(w.cover), hash, desc,
+        people: descNames(w.desc, tokens),
         descKey: desc ? descKey(w.desc) : null, lang: desc ? langOf(w.desc, [w.title].concat(alts)) : null, authors: authorSet(w),
         side: SIDE_RE.test(names[0].norm), langMark: LANG_MARK_RE.test(names[0].norm),
       };
@@ -241,17 +276,21 @@
   }
 
   function idfTable(prepared) {
-    const df = new Map(), ddf = new Map(), hdf = new Map(), dkc = new Map();
+    const df = new Map(), ddf = new Map(), hdf = new Map(), dkc = new Map(), ndf = new Map();
     for (const p of prepared) {
       for (const t of p.tokens) df.set(t, (df.get(t) || 0) + 1);
+      if (p.people) for (const t of p.people) ndf.set(t, (ndf.get(t) || 0) + 1);
       if (p.desc) for (const t of p.desc) ddf.set(t, (ddf.get(t) || 0) + 1);
       if (p.hash) hdf.set(p.hash, (hdf.get(p.hash) || 0) + 1);
       if (p.descKey) dkc.set(p.descKey, (dkc.get(p.descKey) || 0) + 1);
     }
     const n = prepared.length || 1;
+    // Nome "raro": aparece na sinopse de poucas obras (personagem, não "Deus", "Imperador" ou "Academia").
+    const rareName = Math.max(4, Math.round(n * 0.0015));
     // Capa ou sinopse usada por muitas obras é padrão ("sem capa", "sinopse em breve"): não conta.
     return {
-      df, ddf, hdf, dkc, idf: (t) => Math.log(1 + n / (df.get(t) || 1)),
+      df, ddf, hdf, dkc, ndf, idf: (t) => Math.log(1 + n / (df.get(t) || 1)),
+      rarePeople: (p) => (p.people && !((dkc.get(p.descKey) || 0) >= 3) ? Array.from(p.people).filter((t) => (ndf.get(t) || 0) <= rareName && (ddf.get(t) || 0) <= rareName * 3) : []),
       placeholder: (h) => (hdf.get(h) || 0) >= PLACEHOLDER_MIN,
       descOk: (p) => Boolean(p.desc) && (dkc.get(p.descKey) || 0) < 3,
     };
@@ -296,10 +335,27 @@
       }
     }
     for (const [k, n] of co) if (n >= 3) pairs.add(k);
+    // Nomes próprios raros da sinopse (personagens): 2 ou mais em comum = candidatas, mesmo em línguas diferentes.
+    const nBuckets = new Map();
+    for (const p of prepared) {
+      p.rare = table.rarePeople(p);
+      for (const k of p.rare) { const d = table.ndf.get(k) || 0; if (d < 2) continue; let l = nBuckets.get(k); if (!l) nBuckets.set(k, (l = [])); l.push(p.i); }
+    }
+    const nco = new Map();
+    for (const list of nBuckets.values()) {
+      for (let a = 0; a < list.length; a++) for (let b = a + 1; b < list.length; b++) {
+        const k = Math.min(list[a], list[b]) * 1e6 + Math.max(list[a], list[b]);
+        nco.set(k, (nco.get(k) || 0) + 1);
+      }
+    }
+    for (const [k, n] of nco) if (n >= 2) pairs.add(k);
     return pairs;
   }
 
-  /** Nota de 0 a 100 e os motivos de duas obras serem a mesma. */
+  /**
+   * Nota de 0 a 100 e os motivos de duas obras serem a mesma. parts: como a nota foi feita (sinal principal, bônus e
+   * descontos, em pontos); desc: comparação das sinopses (trechos, palavras e nomes em comum).
+   */
   function scorePair(A, B, table) {
     const signals = [];
     const sig = (score, text) => signals.push({ score, text });
@@ -348,59 +404,65 @@
     if (table.descOk(A) && table.descOk(B)) {
       const sh = A.desc.shingles.size && B.desc.shingles.size ? jaccard(A.desc.shingles, B.desc.shingles) : 0;
       const j = jaccard(A.desc, B.desc);
-      descSim = { sh, j };
+      const common = Array.from(A.desc).filter((t) => B.desc.has(t)).sort((x, y) => (table.ddf.get(x) || 0) - (table.ddf.get(y) || 0)).slice(0, 12);
+      descSim = { sh, j, words: common };
       if (sh >= 0.7 || j >= 0.85) sig(96, "Mesma sinopse");
       else if (sh >= 0.4 || j >= 0.6) sig(88, `Sinopse quase igual (${Math.round(Math.max(sh, j) * 100)}%)`);
       else if (j >= 0.4) sig(70, `Sinopse parecida (${Math.round(j * 100)}%)`);
     }
+    // Personagens e lugares (nomes raros) nas duas sinopses: vale entre línguas diferentes.
+    const ra = A.rare || [], rb = new Set(B.rare || []);
+    const people = ra.filter((t) => rb.has(t));
+    if (people.length >= 3) sig(88, `Mesmos nomes na sinopse: ${people.slice(0, 4).join(", ")}`);
+    else if (people.length === 2) sig(76, `Dois nomes iguais na sinopse: ${people.join(", ")}`);
+    if (descSim || people.length) descSim = Object.assign(descSim || { sh: 0, j: 0, words: [] }, { people });
     if (!signals.length) return null;
     signals.sort((p, q) => q.score - p.score);
-    let score = signals[0].score + Math.min(8, 4 * signals.filter((s) => s.score >= 70).slice(1).length);
+    const parts = [{ text: signals[0].text, pts: signals[0].score, base: true }];
+    const extra = signals.filter((s) => s.score >= 70).slice(1, 3);
+    let score = signals[0].score;
+    extra.forEach((s) => { score += 4; parts.push({ text: `Mais um sinal: ${s.text}`, pts: 4 }); });
     const reasons = signals.map((s) => s.text);
     const notes = [];
+    const minus = (pts, text) => { score -= pts; notes.push(text); parts.push({ text, pts: -pts }); };
+    const plus = (pts, text) => { score += pts; reasons.push(text); parts.push({ text, pts }); };
     const ca = Number(A.w.chapters), cb = Number(B.w.chapters);
-    if (ca > 5 && ca === cb) { score += 3; reasons.push(`Mesmo número de capítulos (${ca})`); }
-    else if (ca > 5 && cb > 5 && Math.abs(ca - cb) <= Math.max(2, Math.round(Math.max(ca, cb) * 0.05))) { score += 2; reasons.push(`Número de capítulos parecido (${ca} × ${cb})`); }
+    if (ca > 5 && ca === cb) plus(3, `Mesmo número de capítulos (${ca})`);
+    else if (ca > 5 && cb > 5 && Math.abs(ca - cb) <= Math.max(2, Math.round(Math.max(ca, cb) * 0.05))) plus(2, `Número de capítulos parecido (${ca} × ${cb})`);
     if (A.main.seq !== B.main.seq) {
       // 8 × 9 é outra obra quase sempre; "Obra" × "Obra 2" costuma ser a continuação.
-      score -= A.main.seq && B.main.seq ? 45 : 30;
-      notes.push(`Números diferentes no título (${A.main.seq || "nenhum"} × ${B.main.seq || "nenhum"}): pode ser continuação`);
+      minus(A.main.seq && B.main.seq ? 45 : 30, `Números diferentes no título (${A.main.seq || "nenhum"} × ${B.main.seq || "nenhum"}): pode ser continuação`);
     }
-    if (A.kind && B.kind && A.kind !== B.kind) {
-      score -= 35;
-      notes.push(`Formatos diferentes (${A.w.format} × ${B.w.format}): pode ser adaptação ou outra edição`);
-    }
-    if (A.side !== B.side) {
-      score -= 20;
-      notes.push("Só um dos títulos tem marca de história paralela ou especial");
-    }
-    if (A.langMark !== B.langMark) {
-      score -= 20;
-      notes.push("Só um dos títulos tem marca de outra língua");
-    }
+    if (A.kind && B.kind && A.kind !== B.kind) minus(35, `Formatos diferentes (${A.w.format} × ${B.w.format}): pode ser adaptação ou outra edição`);
+    if (A.side !== B.side) minus(20, "Só um dos títulos tem marca de história paralela ou especial");
+    if (A.langMark !== B.langMark) minus(20, "Só um dos títulos tem marca de outra língua");
     const exactName = bestName >= 95;
     // Sinopses longas, na mesma língua e sem quase nada em comum: histórias diferentes.
-    if (descSim && descSim.sh === 0 && descSim.j < 0.06 && A.lang && A.lang === B.lang && A.desc.size >= 20 && B.desc.size >= 20) {
-      score -= exactName ? 15 : 25;
-      notes.push("Sinopses bem diferentes: podem ser histórias diferentes com nome parecido");
+    let differentStory = false;
+    if (descSim && descSim.sh === 0 && descSim.j < 0.06 && A.lang && A.lang === B.lang && A.desc.size >= 20 && B.desc.size >= 20 && people.length < 2) {
+      differentStory = true;
+      minus(exactName ? 15 : 25, "Sinopses bem diferentes: podem ser histórias diferentes com nome parecido");
+    }
+    // Vários personagens raros em cada sinopse e nenhum em comum (vale entre línguas): outra história.
+    if (!differentStory && ra.length >= 3 && rb.size >= 3 && !people.length && !(descSim && (descSim.sh >= 0.4 || descSim.j >= 0.5))) {
+      minus(exactName ? 15 : 20, "Personagens diferentes nas sinopses");
     }
     // Autores: iguais ajudam; diferentes (sem nenhuma palavra em comum) baixam a nota se o título não for o mesmo.
     if (A.authors.size && B.authors.size) {
       const same = Array.from(A.authors).find((x) => B.authors.has(x));
       const words = (set) => new Set(Array.from(set).join(" ").split(" ").filter((x) => x.length > 2));
       const wa = words(A.authors), wb = words(B.authors);
-      if (same) { score += 3; reasons.push(`Mesmo autor (${same})`); }
+      if (same) plus(3, `Mesmo autor (${same})`);
       else if (!Array.from(wa).some((x) => wb.has(x))) {
-        if (!exactName) score -= 15;
-        notes.push(`Autores diferentes (${Array.from(A.authors)[0]} × ${Array.from(B.authors)[0]})`);
+        const text = `Autores diferentes (${Array.from(A.authors)[0]} × ${Array.from(B.authors)[0]})`;
+        if (!exactName) minus(15, text); else notes.push(text);
       }
     }
     // Capas bem diferentes quando o título só é parecido (e a sinopse não confirma).
-    if (coverDist != null && coverDist >= 28 && bestName < 90 && !(descSim && (descSim.sh >= 0.4 || descSim.j >= 0.6))) {
-      score -= 8;
-      notes.push("Capas bem diferentes");
+    if (coverDist != null && coverDist >= 28 && bestName < 90 && !(descSim && (descSim.sh >= 0.4 || descSim.j >= 0.6)) && people.length < 2) {
+      minus(8, "Capas bem diferentes");
     }
-    return { score: Math.max(0, Math.min(100, Math.round(score))), reasons, notes };
+    return { score: Math.max(0, Math.min(100, Math.round(score))), reasons, notes, parts, desc: descSim, cover: coverDist };
   }
 
   /**
@@ -437,12 +499,17 @@
     const table = idfTable(prepared);
     const cands = candidates(prepared, table);
     const pairs = [];
+    const near = new Map();
     for (const k of cands) {
       const a = Math.floor(k / 1e6), b = k % 1e6;
       const A = prepared[a], B = prepared[b];
       if (dismissed.has(pairKey(String(A.w.id), String(B.w.id)))) continue;
       const r = scorePair(A, B, table);
-      if (r && r.score >= min) pairs.push({ a: A.w, b: B.w, score: r.score, level: levelOf(r.score), reasons: r.reasons, notes: r.notes });
+      if (r && r.score >= min) pairs.push({ a: A.w, b: B.w, score: r.score, level: levelOf(r.score), reasons: r.reasons, notes: r.notes, parts: r.parts, desc: r.desc, coverDist: r.cover });
+      else if (r && r.score >= 35) {
+        // Quase suspeitas: os detalhes (sinopse, nomes, autores) podem confirmar ou descartar.
+        for (const w of [A.w, B.w]) if (!w.detailed) near.set(w.id, Math.max(near.get(w.id) || 0, r.score));
+      }
     }
     // Grupos: obras ligadas por pares de 70 ou mais. Um par "talvez" vira grupo à parte (não junta grupos: A≈B
     // forte e B≈C fraco não põe C junto de A).
@@ -474,7 +541,8 @@
       g.pairs.sort((x, y) => y.score - x.score);
       return { key: ws.map((w) => w.id).join("-"), ids: ws.map((w) => w.id), works: ws, pairs: g.pairs, score: g.score, level: levelOf(g.score), keep: keepOf(ws) };
     }).sort((x, y) => y.score - x.score || y.works.length - x.works.length);
-    return { groups, pairs, compared: cands.size, ms: Date.now() - t0 };
+    const nearIds = Array.from(near.entries()).sort((x, y) => y[1] - x[1]).map((e) => e[0]);
+    return { groups, pairs, near: nearIds, compared: cands.size, ms: Date.now() - t0 };
   }
 
   /** Busca por palavra-chave no catálogo: todas as palavras precisam aparecer (no começo de alguma palavra do nome). */
@@ -655,7 +723,7 @@
     return { items, counts, warnings, ms: Date.now() - t0 };
   }
 
-  const api = { normalize, analyze, ignoreSet, similarity, hamming, keepOf, findDuplicates, search, levelOf, pairKey, langOf, descIssues, coverIssues, findProblems, FORMAT_WORDS };
+  const api = { normalize, analyze, ignoreSet, similarity, hamming, keepOf, findDuplicates, search, levelOf, pairKey, langOf, descNames, skipWords, descIssues, coverIssues, findProblems, FORMAT_WORDS };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.Dup = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

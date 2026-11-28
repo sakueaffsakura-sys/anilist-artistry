@@ -42,20 +42,80 @@ for (const f of readdirSync("android-src").filter((x) => x.endsWith(".java"))) {
   writeFileSync(join(javaDir, f), readFileSync(join("android-src", f), "utf8").replace("package __PKG__;", `package ${pkg};`));
 }
 
-// Tela acesa enquanto o app está aberto: a leitura do catálogo roda na tela e pode levar vários minutos.
+// MainActivity: plugin DupHttp; se o Android encerrar a parte do WebView (pouca memória), recria a tela em vez de
+// fechar o app — a procura roda no serviço nativo e continua de qualquer jeito.
 writeFileSync(main, `package ${pkg};
 
 import android.os.Bundle;
-import android.view.WindowManager;
+import android.webkit.RenderProcessGoneDetail;
+import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.WebViewListener;
 
 public class MainActivity extends BridgeActivity {
+    private volatile boolean visible = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(DupHttpPlugin.class);
         super.onCreate(savedInstanceState);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (getBridge() != null) {
+            getBridge().addWebViewListener(new WebViewListener() {
+                @Override
+                public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                    runOnUiThread(() -> { if (visible) recreate(); else finish(); });
+                    return true;
+                }
+            });
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        visible = true;
+    }
+
+    @Override
+    public void onPause() {
+        visible = false;
+        super.onPause();
     }
 }
 `);
-console.log(`Versão 1.${build}; MainActivity com a tela acesa e o plugin DupHttp (${pkg}).`);
+
+// Permissões e declaração do serviço da procura em segundo plano, do vigia e do religamento.
+const manifestPath = "android/app/src/main/AndroidManifest.xml";
+let m = readFileSync(manifestPath, "utf8");
+const perms = [
+  "android.permission.FOREGROUND_SERVICE",
+  "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+  "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
+  "android.permission.ACCESS_WIFI_STATE",
+  "android.permission.POST_NOTIFICATIONS",
+  "android.permission.WAKE_LOCK",
+  "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+  "android.permission.ACCESS_NETWORK_STATE",
+  "android.permission.RECEIVE_BOOT_COMPLETED",
+].filter((p) => !m.includes(`"${p}"`)).map((p) => `    <uses-permission android:name="${p}" />`).join("\n");
+if (perms) m = m.replace(/<\/manifest>\s*$/, `${perms}\n</manifest>\n`);
+if (!m.includes(".DupBgService")) {
+  // specialUse (Android 14+): procura longa sem o limite diário de 6 h da sincronização de dados no Android 15.
+  m = m.replace("</application>", `        <service android:name=".DupBgService" android:exported="false" android:stopWithTask="false" android:foregroundServiceType="dataSync|specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Procura contínua de obras duplicadas no catálogo, ligada pelo usuário, com notificação e botão Parar." />
+        </service>
+        <service android:name=".DupBgWatch" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="false" />
+        <receiver android:name=".DupBgBoot" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+    </application>`);
+}
+writeFileSync(manifestPath, m);
+if (!m.includes("FOREGROUND_SERVICE_SPECIAL_USE") || !m.includes(".DupBgService") || !m.includes(".DupBgWatch") || !m.includes(".DupBgBoot")) {
+  throw new Error("Manifesto sem o serviço da procura em segundo plano");
+}
+console.log(`Versão 1.${build}; plugin DupHttp e procura em segundo plano (${pkg}).`);

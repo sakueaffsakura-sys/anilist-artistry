@@ -113,7 +113,8 @@
     if (o.obr_novel_id) format = format && /novel/i.test(format) ? format : "Novel";
     const st = o.obr_status ?? o.status;
     const status = typeof st === "string" ? st.trim() : isObj(st) ? str(st, "stt_nome", "nome", "name") : null;
-    const caps = Array.isArray(o.capitulos) ? o.capitulos.length : null;
+    // O motor do celular troca listas grandes (capítulos) pelo tamanho: "__len_capitulos".
+    const caps = Array.isArray(o.capitulos) ? o.capitulos.length : int(o, "__len_capitulos");
     const chapters = int(o, "obr_total_capitulos", "total_capitulos", "capitulos_count", "qtd_capitulos", "obr_qtd_capitulos", "cap_count", "chapters_count") ?? caps;
     const desc = str(o, ...DESC_KEYS);
     const tags = Array.isArray(o.tags) ? o.tags.map((t) => (typeof t === "string" ? t : isObj(t) ? str(t, "tag_nome", "nome", "name") : null)).filter(Boolean) : [];
@@ -136,6 +137,58 @@
     if ("obr_id" in raw || "obr_nome" in raw) return toWork(raw);
     for (const k of ["data", "obra", "result"]) if (isObj(raw[k])) { const w = toDetail(raw[k]); if (w) return w; }
     return null;
+  }
+
+  /* ---------- Juntar ao catálogo (leitura da tela e resultados do motor do celular) ---------- */
+
+  /** Junta obras ao catálogo; devolve quantas eram novas. */
+  function mergeWorks(cat, list) {
+    let added = 0;
+    for (const w of list) {
+      if (!w) continue;
+      const old = cat.works.get(w.id);
+      if (!old) { cat.works.set(w.id, w); added++; }
+      else cat.works.set(w.id, Object.assign({}, w, old, { alts: old.alts && old.alts.length ? old.alts : w.alts, cover: old.cover || w.cover }));
+    }
+    return added;
+  }
+  /** Detalhes lidos de uma obra (raw: resposta da API, ou null se não veio). Devolve a obra atualizada. */
+  function mergeDetail(cat, id, raw) {
+    const old = cat.works.get(id);
+    if (!old) return null;
+    const w = raw ? toDetail(raw) : null;
+    let next;
+    if (w) {
+      // Sem o campo da sinopse na resposta, fica a que veio da lista; capa nova: confere de novo.
+      const keepDesc = !w.descField && old.desc;
+      const fresh = { detailed: true, alts: w.alts.length ? w.alts : old.alts || [], cover: w.cover || old.cover, authors: w.authors.length ? w.authors : old.authors || [] };
+      if (keepDesc) Object.assign(fresh, { desc: old.desc, descField: Boolean(old.descField), descCut: Boolean(old.descCut) });
+      next = Object.assign({}, old, w, fresh);
+      if (next.cover !== old.cover) { delete next.coverInfo; delete next.coverHash; delete next.coverTries; }
+    } else next = Object.assign({}, old, { detailed: true });
+    cat.works.set(id, next);
+    return next;
+  }
+  /**
+   * Resultado da conferência de uma capa: {s: status, t, b, w, h, std, ok, hash, err} (ou só o hash). Sem resposta
+   * (s 0): conta a tentativa e só registra na 3ª (ou se force).
+   */
+  function applyCover(cat, id, info, now, force) {
+    const w = cat.works.get(id);
+    if (!w) return null;
+    if (typeof info === "string") info = { s: 200, ok: true, hash: info };
+    if (!info) info = { s: 0 };
+    const next = Object.assign({}, w);
+    if (!info.s) {
+      next.coverTries = (w.coverTries || 0) + 1;
+      if (next.coverTries >= 3 || force) next.coverInfo = { s: 0, err: info.err || null, at: now };
+    } else {
+      next.coverInfo = { s: info.s, t: info.t || null, b: info.b || 0, w: info.w || 0, h: info.h || 0, std: info.std == null ? null : Math.round(info.std * 10) / 10, ok: Boolean(info.ok), err: info.err || null, at: now };
+      next.coverHash = info.ok && typeof info.hash === "string" ? info.hash : null;
+      delete next.coverTries;
+    }
+    cat.works.set(id, next);
+    return next;
   }
 
   /**
@@ -198,16 +251,7 @@
       return toWorks(data).length;
     }
 
-    /** Junta obras ao catálogo; devolve quantas eram novas. */
-    function mergeInto(cat, list) {
-      let added = 0;
-      for (const w of list) {
-        const old = cat.works.get(w.id);
-        if (!old) { cat.works.set(w.id, w); added++; }
-        else cat.works.set(w.id, Object.assign({}, w, old, { alts: old.alts && old.alts.length ? old.alts : w.alts, cover: old.cover || w.cover }));
-      }
-      return added;
-    }
+    const mergeInto = mergeWorks;
 
     /**
      * Página N de uma lista. Na página 2, descobre como a API pagina (offset, pagina, page…): vale o primeiro jeito que
@@ -354,19 +398,11 @@
         n++;
         const old = cat.works.get(id);
         if (!old || (old.detailed && !force)) continue;
-        let w = null;
-        try { w = toDetail(await get(`/obras/${id}`)); }
+        let raw = null;
+        try { raw = await get(`/obras/${id}`); }
         catch (e) { if (e instanceof Fatal || e instanceof Stopped) throw e; }
-        if (w) {
-          // Sem o campo da sinopse na resposta, fica a que veio da lista; capa nova: confere de novo.
-          const keepDesc = !w.descField && old.desc;
-          const fresh = { detailed: true, alts: w.alts.length ? w.alts : old.alts || [], cover: w.cover || old.cover, authors: w.authors.length ? w.authors : old.authors || [] };
-          if (keepDesc) Object.assign(fresh, { desc: old.desc, descField: Boolean(old.descField), descCut: Boolean(old.descCut) });
-          const next = Object.assign({}, old, w, fresh);
-          if (next.cover !== old.cover) { delete next.coverInfo; delete next.coverHash; delete next.coverTries; }
-          cat.works.set(id, next);
-        } else cat.works.set(id, Object.assign({}, old, { detailed: true }));
-        emit({ type: "detail", n, of: ids.length, id, title: (w || old).title });
+        const next = mergeDetail(cat, id, raw);
+        emit({ type: "detail", n, of: ids.length, id, title: (next || old).title });
         if (n % 5 === 0 || n === ids.length) await save(cat);
       }
       return cat;
@@ -395,18 +431,7 @@
         let info = null;
         try { info = await checkCover(w.cover); } catch (e) { info = { s: 0, err: String((e && e.message) || e).slice(0, 80) }; }
         check();
-        if (typeof info === "string") info = { s: 200, ok: true, hash: info };
-        if (!info) info = { s: 0 };
-        const next = Object.assign({}, w);
-        if (!info.s) {
-          next.coverTries = (w.coverTries || 0) + 1;
-          if (next.coverTries >= 3 || force) next.coverInfo = { s: 0, err: info.err || null, at: deps.now() };
-        } else {
-          next.coverInfo = { s: info.s, t: info.t || null, b: info.b || 0, w: info.w || 0, h: info.h || 0, std: info.std == null ? null : Math.round(info.std * 10) / 10, ok: Boolean(info.ok), err: info.err || null, at: deps.now() };
-          next.coverHash = info.ok && typeof info.hash === "string" ? info.hash : null;
-          delete next.coverTries;
-        }
-        cat.works.set(id, next);
+        applyCover(cat, id, info, deps.now(), force);
         emit({ type: "cover", n, of: ids.length, id, title: w.title });
         if (n % 10 === 0 || n === ids.length) await save(cat);
       }
@@ -417,7 +442,7 @@
     return { get, test, readCatalog, readRecent, readLetters, readDetails, readCovers, stop: () => { stop = true; }, get stopped() { return stop; } };
   }
 
-  const api = { createReader, toWork, toWorks, toDetail, pagination, listOf, snippet, Stopped, Fatal, API, CDN };
+  const api = { createReader, toWork, toWorks, toDetail, pagination, listOf, snippet, mergeWorks, mergeDetail, applyCover, image, Stopped, Fatal, API, CDN, LIST, PAGERS_COUNT: PAGERS.length };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.MediocreApi = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
