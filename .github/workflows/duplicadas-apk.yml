@@ -41,6 +41,14 @@ jobs:
             const w = Api.toWork({obr_id: 9, obr_nome: "X", obr_imagem: "a.webp", formato: {formt_nome: "Manhwa"}});
             if (!w || w.cover !== "https://cdn.mediocrescan.com/obras/9/a.webp") { console.error("api:", w); process.exit(1); }
             console.log("ok:", r.groups.length, "grupos");'
+      - name: Testar o motor em segundo plano (Java puro)
+        run: |
+          mkdir -p /tmp/jt/src/dup /tmp/jt/out
+          for f in android-src/Json.java android-src/DupEngine.java android-src/DupNet.java test/DupEngineTest.java; do
+            sed 's/package __PKG__;/package dup;/' "$f" > "/tmp/jt/src/dup/$(basename "$f")"
+          done
+          javac -d /tmp/jt/out /tmp/jt/src/dup/*.java
+          timeout 300 java -cp /tmp/jt/out dup.DupEngineTest | grep -v "^ok   token goes"
       - name: Instalar o Capacitor
         run: npm install --no-audit --no-fund
       - name: Copiar o Capacitor para o app
@@ -89,5 +97,5 @@ jobs:
           gh release delete duplicadas-apk --yes --cleanup-tag || true
           gh release create duplicadas-apk duplicadas.apk \
             --title "Duplicadas — versão 1.${{ github.run_number }}" \
-            --notes "App que lê o catálogo da MediocreScan com o seu token e procura obras duplicadas. Instale por cima da versão anterior." \
+            --notes "App que lê o catálogo da MediocreScan com o seu token e procura obras duplicadas, sinopses zuadas e capas quebradas (continua com o app fechado). Instale por cima da versão anterior." \
             --latest=false

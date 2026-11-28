@@ -1,7 +1,14 @@
 package __PKG__;
 
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
+import android.Manifest;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
+import android.os.PowerManager;
+import android.provider.Settings;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -13,11 +20,13 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 /**
  * Pedidos à API da MediocreScan pelo mesmo caminho que o Estúdio usa no celular (HttpURLConnection, sem o
  * User-Agent do navegador): só aceita endereços da API, manda o token no cabeçalho e devolve status e texto.
  * cover(url): confere uma capa (abre a imagem aqui no Android e devolve só as medidas e o hash, sem o arquivo).
+ * bg*: procura em segundo plano (serviço DupBgService com o motor DupEngine), que continua com o app fechado.
  */
 @CapacitorPlugin(name = "DupHttp")
 public class DupHttpPlugin extends Plugin {
@@ -112,7 +121,7 @@ public class DupHttpPlugin extends Plugin {
                         try {
                             byte[] bytes = in == null ? new byte[0] : readBytes(in, MAX_IMAGE);
                             o.put("b", bytes.length);
-                            measure(bytes, o);
+                            for (Map.Entry<String, Object> m : DupImages.measureBytes(bytes).entrySet()) o.put(m.getKey(), m.getValue());
                         } catch (IOException big) {
                             o.put("ok", false);
                             o.put("err", "imagem grande demais (mais de 8 MB)");
@@ -137,48 +146,115 @@ public class DupHttpPlugin extends Plugin {
         }, "duplicadas-capa").start();
     }
 
-    /** Abre a imagem em tamanho reduzido e mede: largura e altura reais, hash (dHash) e variação de brilho. */
-    private static void measure(byte[] bytes, JSObject o) {
-        BitmapFactory.Options bounds = new BitmapFactory.Options();
-        bounds.inJustDecodeBounds = true;
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
-        int w = bounds.outWidth, h = bounds.outHeight;
-        if (w <= 0 || h <= 0) { o.put("ok", false); return; }
-        o.put("w", w);
-        o.put("h", h);
-        int sample = 1;
-        while (Math.min(w, h) / (sample * 2) >= 64) sample *= 2;
-        BitmapFactory.Options opts = new BitmapFactory.Options();
-        opts.inSampleSize = sample;
-        Bitmap bm = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, opts);
-        if (bm == null) { o.put("ok", false); return; }
+    /* ---------- procura em segundo plano ---------- */
+
+    private boolean askedNotifications = false;
+
+    /** Liga (ou atualiza) a procura em segundo plano com o plano do app (token, ritmo, filas, catálogo). */
+    @PluginMethod
+    public void bgStart(PluginCall call) {
+        JSObject plan = call.getObject("plan");
+        if (plan == null) { call.reject("Plano vazio."); return; }
         try {
-            Bitmap s9 = Bitmap.createScaledBitmap(bm, 9, 8, true);
-            StringBuilder hex = new StringBuilder();
-            for (int y = 0; y < 8; y++) {
-                int b = 0;
-                for (int x = 0; x < 8; x++) b = (b << 1) | (lum(s9.getPixel(x, y)) > lum(s9.getPixel(x + 1, y)) ? 1 : 0);
-                hex.append(String.format("%02x", b));
-            }
-            if (s9 != bm) s9.recycle();
-            Bitmap s16 = Bitmap.createScaledBitmap(bm, 16, 16, true);
-            double sum = 0, sq = 0;
-            for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) { double l = lum(s16.getPixel(x, y)); sum += l; sq += l * l; }
-            if (s16 != bm) s16.recycle();
-            double mean = sum / 256.0;
-            o.put("std", Math.sqrt(Math.max(0, sq / 256.0 - mean * mean)));
-            o.put("hash", hex.toString());
-            o.put("ok", true);
-        } finally {
-            bm.recycle();
+            DupBgStore.get(getContext()).savePlan(plan.toString());
+            DupBgStore.get(getContext()).setAuto(true);
+            Intent i = new Intent(getContext(), DupBgService.class).setAction(DupBgService.ACTION_PLAN);
+            if (Build.VERSION.SDK_INT >= 26) getContext().startForegroundService(i);
+            else getContext().startService(i);
+        } catch (RuntimeException e) {
+            call.reject("O Android não deixou ligar a procura em segundo plano: " + e.getMessage());
+            return;
         }
+        askNotifications();
+        JSObject o = new JSObject();
+        o.put("ok", true);
+        call.resolve(o);
     }
 
-    /** Brilho do pixel (transparente conta como branco). */
-    private static double lum(int px) {
-        double a = ((px >>> 24) & 0xff) / 255.0;
-        double l = ((px >> 16) & 0xff) * 0.299 + ((px >> 8) & 0xff) * 0.587 + (px & 0xff) * 0.114;
-        return a * l + (1 - a) * 255;
+    @PluginMethod
+    public void bgStop(PluginCall call) {
+        DupBgStore.get(getContext()).setAuto(false);
+        DupBgWatch.cancel(getContext());
+        if (DupBgService.engineRunning()) {
+            try {
+                Intent i = new Intent(getContext(), DupBgService.class).setAction(DupBgService.ACTION_STOP);
+                if (Build.VERSION.SDK_INT >= 26) getContext().startForegroundService(i);
+                else getContext().startService(i);
+            } catch (RuntimeException ignored) { /* já parado */ }
+        }
+        call.resolve(new JSObject());
+    }
+
+    /** Andamento: {status: JSON do motor, running, auto, seq (último resultado), battery, notifications}. */
+    @PluginMethod
+    public void bgStatus(PluginCall call) {
+        JSObject o = new JSObject();
+        Map<String, Object> st = DupBgService.status();
+        o.put("status", st == null ? null : Json.stringify(st));
+        o.put("running", DupBgService.engineRunning());
+        DupBgStore store = DupBgStore.get(getContext());
+        o.put("auto", store.auto());
+        o.put("seq", store.seq());
+        PowerManager pm = (PowerManager) getContext().getSystemService(android.content.Context.POWER_SERVICE);
+        o.put("battery", pm != null && Build.VERSION.SDK_INT >= 23 && pm.isIgnoringBatteryOptimizations(getContext().getPackageName()));
+        o.put("notifications", Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED);
+        call.resolve(o);
+    }
+
+    /** Resultados guardados pelo motor depois de `after` (em pedaços de até `max`). */
+    @PluginMethod
+    public void bgPull(PluginCall call) {
+        long after = call.getLong("after", 0L) == null ? 0 : call.getLong("after", 0L);
+        Integer max = call.getInt("max", 400);
+        Object[] r = DupBgStore.get(getContext()).pull(after, max == null ? 400 : Math.max(1, Math.min(2000, max)));
+        JSObject o = new JSObject();
+        o.put("data", (String) r[0]);
+        o.put("last", (Long) r[1]);
+        o.put("more", (Boolean) r[2]);
+        call.resolve(o);
+    }
+
+    /** O app guardou os resultados até `upTo`: podem ser apagados do celular. */
+    @PluginMethod
+    public void bgAck(PluginCall call) {
+        Long upTo = call.getLong("upTo", 0L);
+        DupBgStore.get(getContext()).ack(upTo == null ? 0 : upTo);
+        call.resolve(new JSObject());
+    }
+
+    /** Pede ao Android para não economizar bateria com o app (sem isso ele pode parar a procura com o app fechado). */
+    @PluginMethod
+    public void bgBattery(PluginCall call) {
+        try {
+            if (Build.VERSION.SDK_INT >= 23) {
+                Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getContext().getPackageName()));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(i);
+            }
+        } catch (RuntimeException e) {
+            try {
+                Intent i = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(i);
+            } catch (RuntimeException ignored) { /* sem tela de ajuste */ }
+        }
+        call.resolve(new JSObject());
+    }
+
+    /** Pede a permissão de avisos (Android 13+), para a notificação do andamento aparecer. */
+    @PluginMethod
+    public void bgNotifications(PluginCall call) {
+        askedNotifications = false;
+        askNotifications();
+        call.resolve(new JSObject());
+    }
+
+    private void askNotifications() {
+        if (askedNotifications || Build.VERSION.SDK_INT < 33 || getActivity() == null) return;
+        askedNotifications = true;
+        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(getActivity(), new String[] { Manifest.permission.POST_NOTIFICATIONS }, 5021);
+        }
     }
 
     private static byte[] readBytes(InputStream in, int max) throws IOException {
