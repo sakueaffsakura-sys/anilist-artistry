@@ -70,6 +70,14 @@
     if (typeof extra === "string") extra.split(/[\s,;]+/).map((w) => normalize(w)).filter(Boolean).forEach((w) => set.add(w));
     return set;
   }
+  /** Palavras que não entram no título normalizado (para o aviso de duplicada nova no motor do celular). */
+  function skipWords(extra) {
+    const out = new Set(ignoreSet(extra));
+    STOP.forEach((w) => out.add(w));
+    SEQ_WORDS.forEach((w) => out.add(w));
+    Object.keys(ROMAN).forEach((w) => out.add(w));
+    return out;
+  }
   const isNum = (w) => /^\d+$/.test(w) || Object.prototype.hasOwnProperty.call(ROMAN, w);
   const numOf = (w) => (/^\d+$/.test(w) ? String(Number(w)) : String(ROMAN[w]));
 
@@ -715,7 +723,7 @@
     return { items, counts, warnings, ms: Date.now() - t0 };
   }
 
-  const api = { normalize, analyze, ignoreSet, similarity, hamming, keepOf, findDuplicates, search, levelOf, pairKey, langOf, descNames, descIssues, coverIssues, findProblems, FORMAT_WORDS };
+  const api = { normalize, analyze, ignoreSet, similarity, hamming, keepOf, findDuplicates, search, levelOf, pairKey, langOf, descNames, skipWords, descIssues, coverIssues, findProblems, FORMAT_WORDS };
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.Dup = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

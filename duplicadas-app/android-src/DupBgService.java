@@ -86,12 +86,21 @@ public class DupBgService extends Service {
             return START_NOT_STICKY;
         }
         if (ACTION_PLAN.equals(action)) {
-            Map<String, Object> plan = store.loadPlan();
-            if (plan == null) { if (!engineAlive()) finish(null, null); return START_STICKY; }
             store.setAuto(true);
             DupBgWatch.schedule(this);
-            if (engineAlive()) engine.applyPlan(plan);
-            else launch(plan);
+            // O plano pode ser grande (filas de milhares de obras): lê e aplica fora da thread da tela.
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    Map<String, Object> plan = store.loadPlan();
+                    synchronized (DupBgService.this) {
+                        if (plan == null) { if (!engineAlive()) finish(null, null); return; }
+                        DupEngine e = engine;
+                        if (e != null && engineAlive()) e.applyPlan(plan);
+                        else launch(plan);
+                    }
+                }
+            }, "duplicadas-plano").start();
             return START_STICKY;
         }
         if (ACTION_WAKE.equals(action)) {
@@ -99,7 +108,15 @@ public class DupBgService extends Service {
         }
         // Recriado pelo Android, religado pelo vigia ou depois de reiniciar: continua o que estava guardado.
         if (engineAlive()) return START_STICKY;
-        if (!store.auto() || !launch(null)) { finish(null, null); return START_NOT_STICKY; }
+        if (!store.auto()) { finish(null, null); return START_NOT_STICKY; }
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (DupBgService.this) {
+                    if (!engineAlive() && !launch(null)) finish(null, null);
+                }
+            }
+        }, "duplicadas-retomar").start();
         return START_STICKY;
     }
 
@@ -170,7 +187,7 @@ public class DupBgService extends Service {
         switch (phase) {
             case "catalogo": return "Lendo o catálogo";
             case "recentes": return "Olhando as obras novas";
-            case "detalhes": return "Lendo detalhes e sinopses";
+            case "detalhes": return "Lendo sinopses e detalhes";
             case "capas": return "Conferindo capas";
             case "pausa": return "Pausa";
             case "espera": return "Tudo conferido";

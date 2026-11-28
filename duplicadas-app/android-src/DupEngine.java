@@ -95,6 +95,8 @@ final class DupEngine {
 
     // Catálogo.
     private String catalogMode = null;
+    /** Modo da leitura do catálogo que está rodando agora (null = nenhuma). */
+    private volatile String catalogRunning = null;
     private Map<String, Object> progress = new LinkedHashMap<>();
     private Map<String, Object> pagers = new LinkedHashMap<>();
     private Map<String, Object> prevIds = new LinkedHashMap<>();
@@ -157,38 +159,41 @@ final class DupEngine {
             coverThreads = (int) clamp(longOf(plan.get("coverThreads"), coverThreads), 1, 6);
             everyMs = clamp(longOf(plan.get("everyMs"), everyMs), 15 * 60_000L, 7L * 24 * 3600_000L);
             if (plan.containsKey("covers")) coversOn = Json.truthy(plan.get("covers"));
-            if (plan.containsKey("catalog")) catalogMode = Json.str(plan.get("catalog"));
+            // Leitura do catálogo já em andamento com o mesmo modo: segue a dela (o app manda o andamento que já sabia).
+            String newMode = plan.containsKey("catalog") ? Json.str(plan.get("catalog")) : catalogMode;
+            boolean sameRunning = catalogRunning != null && catalogRunning.equals(newMode);
+            if (plan.containsKey("catalog") && !sameRunning) catalogMode = newMode;
             Map<String, Object> p = Json.obj(plan.get("progress"));
-            if (p != null) progress = new LinkedHashMap<>(p);
+            if (p != null && !sameRunning) progress = new LinkedHashMap<>(p);
             Map<String, Object> pg = Json.obj(plan.get("pagers"));
             if (pg != null) pagers = new LinkedHashMap<>(pg);
             Map<String, Object> pv = Json.obj(plan.get("prevIds"));
             if (pv != null) prevIds = new LinkedHashMap<>(pv);
+            // Obras e títulos conhecidos: junta (o motor pode ter achado obras depois que o app juntou os resultados).
             List<Object> k = Json.arr(plan.get("known"));
-            if (k != null) { known.clear(); for (Object o : k) { Long id = Json.whole(o); if (id != null) known.add(id); } }
+            if (k != null) for (Object o : k) { Long id = Json.whole(o); if (id != null) known.add(id); }
             List<Object> c = Json.arr(plan.get("cores"));
-            if (c != null) { cores.clear(); for (Object o : c) { String s = Json.str(o); if (s != null && !s.isEmpty()) cores.add(s); } }
+            if (c != null) for (Object o : c) { String s = Json.str(o); if (s != null && !s.isEmpty()) cores.add(s); }
             List<Object> sk = Json.arr(plan.get("skip"));
             if (sk != null) { skipWords.clear(); for (Object o : sk) { String s = Json.str(o); if (s != null) skipWords.add(s); } }
             Long nr = Json.whole(plan.get("nextRecentAt"));
             if (nr != null) nextRecentAt = nr;
             List<Object> dq = Json.arr(plan.get("detailsQueue"));
             if (dq != null) {
+                // O que já foi feito nesta rodada não volta (o app ainda não tinha juntado).
                 details.clear();
-                detailsDone.clear();
-                for (Object o : dq) { Long id = Json.whole(o); if (id != null) details.add(id); }
+                for (Object o : dq) { Long id = Json.whole(o); if (id != null && !detailsDone.contains(id)) details.add(id); }
                 detailsCount = 0;
                 detailsTotal = details.size();
             }
             List<Object> cq = Json.arr(plan.get("coversQueue"));
             if (cq != null) {
                 covers.clear();
-                coversDone.clear();
                 for (Object o : cq) {
                     List<Object> pair = Json.arr(o);
                     Long id = pair != null && pair.size() >= 2 ? Json.whole(pair.get(0)) : null;
                     String url = pair != null && pair.size() >= 2 ? Json.str(pair.get(1)) : null;
-                    if (id != null && url != null) covers.add(new Object[] { id, url });
+                    if (id != null && url != null && !coversDone.contains(id)) covers.add(new Object[] { id, url });
                 }
                 coversCount = 0;
                 coversTotal = covers.size();
@@ -451,12 +456,14 @@ final class DupEngine {
     /* ---------- catálogo ---------- */
 
     private void runCatalog(String mode) throws Fatal, Stopped, InterruptedException {
+        catalogRunning = mode;
         try {
             if ("full".equals(mode)) readCatalog();
             else readRecent();
         } finally {
             synchronized (lock) {
                 if (mode.equals(catalogMode)) catalogMode = null;
+                catalogRunning = null;
                 queuesDirty = true;
             }
             nextRecentAt = host.now() + everyMs;
@@ -735,7 +742,8 @@ final class DupEngine {
         res.put("i", info);
         host.result(res);
         synchronized (lock) {
-            coversDone.add(id);
+            // Sem resposta: o app conta a tentativa e manda de novo depois.
+            if (!Long.valueOf(0).equals(info.get("s"))) coversDone.add(id);
             coversCount++;
             queuesDirty = true;
         }

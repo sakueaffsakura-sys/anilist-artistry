@@ -37,12 +37,19 @@
           </div>
           <label class="switch"><input id="set-auto" type="checkbox" /><span class="track" aria-hidden="true"></span><span class="sr">Procurar sozinho</span></label>
         </div>
-        <ol id="steps" class="steps" aria-label="Etapas da procura">
-          <li data-s="catalogo"><span>Catálogo</span></li>
-          <li data-s="suspeitas"><span>Suspeitas</span></li>
-          <li data-s="capas"><span>Capas</span></li>
-          <li data-s="detalhes"><span>Detalhes</span></li>
-        </ol>
+        <div class="lanes" aria-label="Andamento">
+          <div class="lane" data-l="cat"><div class="lane-h"><span>Catálogo</span><b id="ln-cat"></b></div><div class="bar"><span></span></div></div>
+          <div class="lane" data-l="det"><div class="lane-h"><span>Detalhes e sinopses</span><b id="ln-det"></b></div><div class="bar"><span></span></div></div>
+          <div class="lane" data-l="cov"><div class="lane-h"><span>Capas</span><b id="ln-cov"></b></div><div class="bar"><span></span></div></div>
+        </div>
+        <p id="bg-line" class="bg-line" hidden><span class="beacon" aria-hidden="true"></span><span id="bg-text"></span></p>
+        <div id="bg-warn" class="bg-warn" hidden>
+          <p id="bg-warn-text"></p>
+          <div class="row tight">
+            <button id="bg-battery" type="button" class="btn small">Liberar bateria</button>
+            <button id="bg-notif" type="button" class="btn ghost small">Permitir avisos</button>
+          </div>
+        </div>
         <div id="run" class="run" hidden>
           <div class="bar"><span id="run-bar"></span></div>
           <p id="run-text" class="run-text" role="status"></p>
@@ -108,6 +115,7 @@
         <button type="button" class="chip" data-f="alta" aria-pressed="false">Alta</button>
         <button type="button" class="chip" data-f="provavel" aria-pressed="false">Provável</button>
         <button type="button" class="chip" data-f="talvez" aria-pressed="false">Talvez</button>
+        <button type="button" class="chip" data-f="apagados" aria-pressed="false">Apagados <span id="f-del-n" class="chip-n"></span></button>
       </div>
       <div class="search-row">
         <input id="g-q" class="search" type="search" placeholder="Título, ID ou link" />
@@ -122,6 +130,7 @@
         <p id="g-meta" class="note grow"></p>
         <button id="g-copy" type="button" class="link">Copiar relatório</button>
       </div>
+      <p id="g-hint" class="note hint">Toque no quadradinho de cada bloco para selecionar vários e copiar ou deletar de uma vez.</p>
       <ol id="g-list" class="groups"></ol>
       <button id="g-more" type="button" class="btn ghost wide" hidden>Mostrar mais</button>
       <p id="g-empty" class="empty" hidden></p>
@@ -182,24 +191,35 @@
 
       <article class="card">
         <h2>Automação</h2>
+        <p class="note bg-only" hidden>A procura roda no celular, num serviço com aviso na barra de notificações: continua com o app fechado e volta sozinha depois de reiniciar o celular.</p>
         <div class="set-line">
           <div><strong>Ler os detalhes de todas as obras aos poucos</strong><span>Nomes alternativos e sinopses acham duplicadas com títulos diferentes (outra língua, nome trocado). Lê um pouco a cada procura até completar.</span></div>
           <label class="switch"><input id="set-deep" type="checkbox" /><span class="track" aria-hidden="true"></span><span class="sr">Ler os detalhes de todas as obras</span></label>
         </div>
-        <label class="field">Detalhes por procura
+        <label class="field js-only">Detalhes por procura
           <input id="set-deep-n" type="number" inputmode="numeric" min="20" max="2000" step="10" />
         </label>
         <div class="set-line">
           <div><strong>Conferir as capas de todas as obras</strong><span>Abre cada capa: acha capa quebrada, vazia ou padrão e a mesma imagem com outro nome de arquivo. Começa pelas suspeitas e confere um pouco a cada procura.</span></div>
           <label class="switch"><input id="set-covers" type="checkbox" /><span class="track" aria-hidden="true"></span><span class="sr">Conferir as capas</span></label>
         </div>
-        <label class="field">Capas por procura
+        <label class="field js-only">Capas por procura
           <input id="set-cover-n" type="number" inputmode="numeric" min="20" max="3000" step="10" />
         </label>
-        <label class="field">Intervalo entre pedidos (segundos)
-          <input id="set-gap" type="number" inputmode="decimal" min="1" max="60" step="0.5" />
+        <div class="two">
+          <label class="field">Começar com (s entre pedidos)
+            <input id="set-gap" type="number" inputmode="decimal" min="0.5" max="60" step="0.5" />
+          </label>
+          <label class="field">Acelerar até (s)
+            <input id="set-min-gap" type="number" inputmode="decimal" min="0.5" max="30" step="0.5" />
+          </label>
+        </div>
+        <label class="field bg-only" hidden>Capas ao mesmo tempo
+          <select id="set-threads">
+            <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option>
+          </select>
         </label>
-        <p class="note">Mais curto lê mais rápido, mas a MediocreScan pode recusar. Se recusar, o app espera e tenta de novo sozinho.</p>
+        <p class="note">O ritmo se ajusta sozinho: depois de muitos acertos fica mais rápido (até o “acelerar até”); se a MediocreScan recusar, fica mais devagar por 24 h, espera e tenta de novo. As capas vêm de outro servidor e são conferidas em paralelo.</p>
       </article>
 
       <article class="card">
@@ -279,6 +299,27 @@
       <span>Ajustes</span>
     </button>
   </nav>
+
+  <div id="selbar" class="selbar" aria-hidden="true">
+    <div class="sel-top">
+      <button id="sel-close" type="button" class="sel-x" aria-label="Cancelar a seleção">✕</button>
+      <span id="sel-n" class="sel-n" role="status"></span>
+      <button id="sel-all" type="button" class="link">Todos</button>
+    </div>
+    <div class="sel-acts">
+      <button id="sel-copy" type="button" class="btn small">Copiar</button>
+      <button id="sel-del" type="button" class="btn small danger-fill">Deletar</button>
+    </div>
+  </div>
+
+  <div id="sheet" class="sheet" hidden>
+    <div id="sheet-back" class="sheet-back"></div>
+    <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <h3 id="sheet-title"></h3>
+      <p id="sheet-text" class="note"></p>
+      <div id="sheet-actions" class="sheet-actions"></div>
+    </div>
+  </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 

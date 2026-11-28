@@ -44,6 +44,28 @@ final class DupBgStore {
         seq = prefs.getLong("seq", 0);
         segFirst = prefs.getLong("segFirst", seq + 1);
         segLines = prefs.getInt("segLines", 0);
+        // O número é guardado de 25 em 25: confere no último pedaço (o processo pode ter sido encerrado no meio).
+        long[] firsts = segments();
+        if (firsts.length > 0) {
+            long last = firsts[firsts.length - 1];
+            String text = read(segment(last));
+            if (text != null) {
+                int lines = 0;
+                long max = 0;
+                for (String line : text.split("\n")) {
+                    Matcher m = SEQ.matcher(line);
+                    if (!m.find()) continue;
+                    lines++;
+                    max = Math.max(max, Long.parseLong(m.group(1)));
+                }
+                if (max >= seq) {
+                    seq = max;
+                    segFirst = last;
+                    segLines = lines;
+                    if (segLines >= SEGMENT_LINES) { segFirst = seq + 1; segLines = 0; }
+                }
+            }
+        }
     }
 
     /* ---------- liga/desliga ---------- */
@@ -89,8 +111,9 @@ final class DupBgStore {
         }
         seq = q;
         segLines++;
-        if (segLines >= SEGMENT_LINES) { segFirst = seq + 1; segLines = 0; }
-        prefs.edit().putLong("seq", seq).putLong("segFirst", segFirst).putInt("segLines", segLines).apply();
+        boolean rotate = segLines >= SEGMENT_LINES;
+        if (rotate) { segFirst = seq + 1; segLines = 0; }
+        if (rotate || seq % 25 == 0) prefs.edit().putLong("seq", seq).putLong("segFirst", segFirst).putInt("segLines", segLines).apply();
     }
 
     /** Resultados depois de `after` (no máximo `max`): {data: "[...]", last, more}. */
